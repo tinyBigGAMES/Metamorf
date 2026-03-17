@@ -3180,8 +3180,7 @@ Apache 2.0 is a permissive open source license that lets you use, modify, and di
 
 **Metamorf™** - Define It. Compile It. Ship It.
 
-Copyright &copy; 2025-present tinyBigGAMES™ LLC
-All Rights Reserved.
+Copyright &copy; 2025-present tinyBigGAMES™ LLC<br/>All Rights Reserved.
 
 </div>
 
