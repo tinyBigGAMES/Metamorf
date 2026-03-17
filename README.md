@@ -101,7 +101,7 @@ Metamorf/repo/
    git clone https://github.com/tinyBigGAMES/Metamorf.git
    ```
 3. Extract the source into the root of the release directory; this places the Delphi source alongside the build tools at their expected relative paths
-4. Open `src\Metamorf.groupproj` in Delphi 12 Athens
+4. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 Athens
 5. Build all projects in the group
 
 > [!IMPORTANT]
