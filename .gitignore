@@ -97,3 +97,5 @@ distro.yml
 /bin/res/libs/raylib/include
 /bin/res/assets/icons
 checkpoint_base.zip
+_delphifmt.cmd
+delphifmt.yml
