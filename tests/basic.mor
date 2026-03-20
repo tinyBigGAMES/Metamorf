@@ -1,0 +1,788 @@
+// ===========================================================================
+//  basic.mor -- BASIC language definition for Metamorf
+//
+//  Defines a structured BASIC dialect (inspired by FreeBASIC/QBasic)
+//  that compiles to C++23 via the Metamorf compiler construction
+//  toolkit. This file demonstrates:
+//
+//    Tokens        Case-insensitive keywords, operators, delimiters,
+//                  comments, strings, and source-level directives
+//                  (@platform, @optimize, @subsystem).
+//
+//    Grammar       Pratt-parser expression rules (arithmetic, comparison,
+//                  logical, call, grouped, mod), statement rules
+//                  (DIM, IF/THEN/ELSE/ELSEIF/END IF, WHILE/WEND,
+//                  FOR/TO/STEP/NEXT, DO/LOOP UNTIL, PRINT, FUNCTION,
+//                  SUB, RETURN, DECLARE), and directive rules.
+//
+//    Semantics     Scope management, symbol declaration for variables
+//                  and routines, and child visitation.
+//
+//    Emitters      Multi-pass codegen: directives first, then function/
+//                  sub declarations, then main(). Output uses std::print/
+//                  std::println (C++23 <print>). C++ passthrough is
+//                  handled automatically by the engine via ConfigCpp.
+//
+//    Helpers       resolveType() maps BASIC types to C++ types.
+//                  emitBlock() walks child nodes for block emission.
+//
+//  C++ PASSTHROUGH -- ALGOL-FAMILY GRAMMAR PATTERN
+//
+//  As an Algol-family language, BASIC uses expr.grouped to handle ( as
+//  simple parenthesized grouping. The engine's WrapGroupedExprForCppCast
+//  wraps this handler at runtime to detect C-style casts like
+//  (long long)expr. Because expr.grouped correctly handles nested parens,
+//  stmt.ident_stmt can use parseExpr(0) and all C++ passthrough
+//  constructs parse naturally. S-expression languages like Scheme
+//  cannot use this pattern -- see scheme.mor.
+//
+//  Test source: hello.bas
+// ===========================================================================
+
+language Basic version "1.0";
+
+tokens {
+  casesensitive = false;
+
+  token keyword.dim       = "dim";
+  token keyword.as        = "as";
+  token keyword.function  = "function";
+  token keyword.sub       = "sub";
+  token keyword.end       = "end";
+  token keyword.if        = "if";
+  token keyword.then      = "then";
+  token keyword.else      = "else";
+  token keyword.elseif    = "elseif";
+  token keyword.while     = "while";
+  token keyword.wend      = "wend";
+  token keyword.for       = "for";
+  token keyword.to        = "to";
+  token keyword.step      = "step";
+  token keyword.next      = "next";
+  token keyword.do        = "do";
+  token keyword.loop      = "loop";
+  token keyword.until     = "until";
+  token keyword.return    = "return";
+  token keyword.and       = "and";
+  token keyword.or        = "or";
+  token keyword.not       = "not";
+  token keyword.mod       = "mod";
+  token keyword.true      = "true";
+  token keyword.false     = "false";
+  token keyword.print     = "print";
+  token keyword.write     = "write";
+  token keyword.include   = "include";
+  token keyword.module    = "module";
+  token keyword.declare   = "declare";
+  token op.eq             = "=";
+  token op.neq            = "<>";
+  token op.lte            = "<=";
+  token op.gte            = ">=";
+  token op.plus           = "+";
+  token op.minus          = "-";
+  token op.star           = "*";
+  token op.slash          = "/";
+  token op.lt             = "<";
+  token op.gt             = ">";
+  token delimiter.lparen    = "(";
+  token delimiter.rparen    = ")";
+  token delimiter.comma     = ",";
+  token delimiter.colon     = ":";
+  token delimiter.semicolon = ";";
+  token delimiter.dot       = ".";
+  token comment.line        = "'";
+  token string.dquote       = "\"";
+  directive_prefix = "@";
+  token directive.platform  = "platform";
+  token directive.optimize  = "optimize";
+  token directive.subsystem = "subsystem";
+}
+
+grammar {
+  // --- Prefix expression rules ---
+  rule expr.ident {
+    consume identifier -> @name;
+  }
+  rule expr.string {
+    consume string.dquote -> @value;
+  }
+  rule expr.bool_true {
+    expect keyword.true;
+  }
+  rule expr.bool_false {
+    expect keyword.false;
+  }
+  // Parenthesized grouping: (expr). Critical for C++ passthrough.
+  // The engine's WrapGroupedExprForCppCast wraps this handler at
+  // runtime to detect C-style casts like (long long)expr; otherwise
+  // it delegates here for normal parenthesized expressions.
+  rule expr.grouped {
+    expect delimiter.lparen;
+    parse expr -> @inner;
+    expect delimiter.rparen;
+  }
+  rule expr.negate {
+    expect op.minus;
+    parse expr -> @operand;
+  }
+  rule expr.not {
+    expect keyword.not;
+    parse expr -> @operand;
+  }
+
+  // --- Infix expression rules ---
+  rule expr.add precedence left 20 {
+    consume [op.plus, op.minus] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.mul precedence left 30 {
+    consume [op.star, op.slash] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.compare precedence left 10 {
+    consume [op.eq, op.neq, op.lt, op.gt, op.lte, op.gte] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.mod precedence left 30 {
+    expect keyword.mod;
+    parse expr -> @right;
+  }
+  rule expr.and precedence left 5 {
+    expect keyword.and;
+    parse expr -> @right;
+  }
+  rule expr.or precedence left 3 {
+    expect keyword.or;
+    parse expr -> @right;
+  }
+  rule expr.call precedence left 80 {
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+  }
+
+  // --- Directive rules ---
+  rule stmt.directive_platform {
+    expect directive.platform;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_optimize {
+    expect directive.optimize;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_subsystem {
+    expect directive.subsystem;
+    consume identifier -> @value;
+  }
+
+  // --- Statement rules ---
+  rule stmt.module {
+    expect keyword.module;
+    consume identifier -> @name;
+  }
+  rule stmt.include {
+    expect keyword.include;
+    consume identifier -> @file_name;
+  }
+  rule stmt.dim {
+    expect keyword.dim;
+    let nd = getResultNode();
+    let v = createNode("stmt.single_var");
+    setAttr(v, "vname", currentText());
+    advance();
+    requireToken("keyword.as");
+    setAttr(v, "vtype", currentText());
+    advance();
+    if matchToken("op.eq") {
+      let init = parseExpr(0);
+      addChild(v, init);
+    }
+    addChild(nd, v);
+  }
+  // Identifier-led statement: assignment or call/expression-statement.
+  // Also handles C++ passthrough (e.g. printf(...)). parseExpr(0)
+  // works here because expr.grouped handles ( as simple grouping,
+  // so C++ casts and nested parens parse correctly.
+  rule stmt.ident_stmt {
+    // In BASIC, = is both assignment and comparison.
+    // At statement level: consume identifier, check for ( or =.
+    let nd = getResultNode();
+    setAttr(nd, "target", currentText());
+    advance();
+    if checkToken("delimiter.lparen") {
+      // Call statement: ident(args)
+      setAttr(nd, "is_assign", "false");
+      advance();
+      if not checkToken("delimiter.rparen") {
+        addChild(nd, parseExpr(0));
+        while matchToken("delimiter.comma") {
+          addChild(nd, parseExpr(0));
+        }
+      }
+      requireToken("delimiter.rparen");
+    } else {
+      // Assignment: ident = expr
+      requireToken("op.eq");
+      setAttr(nd, "is_assign", "true");
+      addChild(nd, parseExpr(0));
+    }
+  }
+  rule stmt.if {
+    expect keyword.if;
+    let nd = getResultNode();
+    addChild(nd, parseExpr(0));
+    requireToken("keyword.then");
+    let body = createNode("stmt.block");
+    while not checkToken("keyword.elseif") and not checkToken("keyword.else") and not checkToken("keyword.end") {
+      addChild(body, parseStmt());
+    }
+    addChild(nd, body);
+    // Parse ELSEIF chains
+    while matchToken("keyword.elseif") {
+      let branch = createNode("stmt.elseif_branch");
+      addChild(branch, parseExpr(0));
+      requireToken("keyword.then");
+      let branchBody = createNode("stmt.block");
+      while not checkToken("keyword.elseif") and not checkToken("keyword.else") and not checkToken("keyword.end") {
+        addChild(branchBody, parseStmt());
+      }
+      addChild(branch, branchBody);
+      addChild(nd, branch);
+    }
+    // Parse optional ELSE
+    if matchToken("keyword.else") {
+      let elseBody = createNode("stmt.block");
+      while not checkToken("keyword.end") {
+        addChild(elseBody, parseStmt());
+      }
+      addChild(nd, elseBody);
+    }
+    requireToken("keyword.end");
+    requireToken("keyword.if");
+  }
+  rule stmt.while {
+    expect keyword.while;
+    parse expr -> @condition;
+    parse many stmt until keyword.wend -> @body;
+    expect keyword.wend;
+  }
+  rule stmt.for {
+    expect keyword.for;
+    consume identifier -> @var;
+    expect op.eq;
+    parse expr -> @start;
+    expect keyword.to;
+    parse expr -> @finish;
+    // Optional STEP
+    let nd = getResultNode();
+    if matchToken("keyword.step") {
+      addChild(nd, parseExpr(0));
+    }
+    parse many stmt until keyword.next -> @body;
+    expect keyword.next;
+  }
+  rule stmt.do_loop {
+    expect keyword.do;
+    parse many stmt until keyword.loop -> @body;
+    expect keyword.loop;
+    expect keyword.until;
+    parse expr -> @condition;
+  }
+  rule stmt.print {
+    expect keyword.print;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+  }
+  rule stmt.write {
+    expect keyword.write;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+  }
+  rule stmt.return {
+    expect keyword.return;
+    let nd = getResultNode();
+    let atEnd = false;
+    if checkToken("keyword.end") { atEnd = true; }
+    if checkToken("keyword.wend") { atEnd = true; }
+    if checkToken("keyword.next") { atEnd = true; }
+    if checkToken("keyword.loop") { atEnd = true; }
+    if checkToken("keyword.else") { atEnd = true; }
+    if checkToken("keyword.elseif") { atEnd = true; }
+    if not atEnd {
+      addChild(nd, parseExpr(0));
+    }
+  }
+  rule stmt.func_decl {
+    expect keyword.function;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("keyword.as");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      matchToken("delimiter.comma");
+      addChild(nd, p);
+    }
+    expect delimiter.rparen;
+    expect keyword.as;
+    consume identifier -> @return_type;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+    requireToken("keyword.function");
+  }
+  rule stmt.sub_decl {
+    expect keyword.sub;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("keyword.as");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      matchToken("delimiter.comma");
+      addChild(nd, p);
+    }
+    expect delimiter.rparen;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+    requireToken("keyword.sub");
+  }
+}
+
+semantics {
+  on program.root {
+    scope "global" {
+      visit children;
+    }
+  }
+  on stmt.func_decl {
+    declare @func_name as routine;
+    scope @func_name {
+      visit children;
+    }
+  }
+  on stmt.sub_decl {
+    declare @func_name as routine;
+    scope @func_name {
+      visit children;
+    }
+  }
+  on stmt.dim {
+    visit children;
+  }
+  on stmt.single_var {
+    declare @vname as variable;
+    visit children;
+  }
+  on stmt.ident_stmt { visit children; }
+  on stmt.if         { visit children; }
+  on stmt.while      { visit children; }
+  on stmt.for        { visit children; }
+  on stmt.do_loop    { visit children; }
+  on stmt.return     { visit children; }
+  on stmt.print      { visit children; }
+  on stmt.write      { visit children; }
+  on stmt.directive_platform  { }
+  on stmt.directive_optimize  { }
+  on stmt.directive_subsystem { }
+  on stmt.module     { }
+  on stmt.include {
+    setModuleExtension("inc");
+    compileModule(getAttr(node, "file_name"));
+  }
+  on expr.call       { visit children; }
+  on expr.ident      { }
+}
+
+emitters {
+  on program.root {
+    emitLine("#include <cstdint>");
+    emitLine("#include <print>");
+    setBuildMode("exe");
+    let isModule = false;
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.module" { isModule = true; }
+      i = i + 1;
+    }
+    // Pass 0: directives, preprocessor, module, include
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.directive_platform" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.directive_optimize" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.directive_subsystem" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.preprocessor" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.module" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.include" { emitNode(ch); }
+      i = i + 1;
+    }
+    // Pass 1: functions and subs
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.func_decl" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.sub_decl" { emitNode(ch); }
+      i = i + 1;
+    }
+    // Pass 1.5: header forward declarations (module mode)
+    if isModule {
+      emitLine("#pragma once", "header");
+      emitLine("#include <cstdint>", "header");
+      i = 0;
+      while i < n {
+        let ch = getChild(node, i);
+        if nodeKind(ch) == "stmt.func_decl" {
+          let sig = resolveType(getAttr(ch, "return_type")) + " " + getAttr(ch, "func_name") + "(";
+          let pi = 0;
+          let pc = childCount(ch) - 1;
+          while pi < pc {
+            let p = getChild(ch, pi);
+            if pi > 0 { sig = sig + ", "; }
+            sig = sig + resolveType(getAttr(p, "param.type_text")) + " " + getAttr(p, "param.name");
+            pi = pi + 1;
+          }
+          sig = sig + ");";
+          emitLine(sig, "header");
+        }
+        if nodeKind(ch) == "stmt.sub_decl" {
+          let sig = "void " + getAttr(ch, "func_name") + "(";
+          let pi = 0;
+          let pc = childCount(ch) - 1;
+          while pi < pc {
+            let p = getChild(ch, pi);
+            if pi > 0 { sig = sig + ", "; }
+            sig = sig + resolveType(getAttr(p, "param.type_text")) + " " + getAttr(p, "param.name");
+            pi = pi + 1;
+          }
+          sig = sig + ");";
+          emitLine(sig, "header");
+        }
+        i = i + 1;
+      }
+    }
+    // Pass 2: main (program mode only)
+    if not isModule {
+      func("main", "int");
+      i = 0;
+      while i < n {
+        let ch = getChild(node, i);
+        if nodeKind(ch) == "stmt.dim" { emitNode(ch); }
+        i = i + 1;
+      }
+      i = 0;
+      while i < n {
+        let ch = getChild(node, i);
+        let k = nodeKind(ch);
+        if k != "stmt.func_decl" and k != "stmt.sub_decl" and k != "stmt.dim" and k != "stmt.module" and k != "stmt.include" and k != "stmt.directive_platform" and k != "stmt.directive_optimize" and k != "stmt.directive_subsystem" and k != "stmt.preprocessor" {
+          emitNode(ch);
+        }
+        i = i + 1;
+      }
+      returnVal("0");
+      endFunc();
+    }
+  }
+
+  on stmt.module {
+    setBuildMode("lib");
+  }
+
+  on stmt.include {
+    let fileName = getAttr(node, "file_name");
+    emitLine("#include \"" + fileName + ".h\"");
+  }
+
+  on stmt.directive_platform {
+    setPlatform(getAttr(node, "value"));
+  }
+  on stmt.directive_optimize {
+    setOptimize(getAttr(node, "value"));
+  }
+  on stmt.directive_subsystem {
+    setSubsystem(getAttr(node, "value"));
+  }
+
+  on stmt.dim {
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let v = getChild(node, i);
+      let ctype = resolveType(getAttr(v, "vtype"));
+      let vname = getAttr(v, "vname");
+      if childCount(v) > 0 {
+        declVar(vname, ctype, exprToString(getChild(v, 0)));
+      } else {
+        declVar(vname, ctype);
+      }
+      i = i + 1;
+    }
+  }
+
+  on stmt.ident_stmt {
+    if getAttr(node, "is_assign") == "true" {
+      let target = getAttr(node, "target");
+      let val = exprToString(getChild(node, 0));
+      assign(target, val);
+    } else {
+      // Call statement
+      let fname = getAttr(node, "target");
+      let args = "";
+      let i = 0;
+      let n = child_count();
+      while i < n {
+        if i > 0 { args = args + ", "; }
+        args = args + exprToString(getChild(node, i));
+        i = i + 1;
+      }
+      stmt(fname + "(" + args + ");");
+    }
+  }
+
+  on stmt.print {
+    let n = child_count();
+    if n == 0 {
+      stmt("std::println(\"\");");
+    } else {
+      let args = "";
+      let i = 0;
+      while i < n {
+        if i > 0 { args = args + ", "; }
+        args = args + exprToString(getChild(node, i));
+        i = i + 1;
+      }
+      stmt("std::println(" + args + ");");
+    }
+  }
+
+  on stmt.write {
+    let args = "";
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      if i > 0 { args = args + ", "; }
+      args = args + exprToString(getChild(node, i));
+      i = i + 1;
+    }
+    stmt("std::print(" + args + ");");
+  }
+
+  on stmt.if {
+    let n = child_count();
+    let cond = exprToString(getChild(node, 0));
+    ifStmt(cond);
+    emitBlock(getChild(node, 1));
+    let i = 2;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.elseif_branch" {
+        let branchCond = exprToString(getChild(ch, 0));
+        elseIfStmt(branchCond);
+        emitBlock(getChild(ch, 1));
+      } else {
+        elseStmt();
+        emitBlock(ch);
+      }
+      i = i + 1;
+    }
+    endIf();
+  }
+
+  on stmt.while {
+    let cond = exprToString(getChild(node, 0));
+    whileStmt(cond);
+    emitBlock(getChild(node, 1));
+    endWhile();
+  }
+
+  on stmt.for {
+    let varName = getAttr(node, "var");
+    let startExpr = exprToString(getChild(node, 0));
+    let finishExpr = exprToString(getChild(node, 1));
+    // Check if STEP was provided (child 2 = step, child 3 = body)
+    // or not (child 2 = body)
+    if child_count() > 3 {
+      let stepExpr = exprToString(getChild(node, 2));
+      forStmt(varName, startExpr, varName + " <= " + finishExpr, varName + " += " + stepExpr);
+      emitBlock(getChild(node, 3));
+    } else {
+      forStmt(varName, startExpr, varName + " <= " + finishExpr, varName + "++");
+      emitBlock(getChild(node, 2));
+    }
+    endFor();
+  }
+
+  on stmt.do_loop {
+    emitLine("do {");
+    indentIn();
+    emitBlock(getChild(node, 0));
+    indentOut();
+    let cond = exprToString(getChild(node, 1));
+    emitLine("} while (!(" + cond + "));");
+  }
+
+  on stmt.return {
+    if child_count() > 0 {
+      returnVal(exprToString(getChild(node, 0)));
+    } else {
+      returnVoid();
+    }
+  }
+
+  on stmt.func_decl {
+    let retType = resolveType(getAttr(node, "return_type"));
+    func(getAttr(node, "func_name"), retType);
+    let i = 0;
+    while i < child_count() - 1 {
+      let p = getChild(node, i);
+      param(getAttr(p, "param.name"), resolveType(getAttr(p, "param.type_text")));
+      i = i + 1;
+    }
+    emitBlock(getChild(node, child_count() - 1));
+    endFunc();
+    blankLine();
+  }
+
+  on stmt.sub_decl {
+    func(getAttr(node, "func_name"), "void");
+    let i = 0;
+    while i < child_count() - 1 {
+      let p = getChild(node, i);
+      param(getAttr(p, "param.name"), resolveType(getAttr(p, "param.type_text")));
+      i = i + 1;
+    }
+    emitBlock(getChild(node, child_count() - 1));
+    endFunc();
+    blankLine();
+  }
+
+  // --- Expression emitters ---
+  on expr.string {
+    emit @value;
+  }
+  on expr.bool_true {
+    emit "true";
+  }
+  on expr.bool_false {
+    emit "false";
+  }
+  on expr.ident {
+    emit @name;
+  }
+  on expr.call {
+    let fname = exprToString(getChild(node, 0));
+    let args = "";
+    let i = 1;
+    while i < child_count() {
+      if i > 1 { args = args + ", "; }
+      args = args + exprToString(getChild(node, i));
+      i = i + 1;
+    }
+    emit fname + "(" + args + ")";
+  }
+  on expr.grouped {
+    emit "(" + exprToString(getChild(node, 0)) + ")";
+  }
+  on expr.negate {
+    emit "-" + exprToString(getChild(node, 0));
+  }
+  on expr.not {
+    emit "!(" + exprToString(getChild(node, 0)) + ")";
+  }
+  on expr.compare {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    let op = getAttr(node, "operator");
+    if op == "=" {
+      emit lhs + " == " + rhs;
+    } else {
+      if op == "<>" {
+        emit lhs + " != " + rhs;
+      } else {
+        emit lhs + " " + op + " " + rhs;
+      }
+    }
+  }
+  on expr.mod {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    emit lhs + " % " + rhs;
+  }
+  on expr.and {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    emit lhs + " && " + rhs;
+  }
+  on expr.or {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    emit lhs + " || " + rhs;
+  }
+}
+
+// ===========================================================================
+// HELPER ROUTINES
+// ===========================================================================
+
+routine resolveType(typeText: string) -> string {
+  let t = lower(typeText);
+  if t == "integer" {
+    return "int64_t";
+  }
+  if t == "long" {
+    return "int64_t";
+  }
+  if t == "string" {
+    return "std::string";
+  }
+  if t == "boolean" {
+    return "bool";
+  }
+  if t == "single" {
+    return "float";
+  }
+  if t == "double" {
+    return "double";
+  }
+  if t == "void" {
+    return "void";
+  }
+  return typeText;
+}
+
+routine emitBlock(blk: node) {
+  let i = 0;
+  while i < child_count(blk) {
+    emitNode(getChild(blk, i));
+    i = i + 1;
+  }
+}

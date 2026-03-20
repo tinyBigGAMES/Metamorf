@@ -1,0 +1,843 @@
+﻿// ===========================================================================
+//  pascal.mor -- Pascal language definition for Metamorf
+//
+//  Defines a structured Pascal dialect that compiles to C++23 via the
+//  Metamorf compiler construction toolkit. This file demonstrates:
+//
+//    Tokens        Keywords, operators, delimiters, comments, strings,
+//                  and source-level directives (@platform, @optimize,
+//                  @subsystem) using the directive_prefix API.
+//
+//    Grammar       Pratt-parser expression rules (arithmetic, comparison,
+//                  logical, call, grouped, div/mod), statement rules
+//                  (program, var, if/then/else, while/do, for/to/downto,
+//                  repeat/until, write/writeln, function, procedure),
+//                  and directive rules for build configuration.
+//
+//    Semantics     Scope management, symbol declaration for variables
+//                  and routines, and child visitation.
+//
+//    Emitters      Multi-pass codegen: directives and preprocessor first,
+//                  then function/procedure declarations, then main().
+//                  Output uses std::print/std::println (C++23 <print>).
+//                  Build mode derived from root keyword (program -> exe).
+//                  C++ passthrough (#include, casts, ::, ->) is handled
+//                  automatically by the engine via ConfigCpp.
+//
+//    Helpers       resolveType() maps Pascal types to C++ types.
+//                  emitBlock() walks child nodes for block emission.
+//
+//  C++ PASSTHROUGH -- ALGOL-FAMILY GRAMMAR PATTERN
+//
+//  As an Algol-family language, Pascal uses expr.grouped to handle ( as
+//  simple parenthesized grouping. The engine's WrapGroupedExprForCppCast
+//  wraps this handler at runtime to detect C-style casts like
+//  (long long)expr. Because expr.grouped correctly handles nested parens,
+//  stmt.ident_stmt can use parseExpr(0) and all C++ passthrough
+//  constructs (function calls, casts, grouped expressions) parse
+//  naturally. S-expression languages like Scheme cannot use this pattern
+//  and instead use collectRaw() for passthrough -- see scheme.mor.
+//
+//  Test source: hello.pas
+// ===========================================================================
+
+language Pascal version "1.0";
+
+tokens {
+  token keyword.program   = "program";
+  token keyword.begin     = "begin";
+  token keyword.end       = "end";
+  token keyword.var       = "var";
+  token keyword.const     = "const";
+  token keyword.function  = "function";
+  token keyword.procedure = "procedure";
+  token keyword.if        = "if";
+  token keyword.then      = "then";
+  token keyword.else      = "else";
+  token keyword.while     = "while";
+  token keyword.do        = "do";
+  token keyword.for       = "for";
+  token keyword.to        = "to";
+  token keyword.downto    = "downto";
+  token keyword.repeat    = "repeat";
+  token keyword.until     = "until";
+  token keyword.writeln   = "writeln";
+  token keyword.not       = "not";
+  token keyword.and       = "and";
+  token keyword.or        = "or";
+  token keyword.div       = "div";
+  token keyword.mod       = "mod";
+  token keyword.true      = "true";
+  token keyword.false     = "false";
+  token keyword.nil       = "nil";
+  token keyword.write     = "write";
+  token keyword.unit      = "unit";
+  token keyword.uses      = "uses";
+  token op.assign         = ":=";
+  token op.neq            = "<>";
+  token op.lte            = "<=";
+  token op.gte            = ">=";
+  token op.plus           = "+";
+  token op.minus          = "-";
+  token op.star           = "*";
+  token op.slash          = "/";
+  token op.eq             = "=";
+  token op.lt             = "<";
+  token op.gt             = ">";
+  token delimiter.lparen    = "(";
+  token delimiter.rparen    = ")";
+  token delimiter.lbracket  = "[";
+  token delimiter.rbracket  = "]";
+  token delimiter.comma     = ",";
+  token delimiter.colon     = ":";
+  token delimiter.semicolon = ";";
+  token delimiter.dot       = ".";
+  token comment.line        = "//";
+  token comment.block_open  = "/*";
+  token comment.block_close = "*/";
+  token string.cstring      = "\"";
+  directive_prefix = "@";
+  token directive.platform  = "platform";
+  token directive.optimize  = "optimize";
+  token directive.subsystem = "subsystem";
+}
+
+grammar {
+  // --- Prefix expression rules ---
+  rule expr.ident {
+    consume identifier -> @name;
+  }
+  rule expr.cstring {
+    consume string.cstring -> @value;
+  }
+  rule expr.bool_true {
+    expect keyword.true;
+  }
+  rule expr.bool_false {
+    expect keyword.false;
+  }
+  rule expr.nil {
+    expect keyword.nil;
+  }
+  // Parenthesized grouping: (expr). This rule is critical for C++
+  // passthrough. The engine's WrapGroupedExprForCppCast wraps this
+  // handler at runtime: if the token after ( is a cpp.keyword.*, it
+  // handles a C-style cast; otherwise it delegates here. Without
+  // this rule, C++ casts like (long long) would fail to parse.
+  rule expr.grouped {
+    expect delimiter.lparen;
+    parse expr -> @inner;
+    expect delimiter.rparen;
+  }
+  rule expr.negate {
+    expect op.minus;
+    parse expr -> @operand;
+  }
+  rule expr.not {
+    expect keyword.not;
+    parse expr -> @operand;
+  }
+
+  // --- Infix expression rules ---
+  rule expr.add precedence left 20 {
+    consume [op.plus, op.minus] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.mul precedence left 30 {
+    consume [op.star, op.slash] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.compare precedence left 10 {
+    consume [op.eq, op.neq, op.lt, op.gt, op.lte, op.gte] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.div_mod precedence left 30 {
+    consume [keyword.div, keyword.mod] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.and precedence left 5 {
+    expect keyword.and;
+    parse expr -> @right;
+  }
+  rule expr.or precedence left 3 {
+    expect keyword.or;
+    parse expr -> @right;
+  }
+  rule expr.call precedence left 80 {
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+  }
+
+  // --- Directive rules ---
+  rule stmt.directive_platform {
+    expect directive.platform;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_optimize {
+    expect directive.optimize;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_subsystem {
+    expect directive.subsystem;
+    consume identifier -> @value;
+  }
+
+  // --- Statement rules ---
+  rule stmt.program {
+    expect keyword.program;
+    consume identifier -> @name;
+    expect delimiter.semicolon;
+  }
+  rule stmt.unit {
+    expect keyword.unit;
+    consume identifier -> @name;
+    expect delimiter.semicolon;
+  }
+  rule stmt.uses {
+    expect keyword.uses;
+    let nd = getResultNode();
+    let u = createNode("stmt.uses_item");
+    setAttr(u, "unit.name", currentText());
+    advance();
+    addChild(nd, u);
+    while matchToken("delimiter.comma") {
+      let u2 = createNode("stmt.uses_item");
+      setAttr(u2, "unit.name", currentText());
+      advance();
+      addChild(nd, u2);
+    }
+    requireToken("delimiter.semicolon");
+  }
+  rule stmt.main_block {
+    expect keyword.begin;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+    matchToken("delimiter.dot");
+  }
+  rule stmt.var_decl {
+    expect keyword.var;
+    let nd = getResultNode();
+    let more = true;
+    while more {
+      // Stop at section-starting keywords
+      if checkToken("keyword.var") { more = false; }
+      if checkToken("keyword.const") { more = false; }
+      if checkToken("keyword.begin") { more = false; }
+      if checkToken("keyword.function") { more = false; }
+      if checkToken("keyword.procedure") { more = false; }
+      if checkToken("keyword.end") { more = false; }
+      if checkToken("keyword.uses") { more = false; }
+      if checkToken("keyword.if") { more = false; }
+      if checkToken("keyword.while") { more = false; }
+      if checkToken("keyword.for") { more = false; }
+      if checkToken("keyword.repeat") { more = false; }
+      if not checkToken("identifier") { more = false; }
+
+      if more {
+        let v = createNode("stmt.single_var");
+        setAttr(v, "vname", currentText());
+        advance();
+        requireToken("delimiter.colon");
+        setAttr(v, "vtype", currentText());
+        advance();
+        if checkToken("op.assign") {
+          advance();
+          let init = parseExpr(0);
+          addChild(v, init);
+        }
+        requireToken("delimiter.semicolon");
+        addChild(nd, v);
+      }
+    }
+  }
+  // Identifier-led statement: assignment (lhs := rhs) or expression-
+  // statement (e.g. a procedure call). Also handles C++ passthrough
+  // lines like printf(...) since they start with a bare identifier.
+  // parseExpr(0) works here because expr.grouped handles ( as simple
+  // parenthesized grouping, so C++ casts and nested parens parse
+  // correctly through the normal expression parser.
+  rule stmt.ident_stmt {
+    let lhs = parseExpr(0);
+    let nd = getResultNode();
+    if checkToken("op.assign") {
+      // Assignment: lhs := rhs;
+      advance();
+      let rhs = parseExpr(0);
+      setAttr(nd, "is_assign", "true");
+      addChild(nd, lhs);
+      addChild(nd, rhs);
+    } else {
+      // Expression-statement: func(...);
+      setAttr(nd, "is_assign", "false");
+      addChild(nd, lhs);
+    }
+    requireToken("delimiter.semicolon");
+  }
+  rule stmt.writeln {
+    expect keyword.writeln;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+  }
+  rule stmt.write {
+    expect keyword.write;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+  }
+  rule stmt.if {
+    expect keyword.if;
+    parse expr -> @condition;
+    expect keyword.then;
+    parse many stmt until [keyword.else, keyword.end] -> @then_body;
+    optional {
+      expect keyword.else;
+      parse many stmt until keyword.end -> @else_body;
+    }
+    expect keyword.end;
+  }
+  rule stmt.while {
+    expect keyword.while;
+    parse expr -> @condition;
+    expect keyword.do;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+  }
+  rule stmt.for {
+    expect keyword.for;
+    consume identifier -> @var;
+    expect op.assign;
+    parse expr -> @start;
+    consume [keyword.to, keyword.downto] -> @dir;
+    parse expr -> @finish;
+    expect keyword.do;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+  }
+  rule stmt.repeat {
+    expect keyword.repeat;
+    parse many stmt until keyword.until -> @body;
+    expect keyword.until;
+    parse expr -> @condition;
+    expect delimiter.semicolon;
+  }
+  rule stmt.func_decl {
+    expect keyword.function;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    // Manual param parsing: name: type, name: type, ...
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("delimiter.colon");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      addChild(nd, p);
+      matchToken("delimiter.comma");
+    }
+    expect delimiter.rparen;
+    expect delimiter.colon;
+    consume identifier -> @return_type;
+    expect delimiter.semicolon;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+  }
+  rule stmt.proc_decl {
+    expect keyword.procedure;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("delimiter.colon");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      addChild(nd, p);
+      matchToken("delimiter.comma");
+    }
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+  }
+}
+
+semantics {
+  on program.root {
+    scope "global" {
+      visit children;
+    }
+  }
+  on stmt.main_block {
+    scope "main" {
+      visit children;
+    }
+  }
+  on stmt.func_decl {
+    declare @func_name as routine;
+    scope @func_name {
+      visit children;
+    }
+  }
+  on stmt.proc_decl {
+    declare @func_name as routine;
+    scope @func_name {
+      visit children;
+    }
+  }
+  on stmt.var_decl {
+    visit children;
+  }
+  on stmt.single_var {
+    declare @vname as variable;
+    visit children;
+  }
+  on stmt.ident_stmt { visit children; }
+  on stmt.if       { visit children; }
+  on stmt.while    { visit children; }
+  on stmt.for      { visit children; }
+  on stmt.repeat   { visit children; }
+  on stmt.writeln  { visit children; }
+  on stmt.write    { visit children; }
+  on stmt.directive_platform  { }
+  on stmt.directive_optimize  { }
+  on stmt.directive_subsystem { }
+  on stmt.unit    { }
+  on stmt.uses {
+    setModuleExtension("pas");
+    visit children;
+  }
+  on stmt.uses_item {
+    compileModule(getAttr(node, "unit.name"));
+  }
+  on expr.call     { visit children; }
+  on expr.ident    { }
+}
+
+emitters {
+  on program.root {
+    // Language-required headers
+    emitLine("#include <cstdint>");
+    emitLine("#include <print>");
+    // Detect unit mode
+    let isUnit = false;
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.unit" {
+        isUnit = true;
+      }
+      i = i + 1;
+    }
+    // Pass 0: directives, preprocessor, program/unit declaration, uses
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.directive_platform" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.directive_optimize" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.directive_subsystem" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.preprocessor" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.program" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.unit" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.uses" {
+        emitNode(ch);
+      }
+      i = i + 1;
+    }
+    // Pass 1: functions and procedures
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.func_decl" {
+        emitNode(ch);
+      }
+      if nodeKind(ch) == "stmt.proc_decl" {
+        emitNode(ch);
+      }
+      i = i + 1;
+    }
+    // Pass 1.5: header forward declarations (unit mode only)
+    if isUnit {
+      emitLine("#pragma once", "header");
+      emitLine("#include <cstdint>", "header");
+      i = 0;
+      while i < n {
+        let ch = getChild(node, i);
+        if nodeKind(ch) == "stmt.func_decl" {
+          let sig = resolveType(getAttr(ch, "return_type")) + " " + getAttr(ch, "func_name") + "(";
+          let pi = 0;
+          let pc = childCount(ch) - 1;
+          while pi < pc {
+            let p = getChild(ch, pi);
+            if pi > 0 {
+              sig = sig + ", ";
+            }
+            sig = sig + resolveType(getAttr(p, "param.type_text")) + " " + getAttr(p, "param.name");
+            pi = pi + 1;
+          }
+          sig = sig + ");";
+          emitLine(sig, "header");
+        }
+        if nodeKind(ch) == "stmt.proc_decl" {
+          let sig = "void " + getAttr(ch, "func_name") + "(";
+          let pi = 0;
+          let pc = childCount(ch) - 1;
+          while pi < pc {
+            let p = getChild(ch, pi);
+            if pi > 0 {
+              sig = sig + ", ";
+            }
+            sig = sig + resolveType(getAttr(p, "param.type_text")) + " " + getAttr(p, "param.name");
+            pi = pi + 1;
+          }
+          sig = sig + ");";
+          emitLine(sig, "header");
+        }
+        i = i + 1;
+      }
+    }
+    // Pass 2: main (program mode only)
+    if not isUnit {
+      func("main", "int");
+      i = 0;
+      while i < n {
+        let ch = getChild(node, i);
+        if nodeKind(ch) == "stmt.var_decl" {
+          emitNode(ch);
+        }
+        i = i + 1;
+      }
+      i = 0;
+      while i < n {
+        let ch = getChild(node, i);
+        if nodeKind(ch) == "stmt.main_block" {
+          emitChildren(ch);
+        }
+        i = i + 1;
+      }
+      returnVal("0");
+      endFunc();
+    }
+  }
+
+  on stmt.program {
+    setBuildMode("exe");
+  }
+
+  on stmt.unit {
+    setBuildMode("lib");
+  }
+
+  on stmt.uses {
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      let uname = getAttr(ch, "unit.name");
+      emitLine("#include \"" + uname + ".h\"");
+      i = i + 1;
+    }
+  }
+
+  on stmt.uses_item {
+    // Compilation handled in semantics; emitter is a no-op
+  }
+
+  on stmt.directive_platform {
+    setPlatform(getAttr(node, "value"));
+  }
+
+  on stmt.directive_optimize {
+    setOptimize(getAttr(node, "value"));
+  }
+
+  on stmt.directive_subsystem {
+    setSubsystem(getAttr(node, "value"));
+  }
+
+  on stmt.main_block {
+    emitChildren(node);
+  }
+
+  on stmt.var_decl {
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let v = getChild(node, i);
+      let ctype = resolveType(getAttr(v, "vtype"));
+      let vname = getAttr(v, "vname");
+      if childCount(v) > 0 {
+        declVar(vname, ctype, exprToString(getChild(v, 0)));
+      } else {
+        declVar(vname, ctype);
+      }
+      i = i + 1;
+    }
+  }
+
+  on stmt.ident_stmt {
+    if getAttr(node, "is_assign") == "true" {
+      // Assignment: child 0 = lhs, child 1 = rhs
+      let target = exprToString(getChild(node, 0));
+      let val = exprToString(getChild(node, 1));
+      assign(target, val);
+    } else {
+      // Expression-statement: child 0 = call expr
+      stmt(exprToString(getChild(node, 0)) + ";");
+    }
+  }
+
+  on stmt.writeln {
+    let n = child_count();
+    if n == 0 {
+      stmt("std::println(\"\");");
+    } else {
+      let args = "";
+      let i = 0;
+      while i < n {
+        if i > 0 {
+          args = args + ", ";
+        }
+        args = args + exprToString(getChild(node, i));
+        i = i + 1;
+      }
+      stmt("std::println(" + args + ");");
+    }
+  }
+
+  on stmt.write {
+    let args = "";
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      if i > 0 {
+        args = args + ", ";
+      }
+      args = args + exprToString(getChild(node, i));
+      i = i + 1;
+    }
+    stmt("std::print(" + args + ");");
+  }
+
+  on stmt.if {
+    let cond = exprToString(getChild(node, 0));
+    ifStmt(cond);
+    emitBlock(getChild(node, 1));
+    if child_count() > 2 {
+      elseStmt();
+      emitBlock(getChild(node, 2));
+    }
+    endIf();
+  }
+
+  on stmt.while {
+    let cond = exprToString(getChild(node, 0));
+    whileStmt(cond);
+    emitBlock(getChild(node, 1));
+    endWhile();
+  }
+
+  on stmt.for {
+    let varName = getAttr(node, "var");
+    let startExpr = exprToString(getChild(node, 0));
+    let finishExpr = exprToString(getChild(node, 1));
+    let dir = getAttr(node, "dir");
+    if dir == "to" {
+      forStmt(varName, startExpr, varName + " <= " + finishExpr, varName + "++");
+    } else {
+      forStmt(varName, startExpr, varName + " >= " + finishExpr, varName + "--");
+    }
+    emitBlock(getChild(node, 2));
+    endFor();
+  }
+
+  on stmt.repeat {
+    emitLine("do {");
+    indentIn();
+    emitBlock(getChild(node, 0));
+    indentOut();
+    let cond = exprToString(getChild(node, 1));
+    emitLine("} while (!(" + cond + "));");
+  }
+
+  on stmt.func_decl {
+    let retType = resolveType(getAttr(node, "return_type"));
+    func(getAttr(node, "func_name"), retType);
+    // Params: children before the body block
+    let i = 0;
+    while i < child_count() - 1 {
+      let p = getChild(node, i);
+      param(getAttr(p, "param.name"), resolveType(getAttr(p, "param.type_text")));
+      i = i + 1;
+    }
+    // Pascal Result variable
+    if retType != "void" {
+      declVar("Result", retType);
+    }
+    emitBlock(getChild(node, child_count() - 1));
+    if retType != "void" {
+      returnVal("Result");
+    }
+    endFunc();
+    blankLine();
+  }
+
+  on stmt.proc_decl {
+    func(getAttr(node, "func_name"), "void");
+    let i = 0;
+    while i < child_count() - 1 {
+      let p = getChild(node, i);
+      param(getAttr(p, "param.name"), resolveType(getAttr(p, "param.type_text")));
+      i = i + 1;
+    }
+    emitBlock(getChild(node, child_count() - 1));
+    endFunc();
+    blankLine();
+  }
+
+  // --- Expression emitters ---
+  on expr.cstring {
+    emit @value;
+  }
+  on expr.bool_true {
+    emit "true";
+  }
+  on expr.bool_false {
+    emit "false";
+  }
+  on expr.nil {
+    emit "nullptr";
+  }
+  on expr.ident {
+    emit @name;
+  }
+  on expr.call {
+    // child 0 = left (function name), children 1+ = args
+    let fname = exprToString(getChild(node, 0));
+    let args = "";
+    let i = 1;
+    while i < child_count() {
+      if i > 1 {
+        args = args + ", ";
+      }
+      args = args + exprToString(getChild(node, i));
+      i = i + 1;
+    }
+    emit fname + "(" + args + ")";
+  }
+  on expr.grouped {
+    emit "(" + exprToString(getChild(node, 0)) + ")";
+  }
+  on expr.negate {
+    emit "-" + exprToString(getChild(node, 0));
+  }
+  on expr.not {
+    emit "!(" + exprToString(getChild(node, 0)) + ")";
+  }
+  on expr.compare {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    let op = getAttr(node, "operator");
+    if op == "=" {
+      emit lhs + " == " + rhs;
+    } else {
+      if op == "<>" {
+        emit lhs + " != " + rhs;
+      } else {
+        emit lhs + " " + op + " " + rhs;
+      }
+    }
+  }
+  on expr.div_mod {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    let op = getAttr(node, "operator");
+    if op == "div" {
+      emit lhs + " / " + rhs;
+    } else {
+      emit lhs + " % " + rhs;
+    }
+  }
+  on expr.and {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    emit lhs + " && " + rhs;
+  }
+  on expr.or {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    emit lhs + " || " + rhs;
+  }
+}
+
+// ===========================================================================
+// HELPER ROUTINES
+// ===========================================================================
+
+routine resolveType(typeText: string) -> string {
+  if typeText == "integer" {
+    return "int64_t";
+  }
+  if typeText == "string" {
+    return "std::string";
+  }
+  if typeText == "boolean" {
+    return "bool";
+  }
+  if typeText == "single" {
+    return "float";
+  }
+  if typeText == "double" {
+    return "double";
+  }
+  if typeText == "void" {
+    return "void";
+  }
+  return typeText;
+}
+
+routine emitBlock(blk: node) {
+  let i = 0;
+  while i < child_count(blk) {
+    emitNode(getChild(blk, i));
+    i = i + 1;
+  }
+}
