@@ -1,0 +1,15 @@
+/* EXPECT: x + y = 42 */
+
+module exe test_exe_variables;
+
+var
+  x: int32;
+  y: int32;
+  sum: int32;
+
+begin
+  x := 10;
+  y := 32;
+  sum := x + y;
+  writeln("x + y = {}", sum);
+end.

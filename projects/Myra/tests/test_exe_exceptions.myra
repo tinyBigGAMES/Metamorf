@@ -1,0 +1,214 @@
+/* EXPECT: === Basic guard/except ===
+Exception caught: code=1, msg=Test error
+=== Guard/finally (no exception) ===
+In guard block
+In finally block
+After guard
+=== Guard/except/finally ===
+In guard block
+In except block: code=1
+In finally block
+=== raiseexceptioncode ===
+Custom code: 42, msg=Custom error
+=== Nested guard ===
+Inner exception caught
+Outer finally
+=== Hardware exception (div by zero) ===
+Hardware exception caught: code=2, msg=Divide by zero
+=== Local variable capture ===
+Before: localVar=100
+Inside guard: localVar=100
+After modify: localVar=200
+After guard: localVar=200
+=== Parameter capture ===
+Param in guard: value=42
+=== Global variable in guard ===
+Global in guard: gValue=999
+=== Routine with guard modifying local ===
+Result: 30
+=== Multiple sequential guard blocks ===
+First guard ok
+Second guard ok
+localA=10, localB=20
+=== Exception propagation ===
+Caught propagated: code=1
+Done */
+
+module exe test_exe_exceptions;
+
+var
+  gValue: int32;
+
+// Helper routine to return zero at runtime (prevents LLVM optimization)
+routine getZero(): int32;
+begin
+  return 0;
+end;
+
+// Test local variable capture in routine
+routine testLocalCapture();
+var
+  localVar: int32;
+begin
+  localVar := 100;
+  writeln("Before: localVar={}", localVar);
+  guard
+    writeln("Inside guard: localVar={}", localVar);
+    localVar := 200;
+    writeln("After modify: localVar={}", localVar);
+  except
+    writeln("Should not reach");
+  end;
+  writeln("After guard: localVar={}", localVar);
+end;
+
+// Test parameter capture
+routine testParamCapture(const AValue: int32);
+begin
+  guard
+    writeln("Param in guard: value={}", AValue);
+  except
+    writeln("Should not reach");
+  end;
+end;
+
+// Test routine with guard that modifies and returns
+routine computeWithGuard(const A: int32; const B: int32): int32;
+var
+  result: int32;
+begin
+  result := 0;
+  guard
+    result := A + B;
+  except
+    result := -1;
+  end;
+  return result;
+end;
+
+// Routine that throws - for propagation test
+routine throwingRoutine();
+begin
+  raiseexception("Propagated error");
+end;
+
+// Test exception propagation
+routine testPropagation();
+begin
+  guard
+    throwingRoutine();
+  except
+    writeln("Caught propagated: code={}", getexceptioncode());
+  end;
+end;
+
+var
+  x: int32;
+  localA: int32;
+  localB: int32;
+
+begin
+  // Test 1: Basic guard/except with raise - test getexceptionmessage
+  writeln("=== Basic guard/except ===");
+  guard
+    raiseexception("Test error");
+    writeln("Should not print");
+  except
+    writeln("Exception caught: code={}, msg={}", getexceptioncode(), getexceptionmessage());
+  end;
+
+  // Test 2: Guard/finally without exception
+  writeln("=== Guard/finally (no exception) ===");
+  guard
+    writeln("In guard block");
+  finally
+    writeln("In finally block");
+  end;
+  writeln("After guard");
+
+  // Test 3: Guard/except/finally
+  writeln("=== Guard/except/finally ===");
+  guard
+    writeln("In guard block");
+    raiseexception("Error!");
+  except
+    writeln("In except block: code={}", getexceptioncode());
+  finally
+    writeln("In finally block");
+  end;
+
+  // Test 4: raiseexceptioncode with custom code and message
+  writeln("=== raiseexceptioncode ===");
+  guard
+    raiseexceptioncode(42, "Custom error");
+  except
+    writeln("Custom code: {}, msg={}", getexceptioncode(), getexceptionmessage());
+  end;
+
+  // Test 5: Nested guard blocks
+  writeln("=== Nested guard ===");
+  guard
+    guard
+      raiseexception("Inner error");
+    except
+      writeln("Inner exception caught");
+    end;
+  finally
+    writeln("Outer finally");
+  end;
+
+  // Test 6: Hardware exception (division by zero) - test message
+  writeln("=== Hardware exception (div by zero) ===");
+  guard
+    x := 10 div getZero();
+    writeln("Should not print: {}", x);
+  except
+    writeln("Hardware exception caught: code={}, msg={}", getexceptioncode(), getexceptionmessage());
+  end;
+
+  // Test 7: Local variable capture in routine
+  writeln("=== Local variable capture ===");
+  testLocalCapture();
+
+  // Test 8: Parameter capture
+  writeln("=== Parameter capture ===");
+  testParamCapture(42);
+
+  // Test 9: Global variable access in guard (main block)
+  writeln("=== Global variable in guard ===");
+  gValue := 999;
+  guard
+    writeln("Global in guard: gValue={}", gValue);
+  except
+    writeln("Should not reach");
+  end;
+
+  // Test 10: Routine with guard that computes result
+  writeln("=== Routine with guard modifying local ===");
+  x := computeWithGuard(10, 20);
+  writeln("Result: {}", x);
+
+  // Test 11: Multiple sequential guard blocks sharing locals
+  writeln("=== Multiple sequential guard blocks ===");
+  localA := 0;
+  localB := 0;
+  guard
+    localA := 10;
+    writeln("First guard ok");
+  except
+    writeln("Should not reach");
+  end;
+  guard
+    localB := 20;
+    writeln("Second guard ok");
+  except
+    writeln("Should not reach");
+  end;
+  writeln("localA={}, localB={}", localA, localB);
+
+  // Test 12: Exception propagation from nested routine
+  writeln("=== Exception propagation ===");
+  testPropagation();
+
+  writeln("Done");
+end.

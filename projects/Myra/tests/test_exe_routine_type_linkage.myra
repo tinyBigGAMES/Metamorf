@@ -1,0 +1,74 @@
+﻿/* EXPECT: === Routine Type Linkage Test ===
+--- C++ Linkage (Default) ---
+TIntFunc callback: 30
+--- C Linkage ---
+TCCallback result: 200
+TEventHandler result: 42
+--- Mixed Usage ---
+All tests passed!
+=== DONE === */
+
+module exe test_exe_routine_type_linkage;
+
+type
+  // C++ linkage routine type (default) - for Myra/C++ callbacks
+  TIntFunc = routine(const a: int32; const b: int32): int32;
+  
+  // C linkage routine types - for C library callbacks
+  TCCallback = routine "C" (const x: int32): int32;
+  TEventHandler = routine "C" (const code: int32; const data: pointer): int32;
+
+var
+  // C++ linkage variables
+  mathOp: TIntFunc;
+  
+  // C linkage variables
+  cCallback: TCCallback;
+  eventHandler: TEventHandler;
+
+// C++ linkage routine (default)
+routine Add(const a: int32; const b: int32): int32;
+begin
+  return a + b;
+end;
+
+// C linkage routines - match the C linkage types
+routine "C" DoubleValue(const x: int32): int32;
+begin
+  return x * 2;
+end;
+
+routine "C" HandleEvent(const code: int32; const data: pointer): int32;
+begin
+  // Just return the code for testing
+  return code;
+end;
+
+begin
+  writeln("=== Routine Type Linkage Test ===");
+  
+  // Test C++ linkage routine type
+  writeln("--- C++ Linkage (Default) ---");
+  mathOp := Add;
+  writeln("TIntFunc callback: {}", mathOp(10, 20));
+  
+  // Test C linkage routine types
+  writeln("--- C Linkage ---");
+  cCallback := DoubleValue;
+  writeln("TCCallback result: {}", cCallback(100));
+  
+  eventHandler := HandleEvent;
+  writeln("TEventHandler result: {}", eventHandler(42, nil));
+  
+  // Test that assignments work correctly
+  writeln("--- Mixed Usage ---");
+  if mathOp(5, 5) = 10 then
+    if cCallback(25) = 50 then
+      if eventHandler(99, nil) = 99 then
+        writeln("All tests passed!");
+      end;
+    end;
+  end;
+  
+  writeln("=== DONE ===");
+end.

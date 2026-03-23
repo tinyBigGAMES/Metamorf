@@ -9,6 +9,12 @@
         <Projects Include="..\projects\delphifmt\DFTestbed.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="..\projects\DelphiCImp\DCITestbed.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="..\projects\Myra\Myra.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -35,14 +41,32 @@
     <Target Name="DFTestbed:Make">
         <MSBuild Projects="..\projects\delphifmt\DFTestbed.dproj" Targets="Make"/>
     </Target>
+    <Target Name="DCITestbed">
+        <MSBuild Projects="..\projects\DelphiCImp\DCITestbed.dproj"/>
+    </Target>
+    <Target Name="DCITestbed:Clean">
+        <MSBuild Projects="..\projects\DelphiCImp\DCITestbed.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="DCITestbed:Make">
+        <MSBuild Projects="..\projects\DelphiCImp\DCITestbed.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Myra">
+        <MSBuild Projects="..\projects\Myra\Myra.dproj"/>
+    </Target>
+    <Target Name="Myra:Clean">
+        <MSBuild Projects="..\projects\Myra\Myra.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Myra:Make">
+        <MSBuild Projects="..\projects\Myra\Myra.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="Metamorf;DFTestbed"/>
+        <CallTarget Targets="Metamorf;DFTestbed;DCITestbed;Myra"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="Metamorf:Clean;DFTestbed:Clean"/>
+        <CallTarget Targets="Metamorf:Clean;DFTestbed:Clean;DCITestbed:Clean;Myra:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="Metamorf:Make;DFTestbed:Make"/>
+        <CallTarget Targets="Metamorf:Make;DFTestbed:Make;DCITestbed:Make;Myra:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

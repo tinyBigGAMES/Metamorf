@@ -1,0 +1,254 @@
+/* EXPECT: Testing records...
+Basic: 10, 20
+Sum: 30
+Types: 1, 1000, 100000, 3.14, true, A
+Packed: 1, 2, 3
+PackedSize: 3
+Align1: 1, 2
+Align2: 3, 4
+Align4: 5, 6
+Align8: 7, 8
+Align16: 9, 10
+Inherit: 100, 200, 300
+Bits: 7, 3, 1
+Union: 42
+UnionFloat: 3.14
+Nested: 5, 10
+Deep: 100
+Rect: 0, 0, 100, 50
+Area: 5000
+AnonUnion: 99
+AnonRecord: 11, 22
+Literal: 77, 88
+Done */
+
+module exe test_exe_records;
+
+type
+  // 1. Basic record
+  Point = record
+    x: int32;
+    y: int32;
+  end;
+
+  // 2. Record with various field types
+  MixedRec = record
+    b: int8;
+    i: int32;
+    l: int64;
+    f: float64;
+    flag: boolean;
+    ch: char;
+  end;
+
+  // 3. Packed record (no padding)
+  PackedRec = record packed
+    a: int8;
+    b: int8;
+    c: int8;
+  end;
+
+  // 4. Alignment variations (1, 2, 4, 8, 16)
+  Align1Rec = record align(1)
+    a: int8;
+    b: int8;
+  end;
+
+  Align2Rec = record align(2)
+    a: int8;
+    b: int8;
+  end;
+
+  Align4Rec = record align(4)
+    a: int8;
+    b: int8;
+  end;
+
+  Align8Rec = record align(8)
+    a: int8;
+    b: int8;
+  end;
+
+  Align16Rec = record align(16)
+    a: int8;
+    b: int8;
+  end;
+
+  // 5. Record inheritance
+  Point3D = record(Point)
+    z: int32;
+  end;
+
+  // 6. Bit fields in packed record
+  BitRec = record packed
+    a: int8 : 3;
+    b: int8 : 2;
+    c: int8 : 1;
+  end;
+
+  // 7. Overlay type (was union)
+  IntOrFloat = overlay
+    i: int32;
+    f: float32;
+  end;
+
+  // 8. Record with anonymous overlay
+  RecWithAnonOverlay = record
+    tag: int32;
+    overlay
+      asInt: int32;
+      asFloat: float32;
+    end;
+  end;
+
+  // 9. Overlay with anonymous record
+  OverlayWithAnonRec = overlay
+    single: int64;
+    record
+      lo: int32;
+      hi: int32;
+    end;
+  end;
+
+  // 10. Record containing another record (nested)
+  Line = record
+    start: Point;
+    finish: Point;
+  end;
+
+  // 11. Deep nesting (3 levels)
+  Box = record
+    corner: Point;
+    depth: int32;
+  end;
+
+  Container = record
+    box: Box;
+    id: int32;
+  end;
+
+  // Rectangle using nested records
+  Rect = record
+    origin: Point;
+    size: Point;
+  end;
+
+var
+  p: Point;
+  sum: int32;
+  m: MixedRec;
+  pk: PackedRec;
+  a1: Align1Rec;
+  a2: Align2Rec;
+  a4: Align4Rec;
+  a8: Align8Rec;
+  a16: Align16Rec;
+  p3d: Point3D;
+  bits: BitRec;
+  u: IntOrFloat;
+  rau: RecWithAnonOverlay;
+  uwar: OverlayWithAnonRec;
+  line: Line;
+  cont: Container;
+  r: Rect;
+  area: int32;
+  litPoint: Point;
+
+begin
+  writeln("Testing records...");
+
+  // 1. Basic record
+  p.x := 10;
+  p.y := 20;
+  writeln("Basic: {}, {}", p.x, p.y);
+  sum := p.x + p.y;
+  writeln("Sum: {}", sum);
+
+  // 2. Various field types
+  m.b := 1;
+  m.i := 1000;
+  m.l := 100000;
+  m.f := 3.14;
+  m.flag := true;
+  m.ch := 'A';
+  writeln("Types: {}, {}, {}, {:.2}, {}, {}", m.b, m.i, m.l, m.f, m.flag, m.ch);
+
+  // 3. Packed record
+  pk.a := 1;
+  pk.b := 2;
+  pk.c := 3;
+  writeln("Packed: {}, {}, {}", pk.a, pk.b, pk.c);
+  writeln("PackedSize: {}", size(PackedRec));
+
+  // 4. All alignment values
+  a1.a := 1;
+  a1.b := 2;
+  writeln("Align1: {}, {}", a1.a, a1.b);
+
+  a2.a := 3;
+  a2.b := 4;
+  writeln("Align2: {}, {}", a2.a, a2.b);
+
+  a4.a := 5;
+  a4.b := 6;
+  writeln("Align4: {}, {}", a4.a, a4.b);
+
+  a8.a := 7;
+  a8.b := 8;
+  writeln("Align8: {}, {}", a8.a, a8.b);
+
+  a16.a := 9;
+  a16.b := 10;
+  writeln("Align16: {}, {}", a16.a, a16.b);
+
+  // 5. Record inheritance
+  p3d.x := 100;
+  p3d.y := 200;
+  p3d.z := 300;
+  writeln("Inherit: {}, {}, {}", p3d.x, p3d.y, p3d.z);
+
+  // 6. Bit fields
+  bits.a := 7;
+  bits.b := 3;
+  bits.c := 1;
+  writeln("Bits: {}, {}, {}", bits.a, bits.b, bits.c);
+
+  // 7. Overlay
+  u.i := 42;
+  writeln("Union: {}", u.i);
+  u.f := 3.14;
+  writeln("UnionFloat: {:.2}", u.f);
+
+  // 8. Nested record
+  line.start.x := 5;
+  line.start.y := 10;
+  writeln("Nested: {}, {}", line.start.x, line.start.y);
+
+  // 9. Deep nesting (3 levels)
+  cont.box.corner.x := 100;
+  writeln("Deep: {}", cont.box.corner.x);
+
+  // 10. Multiple nested fields
+  r.origin.x := 0;
+  r.origin.y := 0;
+  r.size.x := 100;
+  r.size.y := 50;
+  writeln("Rect: {}, {}, {}, {}", r.origin.x, r.origin.y, r.size.x, r.size.y);
+  area := r.size.x * r.size.y;
+  writeln("Area: {}", area);
+
+  // 11. Anonymous overlay in record
+  rau.asInt := 99;
+  writeln("AnonUnion: {}", rau.asInt);
+
+  // 12. Anonymous record in overlay
+  uwar.lo := 11;
+  uwar.hi := 22;
+  writeln("AnonRecord: {}, {}", uwar.lo, uwar.hi);
+
+  // 13. Record literal construction
+  litPoint := Point(77, 88);
+  writeln("Literal: {}, {}", litPoint.x, litPoint.y);
+
+  writeln("Done");
+end.

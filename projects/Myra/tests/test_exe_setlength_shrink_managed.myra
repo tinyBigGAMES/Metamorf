@@ -1,0 +1,103 @@
+/* EXPECT: Test 1: array of string
+Before shrink, len=5
+After shrink, len=2
+arr1[0]=zero
+arr1[1]=one
+Test 2: array of record with string
+Before shrink, len=3
+After shrink, len=1
+arr2[0].Title=first
+arr2[0].Value=100
+Test 3: nested dynamic array
+Before shrink, len=3
+After shrink, len=1
+arr3[0][0]=nested00
+arr3[0][1]=nested01
+Test 4: shrink to zero
+After shrink to 0, len=0
+Test 5: grow after shrink
+After regrow, len=3
+arr1[0]=new0
+arr1[1]=new1
+arr1[2]=new2
+Done
+*/
+
+module exe test_exe_setlength_shrink_managed;
+
+type
+  TRec = record
+    Title: string;
+    Value: int32;
+  end;
+
+var
+  arr1: array of string;
+  arr2: array of TRec;
+  arr3: array of array of string;
+  i: int32;
+begin
+  // Test 1: array of string
+  writeln("Test 1: array of string");
+  setlength(arr1, 5);
+  arr1[0] := "zero";
+  arr1[1] := "one";
+  arr1[2] := "two";
+  arr1[3] := "three";
+  arr1[4] := "four";
+  writeln("Before shrink, len={}", len(arr1));
+  setlength(arr1, 2);
+  writeln("After shrink, len={}", len(arr1));
+  writeln("arr1[0]={}", arr1[0]);
+  writeln("arr1[1]={}", arr1[1]);
+  
+  // Test 2: array of record with string
+  writeln("Test 2: array of record with string");
+  setlength(arr2, 3);
+  arr2[0].Title := "first";
+  arr2[0].Value := 100;
+  arr2[1].Title := "second";
+  arr2[1].Value := 200;
+  arr2[2].Title := "third";
+  arr2[2].Value := 300;
+  writeln("Before shrink, len={}", len(arr2));
+  setlength(arr2, 1);
+  writeln("After shrink, len={}", len(arr2));
+  writeln("arr2[0].Title={}", arr2[0].Title);
+  writeln("arr2[0].Value={}", arr2[0].Value);
+  
+  // Test 3: nested dynamic array
+  writeln("Test 3: nested dynamic array");
+  setlength(arr3, 3);
+  setlength(arr3[0], 2);
+  arr3[0][0] := "nested00";
+  arr3[0][1] := "nested01";
+  setlength(arr3[1], 2);
+  arr3[1][0] := "nested10";
+  arr3[1][1] := "nested11";
+  setlength(arr3[2], 1);
+  arr3[2][0] := "nested20";
+  writeln("Before shrink, len={}", len(arr3));
+  setlength(arr3, 1);
+  writeln("After shrink, len={}", len(arr3));
+  writeln("arr3[0][0]={}", arr3[0][0]);
+  writeln("arr3[0][1]={}", arr3[0][1]);
+  
+  // Test 4: shrink to zero
+  writeln("Test 4: shrink to zero");
+  setlength(arr1, 0);
+  writeln("After shrink to 0, len={}", len(arr1));
+  
+  // Test 5: grow after shrink (verify no corruption)
+  writeln("Test 5: grow after shrink");
+  setlength(arr1, 3);
+  arr1[0] := "new0";
+  arr1[1] := "new1";
+  arr1[2] := "new2";
+  writeln("After regrow, len={}", len(arr1));
+  for i := 0 to len(arr1) - 1 do
+    writeln("arr1[{}]={}", i, arr1[i]);
+  end;
+  
+  writeln("Done");
+end.
