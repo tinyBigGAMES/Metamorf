@@ -1,8 +1,10 @@
 ﻿{===============================================================================
-  DelphiFmt™ - Delphi Source Code Formatter
+  Metamorf™ - Language Engineering Platform
 
-  Copyright © 2026-present tinyBigGAMES™ LLC
+  Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
+
+  https://metamorf.dev
 
   See LICENSE for license information
 ===============================================================================}

@@ -1,4 +1,15 @@
-﻿program Metamorf;
+﻿{===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+===============================================================================}
+
+program Metamorf;
 
 {$APPTYPE CONSOLE}
 
