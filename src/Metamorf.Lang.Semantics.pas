@@ -123,9 +123,8 @@ begin
         ASem.AddSemanticError(ANode, 'M020',
           'Rule must specify a node kind');
 
-      if not ASem.DeclareSymbol('rule:' + LNodeKind, ANode) then
-        ASem.AddSemanticError(ANode, 'M021',
-          Format('Duplicate rule for node kind: ''%s''', [LNodeKind]));
+      // Note: multiple rules may produce the same node kind (e.g. intrinsics)
+      // so we do not reject duplicate node_kind here.
 
       // Visit handler body
       ASem.VisitChildren(ANode);

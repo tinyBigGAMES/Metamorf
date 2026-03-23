@@ -63,8 +63,8 @@ begin
     // ---- Grammar rules ----
     .AddKeyword('rule',        'keyword.rule')
     .AddKeyword('precedence',  'keyword.precedence')
-    .AddKeyword('left',        'keyword.left')
-    .AddKeyword('right',       'keyword.right')
+    //.AddKeyword('left',        'keyword.left')   // context-sensitive, not a global keyword
+    //.AddKeyword('right',       'keyword.right')  // context-sensitive, not a global keyword
     .AddKeyword('expect',      'keyword.expect')
     .AddKeyword('consume',     'keyword.consume')
     .AddKeyword('parse',       'keyword.parse')

@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -1016,7 +1016,7 @@ begin
       Result := TValue.Empty;
     end);
 
-  FBuiltins.Add('include',
+  FBuiltins.Add('emitInclude',
     function(const AArgs: TArray<TValue>): TValue
     begin
       if (Self.FIR <> nil) and (Length(AArgs) >= 1) then

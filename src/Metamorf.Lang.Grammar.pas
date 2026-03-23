@@ -1324,8 +1324,7 @@ begin
           AParser.Expect('delimiter.semicolon');
           LNode.AddChild(LChild);
         end
-        else if (AParser.CurrentToken().Kind = 'identifier') and
-                (AParser.CurrentToken().Text = 'map') then
+        else if AParser.CurrentToken().Kind = 'keyword.map' then
         begin
           // map "type.int32" -> "int32_t";
           LChild := AParser.CreateNode('meta.type_mapping_decl');
