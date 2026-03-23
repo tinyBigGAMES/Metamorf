@@ -82,7 +82,10 @@ begin
       end);
     // — -
     LLangFile := TPath.Combine('..\tests', TPath.ChangeExtension(ALangFile, METAMORF_LANG_EXT));
+    //LLangFile := TPath.ChangeExtension(ALangFile, METAMORF_LANG_EXT).Replace('\', '/');
+
     LSrcFile := TPath.Combine('..\tests', ASrcFile);
+    //LSrcFile := ASrcFile.Replace('\', '/');
 
     if not TFile.Exists(LLangFile) then Exit;
     if not TFile.Exists(LSrcFile) then Exit;
@@ -106,14 +109,15 @@ var
   LNum: Integer;
 begin
   try
-    LNum := 5;
+    LNum := 6;
 
     case LNum of
-      01: TestLang('pascal', 'hello.pas');
-      02: TestLang('lua',    'hello.lua');
-      03: TestLang('basic',  'hello.bas');
-      04: TestLang('scheme', 'hello.scm');
-      05: TestLang('mylang', 'hello.ml');
+      01: TestLang('..\tests\pascal', '..\tests\hello.pas');
+      02: TestLang('..\tests\lua',    '..\tests\hello.lua');
+      03: TestLang('..\tests\basic',  '..\tests\hello.bas');
+      04: TestLang('..\tests\scheme', '..\tests\hello.scm');
+      05: TestLang('..\tests\mylang', '..\tests\hello.ml');
+      06: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_hello.myra');
     end;
 
   except

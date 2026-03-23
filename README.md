@@ -53,6 +53,14 @@ The `.mor` language is itself built using the same `TMetamorf` API it exposes to
 
 See the [Metamorf Manual](docs/Metamorf.md) for the complete guide: architecture, grammar rules, semantic analysis, code emission, type inference, worked examples, and a checklist for building a new language.
 
+## Sub-Projects
+
+Metamorf includes two sub-project libraries built on the core engine:
+
+- **[DelphiFmt](docs/DelphiFmt.md)**: A Delphi source code formatter. Parses `.pas`, `.dpr`, `.dpk`, and `.inc` files into an AST using Metamorf's lexer and parser, then reconstructs the source using over 75 configurable formatting rules covering indentation, spacing, line breaks, capitalization, and alignment.
+
+- **[DelphiCImp](docs/DelphiCImp.md)**: A C header to Delphi import unit generator. Preprocesses C headers via `zig cc`, parses structs, enums, typedefs, and function declarations, then generates complete Delphi units with type mappings, constants, and external function bindings. Supports TOML configuration files for reproducible builds.
+
 ## Getting Started
 
 Metamorf ships as a self-contained release with everything included. No separate toolchain download, no configuration.
