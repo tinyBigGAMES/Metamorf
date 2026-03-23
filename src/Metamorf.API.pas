@@ -290,6 +290,12 @@ type
 
 
     // Pipeline
+
+    // Virtual factory for child compilers. Override in language subclasses
+    // so that CompileModule creates a fully configured child (with its own
+    // TLangConfig and closures) instead of a bare TMetamorf with shared config.
+    function  CreateChild(): TMetamorf; virtual;
+
     function  CompileModule(const AModuleName: string): Boolean;
     function  CompileImportedModules(): Boolean; virtual;
     function  Compile(const ABuild: Boolean = True; const AAutoRun: Boolean = True): Boolean;
@@ -489,6 +495,13 @@ begin
   FConfig.LoadConfig();
 end;
 
+// Virtual factory for child compilers
+
+function TMetamorf.CreateChild(): TMetamorf;
+begin
+  Result := TMetamorf.Create();
+end;
+
 // Virtual hook for language-specific module compilation
 
 function TMetamorf.CompileModule(const AModuleName: string): Boolean;
@@ -541,10 +554,17 @@ begin
     Exit;
   end;
 
-  // Compile the module: codegen only, no build/run
-  LChild := TMetamorf.Create();
+  // Compile the module: codegen only, no build/run.
+  // CreateChild() returns a fully configured compiler (with its own
+  // TLangConfig and closures) so child compilation cannot mutate the parent.
+  LChild := CreateChild();
   try
-    LChild.SetConfig(Self.FConfig);  // shared language definition
+    // Share language config with child so it has the full lexer/parser/emitter
+    // surface. For subclasses like TMyraCompiler, CreateChild() already
+    // populates an identical config; sharing the parent's is equivalent.
+    // For plain TMetamorf (the .mor path), the child would otherwise have
+    // an empty config and fail to lex comments, keywords, etc.
+    LChild.SetConfig(Self.FConfig);
     LChild.SetStatusCallback(FStatusCallback.Callback, FStatusCallback.UserData);
     LChild.SetSourceFile(LModuleFile);
     LChild.SetOutputPath(FOutputPath);

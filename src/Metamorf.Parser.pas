@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -575,6 +575,11 @@ begin
   if IsAtEnd() then
     Exit;
 
+  SkipComments();
+
+  if IsAtEnd() then
+    Exit;
+
   LToken := CurrentToken();
 
   // Look up prefix handler — every expression must start with one
@@ -594,6 +599,9 @@ begin
   // Pratt loop — keep consuming infix operators while binding power allows
   while not IsAtEnd() do
   begin
+    SkipComments();
+    if IsAtEnd() then
+      Break;
     LToken := CurrentToken();
 
     if not FConfig.GetInfixEntry(LToken.Kind, LInfixEntry) then
@@ -620,6 +628,11 @@ var
   LSavedPos:    Integer;
 begin
   Result := nil;
+
+  if IsAtEnd() then
+    Exit;
+
+  SkipComments();
 
   if IsAtEnd() then
     Exit;
