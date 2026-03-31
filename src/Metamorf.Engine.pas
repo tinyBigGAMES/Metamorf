@@ -161,11 +161,16 @@ begin
   // Lex .mor source
   Status(RSMorLexerTokenizing, [LMorDisplay]);
   LMorTokens := FMorLexer.Tokenize(LMorSource, LMorDisplay);
-  if FErrors.HasErrors() then Exit;
+  if FErrors.HasErrors() then
+  begin
+    LMorTokens.Free();
+    Exit;
+  end;
 
   // Parse .mor source
   Status(RSMorParserParsing, [LMorDisplay]);
   LMorAST := FMorParser.Parse(LMorTokens, LMorDisplay);
+  LMorTokens.Free();
   if FErrors.HasErrors() then Exit;
 
   // --- Phase 2: Setup interpreter tables ---
@@ -181,7 +186,6 @@ begin
   FInterp.SetImportMorFunc(ImportMorFile);
   FInterp.RunSetup(LMorAST);
   FInterp.SetImportMorFunc(nil);
-  FreeAndNil(FMorMasterRoot);
   if FErrors.HasErrors() then Exit;
 
   // Register C++ passthrough (AFTER custom lang setup)
@@ -219,6 +223,7 @@ begin
   finally
     LGenParser.Free();
   end;
+  LUserTokens.Free();
   if FErrors.HasErrors() then Exit;
 
   // Assemble master AST: single root, one branch per file
@@ -316,6 +321,7 @@ begin
     LOutput.Free();
     LScopes.Free();
     LMasterRoot.Free();
+    FreeAndNil(FMorMasterRoot);
   end;
 end;
 
@@ -371,6 +377,7 @@ begin
   finally
     LGenParser.Free();
   end;
+  LTokens.Free();
   if FErrors.HasErrors() then Exit(False);
 
   // Attach branch to master root and mark processed
@@ -422,11 +429,16 @@ begin
   // Lex imported .mor file
   Status(RSMorLexerTokenizing, [LDisplay]);
   LTokens := FMorLexer.Tokenize(LSource, LDisplay);
-  if FErrors.HasErrors() then Exit;
+  if FErrors.HasErrors() then
+  begin
+    LTokens.Free();
+    Exit;
+  end;
 
   // Parse imported .mor file
   Status(RSMorParserParsing, [LDisplay]);
   LAST := FMorParser.Parse(LTokens, LDisplay);
+  LTokens.Free();
   if FErrors.HasErrors() then Exit;
 
   // Add to .mor master root for lifetime management

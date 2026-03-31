@@ -170,7 +170,7 @@ begin
   FToken.Line := 0;
   FToken.Col := 0;
   FAttrs := TDictionary<string, string>.Create();
-  FChildren := TObjectList<TASTNode>.Create(False);
+  FChildren := TObjectList<TASTNode>.Create(True);
   FNamedChildren := TDictionary<string, TASTNode>.Create();
 end;
 

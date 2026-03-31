@@ -1,4 +1,10 @@
+@optimize debug
+
+@subsystem console
+
 program Hello2;
+
+@platform win64
 
 uses mathlib;
 
