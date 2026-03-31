@@ -61,7 +61,7 @@ type
 
 
   { TBuild }
-  TBuild = class(TStatusObject)
+  TBuild = class(TErrorsObject)
   private
     FOutputPath: string;
     FProjectName: string;
@@ -76,7 +76,7 @@ type
     FDefines: TStringList;
     FUndefines: TStringList;
     FCopyDLLs: TStringList;
-    FErrors: TErrors;
+    //FErrors: TErrors;
     FOutput: TCallback<TCaptureConsoleCallback>;
     FLastExitCode: DWORD;
     FRawOutput: Boolean;
@@ -117,7 +117,6 @@ type
     procedure SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
     procedure SetTarget(const ATarget: TTargetPlatform);
     procedure SetSubsystem(const ASubsystem: TSubsystemType);
-    procedure SetErrors(const AErrors: TErrors);
     procedure SetOutputCallback(const ACallback: TCaptureConsoleCallback; const AUserData: Pointer = nil);
     procedure SetRawOutput(const AValue: Boolean);
 
@@ -234,7 +233,6 @@ begin
   FDefines := TStringList.Create();
   FUndefines := TStringList.Create();
   FCopyDLLs := TStringList.Create();
-  FErrors := nil;
   FLastExitCode := 0;
   FRawOutput := False;
 
@@ -339,11 +337,6 @@ end;
 function TBuild.GetSubsystem(): TSubsystemType;
 begin
   Result := FSubsystem;
-end;
-
-procedure TBuild.SetErrors(const AErrors: TErrors);
-begin
-  FErrors := AErrors;
 end;
 
 procedure TBuild.SetOutputCallback(const ACallback: TCaptureConsoleCallback; const AUserData: Pointer);
@@ -786,6 +779,7 @@ var
   LFlags: TStringList;
   LI: Integer;
   LEntry: string;
+  LMaxErrors: Integer;
 begin
   LFlags := TStringList.Create();
   try
@@ -817,6 +811,12 @@ begin
       LEntry := FUndefines[LI];
       LFlags.Add('"-U' + LEntry + '"');
     end;
+
+    // Error limit (default to 1)
+    LMaxErrors := 1;
+    if (FErrors <> nil) and (FErrors.GetMaxErrors() > 0) then
+      LMaxErrors := FErrors.GetMaxErrors();
+    LFlags.Add(Format('"-ferror-limit=%d"', [LMaxErrors]));
 
     // Build the result string
     Result := '';
