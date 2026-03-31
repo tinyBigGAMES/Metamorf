@@ -250,6 +250,75 @@ resourcestring
   RSFatalFileReadError = 'Cannot read file ''%s'': %s';
   RSFatalInternalError = 'Internal error: %s';
 
+  //--------------------------------------------------------------------------
+  // .mor Lexer Messages
+  //--------------------------------------------------------------------------
+  RSMorLexerUnexpectedChar       = 'Unexpected character: ''%s''';
+  RSMorLexerUnterminatedString   = 'Unterminated string literal';
+  RSMorLexerUnterminatedComment  = 'Unterminated block comment';
+  RSMorLexerInvalidNumber        = 'Invalid number format: %s';
+  RSMorLexerUnterminatedTriple   = 'Unterminated triple-quoted string';
+
+  //--------------------------------------------------------------------------
+  // .mor Parser Messages
+  //--------------------------------------------------------------------------
+  RSMorParserExpectedToken       = 'Expected %s but found ''%s''';
+  RSMorParserUnexpectedTopLevel  = 'Unexpected top-level token: ''%s''';
+  RSMorParserExpectedIdentifier  = 'Expected identifier but found ''%s''';
+  RSMorParserExpectedLBrace      = 'Expected ''{'' to open block';
+  RSMorParserExpectedRBrace      = 'Expected ''}'' to close block';
+  RSMorParserExpectedSemicolon   = 'Expected '';''';
+  RSMorParserUnexpectedExpr      = 'Unexpected token in expression: ''%s''';
+
+  //--------------------------------------------------------------------------
+  // .mor Interpreter Messages
+  //--------------------------------------------------------------------------
+  RSMorInterpUndefinedVar        = 'Undefined variable: ''%s''';
+  RSMorInterpUndefinedRoutine    = 'Undefined routine: ''%s''';
+  RSMorInterpUnknownBuiltin      = 'Unknown built-in function: ''%s''';
+  RSMorInterpTypeMismatch        = 'Type error: expected %s, got %s';
+  RSMorInterpNilNode             = 'Nil node dereference';
+  RSMorInterpChildOutOfBounds    = 'Child index %d out of bounds (count: %d)';
+  RSMorInterpEmitterCrash        = 'Emitter crash on node ''%s'': %s';
+  RSMorInterpBuiltinCrash        = 'Builtin ''%s'' crash on node ''%s'': %s';
+  RSMorInterpBadIndexType        = 'getChild index has unexpected type: %s (value: %s, node: %s)';
+
+  //--------------------------------------------------------------------------
+  // User Lexer Messages
+  //--------------------------------------------------------------------------
+  RSUserLexerUnexpectedChar      = 'Unexpected character: ''%s''';
+  RSUserLexerUnterminatedString  = 'Unterminated string literal';
+  RSUserLexerUnterminatedComment = 'Unterminated comment';
+
+  //--------------------------------------------------------------------------
+  // User Parser Messages
+  //--------------------------------------------------------------------------
+  RSUserParserExpectedToken      = 'Expected %s but found ''%s''';
+  RSUserParserNoPrefixHandler    = 'Unexpected token in expression: ''%s''';
+
+  //--------------------------------------------------------------------------
+  // User Semantic Messages
+  //--------------------------------------------------------------------------
+  RSUserSemanticUndeclared       = 'Undeclared identifier: ''%s''';
+  RSUserSemanticDuplicate        = 'Duplicate declaration: ''%s''';
+  RSUserSemanticModuleNotFound   = 'Module not found: ''%s''';
+
+  //--------------------------------------------------------------------------
+  // User CodeGen Messages
+  //--------------------------------------------------------------------------
+  RSUserCodeGenEmitterError      = 'Emitter error on node ''%s'': %s';
+
+  //--------------------------------------------------------------------------
+  // .mor Engine Status Messages
+  //--------------------------------------------------------------------------
+  RSMorLexerTokenizing           = 'Tokenizing .mor file: %s...';
+  RSMorParserParsing             = 'Parsing .mor file: %s...';
+  RSMorInterpSetup               = 'Setting up language tables...';
+  RSUserLexerTokenizing          = 'Tokenizing %s...';
+  RSUserParserParsing            = 'Parsing %s...';
+  RSUserSemanticAnalyzing        = 'Analyzing %s...';
+  RSUserCodeGenEmitting          = 'Emitting %s...';
+
 implementation
 
 end.

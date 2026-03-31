@@ -120,6 +120,7 @@ type
     class function  GetFileSHA256(const APath: string): string; static;
     class function  GetRelativePath(const ABasePath, AFullPath: string): string; static;
     class function  NormalizePath(const APath: string): string; static;
+    class function  DisplayPath(const APath: string): string; static;
 
     class function  GetEnv(const AName: string): string; static;
     class procedure SetEnv(const AName: string; const AValue: string); static;
@@ -1830,6 +1831,11 @@ end;
 class function TUtils.NormalizePath(const APath: string): string;
 begin
   Result := APath.Replace(PathDelim, '/');
+end;
+
+class function TUtils.DisplayPath(const APath: string): string;
+begin
+  Result := TPath.GetFullPath(APath).Replace('\', '/');
 end;
 
 class function TUtils.GetEnv(const AName: string): string;

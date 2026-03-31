@@ -119,6 +119,12 @@ grammar {
   rule expr.nil {
     expect keyword.nil;
   }
+  rule expr.integer {
+    consume literal.integer -> @value;
+  }
+  rule expr.float {
+    consume literal.float -> @value;
+  }
   // Parenthesized grouping: (expr). This rule is critical for C++
   // passthrough. The engine's WrapGroupedExprForCppCast wraps this
   // handler at runtime: if the token after ( is a cpp.keyword.*, it
@@ -284,12 +290,7 @@ grammar {
     expect keyword.writeln;
     expect delimiter.lparen;
     let nd = getResultNode();
-    if not checkToken("delimiter.rparen") {
-      addChild(nd, parseExpr(0));
-      while matchToken("delimiter.comma") {
-        addChild(nd, parseExpr(0));
-      }
-    }
+    setAttr(nd, "raw_args", collectUntil("delimiter.rparen"));
     expect delimiter.rparen;
     expect delimiter.semicolon;
   }
@@ -297,12 +298,7 @@ grammar {
     expect keyword.write;
     expect delimiter.lparen;
     let nd = getResultNode();
-    if not checkToken("delimiter.rparen") {
-      addChild(nd, parseExpr(0));
-      while matchToken("delimiter.comma") {
-        addChild(nd, parseExpr(0));
-      }
-    }
+    setAttr(nd, "raw_args", collectUntil("delimiter.rparen"));
     expect delimiter.rparen;
     expect delimiter.semicolon;
   }
@@ -422,8 +418,8 @@ semantics {
   on stmt.while    { visit children; }
   on stmt.for      { visit children; }
   on stmt.repeat   { visit children; }
-  on stmt.writeln  { visit children; }
-  on stmt.write    { visit children; }
+  on stmt.writeln  { }
+  on stmt.write    { }
   on stmt.directive_platform  { }
   on stmt.directive_optimize  { }
   on stmt.directive_subsystem { }
@@ -626,34 +622,16 @@ emitters {
   }
 
   on stmt.writeln {
-    let n = child_count();
-    if n == 0 {
+    let args = getAttr(node, "raw_args");
+    if args == "" {
       stmt("std::println(\"\");");
     } else {
-      let args = "";
-      let i = 0;
-      while i < n {
-        if i > 0 {
-          args = args + ", ";
-        }
-        args = args + exprToString(getChild(node, i));
-        i = i + 1;
-      }
       stmt("std::println(" + args + ");");
     }
   }
 
   on stmt.write {
-    let args = "";
-    let i = 0;
-    let n = child_count();
-    while i < n {
-      if i > 0 {
-        args = args + ", ";
-      }
-      args = args + exprToString(getChild(node, i));
-      i = i + 1;
-    }
+    let args = getAttr(node, "raw_args");
     stmt("std::print(" + args + ");");
   }
 
@@ -735,7 +713,7 @@ emitters {
 
   // --- Expression emitters ---
   on expr.cstring {
-    emit @value;
+    emit "\"" + @value + "\"";
   }
   on expr.bool_true {
     emit "true";
@@ -745,6 +723,12 @@ emitters {
   }
   on expr.nil {
     emit "nullptr";
+  }
+  on expr.integer {
+    emit @value;
+  }
+  on expr.float {
+    emit @value;
   }
   on expr.ident {
     emit @name;
@@ -771,6 +755,18 @@ emitters {
   }
   on expr.not {
     emit "!(" + exprToString(getChild(node, 0)) + ")";
+  }
+  on expr.add {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    let op = getAttr(node, "operator");
+    emit lhs + " " + op + " " + rhs;
+  }
+  on expr.mul {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    let op = getAttr(node, "operator");
+    emit lhs + " " + op + " " + rhs;
   }
   on expr.compare {
     let lhs = exprToString(getChild(node, 0));

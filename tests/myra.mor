@@ -563,28 +563,93 @@ grammar {
   // STATEMENT RULES
   // -----------------------------------------------------------------------
 
-  // Directives: @name [value];
-  // One rule triggered by all directive token kinds
-  rule stmt.directive {
-    consume [directive.exeicon, directive.copydll, directive.linklibrary,
-             directive.librarypath, directive.modulepath, directive.includepath,
-             directive.subsystem, directive.target, directive.optimize,
-             directive.addverinfo, directive.vimajor, directive.viminor,
-             directive.vipatch, directive.viproductname, directive.videscription,
-             directive.vifilename, directive.vicompanyname, directive.vicopyright,
-             directive.breakpoint, directive.message] -> @raw_name;
-    let nd = getResultNode();
-    let dname = getAttr(nd, "raw_name");
-    if starts_with(dname, "@") {
-      dname = replace(dname, "@", "");
-    }
-    setAttr(nd, "directive.name", dname);
-    // Optional value: ident, string, integer, or float
-    if checkToken("identifier") or checkToken("literal.cstring") or checkToken("literal.integer") or checkToken("literal.float") {
-      setAttr(nd, "directive.value", currentText());
-      advance();
-    }
-    requireToken("delimiter.semicolon");
+  // Directives: one rule per directive (expect + consume pattern)
+
+  // Build configuration
+  rule stmt.directive_optimize {
+    expect directive.optimize;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_subsystem {
+    expect directive.subsystem;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_target {
+    expect directive.target;
+    consume identifier -> @value;
+  }
+
+  // Version info
+  rule stmt.directive_addverinfo {
+    expect directive.addverinfo;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_vimajor {
+    expect directive.vimajor;
+    consume literal.integer -> @value;
+  }
+  rule stmt.directive_viminor {
+    expect directive.viminor;
+    consume literal.integer -> @value;
+  }
+  rule stmt.directive_vipatch {
+    expect directive.vipatch;
+    consume literal.integer -> @value;
+  }
+  rule stmt.directive_viproductname {
+    expect directive.viproductname;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_videscription {
+    expect directive.videscription;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_vifilename {
+    expect directive.vifilename;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_vicompanyname {
+    expect directive.vicompanyname;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_vicopyright {
+    expect directive.vicopyright;
+    consume literal.cstring -> @value;
+  }
+
+  // Resource and path
+  rule stmt.directive_exeicon {
+    expect directive.exeicon;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_copydll {
+    expect directive.copydll;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_linklibrary {
+    expect directive.linklibrary;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_librarypath {
+    expect directive.librarypath;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_modulepath {
+    expect directive.modulepath;
+    consume literal.cstring -> @value;
+  }
+  rule stmt.directive_includepath {
+    expect directive.includepath;
+    consume literal.cstring -> @value;
+  }
+
+  // Debug and diagnostic
+  rule stmt.directive_breakpoint {
+    expect directive.breakpoint;
+  }
+  rule stmt.directive_message {
+    expect directive.message;
+    consume literal.cstring -> @value;
   }
 
   // Module: module kind name; [directives] [imports] {decls} [begin body end] end.
@@ -600,7 +665,7 @@ grammar {
     requireToken("delimiter.semicolon");
 
     // Optional directives (any directive.* token)
-    while isDirectiveToken() {
+    while starts_with(currentKind(), "directive.") {
       addChild(nd, parseStmt());
     }
 
@@ -1272,48 +1337,27 @@ semantics {
 
   on stmt.import_clause { visit children; }
 
-  // Directives: build configuration
-  on stmt.directive {
-    let dname = getAttr(node, "directive.name");
-    let dval = getAttr(node, "directive.value");
-
-    if dname == "optimize" {
-      setOptimize(dval);
-    } else if dname == "addverinfo" {
-      setAddVerInfo(dval);
-    } else if dname == "vimajor" {
-      setVersionMajor(dval);
-    } else if dname == "viminor" {
-      setVersionMinor(dval);
-    } else if dname == "vipatch" {
-      setVersionPatch(dval);
-    } else if dname == "viproductname" {
-      setProductName(dval);
-    } else if dname == "videscription" {
-      setDescription(dval);
-    } else if dname == "vifilename" {
-      setFilename(dval);
-    } else if dname == "vicompanyname" {
-      setCompanyName(dval);
-    } else if dname == "vicopyright" {
-      setCopyright(dval);
-    } else if dname == "exeicon" {
-      setExeIcon(dval);
-    } else if dname == "includepath" or dname == "modulepath" {
-      addIncludePath(dval);
-    } else if dname == "librarypath" {
-      addLibraryPath(dval);
-    } else if dname == "linklibrary" {
-      addLinkLibrary(dval);
-    } else if dname == "copydll" {
-      addCopyDLL(dval);
-    } else if dname == "subsystem" {
-      setSubsystem(dval);
-    } else if dname == "target" {
-      setPlatform(dval);
-    }
-    // breakpoint, message: no-op at semantic level
-  }
+  // Directive semantics (no-op; configuration wired in emitters)
+  on stmt.directive_optimize    { }
+  on stmt.directive_subsystem   { }
+  on stmt.directive_target      { }
+  on stmt.directive_addverinfo  { }
+  on stmt.directive_vimajor     { }
+  on stmt.directive_viminor     { }
+  on stmt.directive_vipatch     { }
+  on stmt.directive_viproductname { }
+  on stmt.directive_videscription { }
+  on stmt.directive_vifilename  { }
+  on stmt.directive_vicompanyname { }
+  on stmt.directive_vicopyright { }
+  on stmt.directive_exeicon     { }
+  on stmt.directive_copydll     { }
+  on stmt.directive_linklibrary { }
+  on stmt.directive_librarypath { }
+  on stmt.directive_modulepath  { }
+  on stmt.directive_includepath { }
+  on stmt.directive_breakpoint  { }
+  on stmt.directive_message     { }
 
   // Declaration semantics
   on stmt.var_block  { visit children; }
@@ -1690,7 +1734,27 @@ emitters {
   // STATEMENT EMITTERS
   // -----------------------------------------------------------------------
 
-  on stmt.directive { }
+  // Directive emitters: wire to pipeline builtins
+  on stmt.directive_optimize    { setOptimize(getAttr(node, "value")); }
+  on stmt.directive_subsystem   { setSubsystem(getAttr(node, "value")); }
+  on stmt.directive_target      { setPlatform(getAttr(node, "value")); }
+  on stmt.directive_addverinfo  { setAddVerInfo(getAttr(node, "value")); }
+  on stmt.directive_vimajor     { setVersionMajor(getAttr(node, "value")); }
+  on stmt.directive_viminor     { setVersionMinor(getAttr(node, "value")); }
+  on stmt.directive_vipatch     { setVersionPatch(getAttr(node, "value")); }
+  on stmt.directive_viproductname { setProductName(getAttr(node, "value")); }
+  on stmt.directive_videscription { setDescription(getAttr(node, "value")); }
+  on stmt.directive_vifilename  { setFilename(getAttr(node, "value")); }
+  on stmt.directive_vicompanyname { setCompanyName(getAttr(node, "value")); }
+  on stmt.directive_vicopyright { setCopyright(getAttr(node, "value")); }
+  on stmt.directive_exeicon     { setExeIcon(getAttr(node, "value")); }
+  on stmt.directive_copydll     { addCopyDLL(getAttr(node, "value")); }
+  on stmt.directive_linklibrary { addLinkLibrary(getAttr(node, "value")); }
+  on stmt.directive_librarypath { addLibraryPath(getAttr(node, "value")); }
+  on stmt.directive_modulepath  { addIncludePath(getAttr(node, "value")); }
+  on stmt.directive_includepath { addIncludePath(getAttr(node, "value")); }
+  on stmt.directive_breakpoint  { }
+  on stmt.directive_message     { }
 
   on stmt.begin_block  { emitChildren(node); }
   on stmt.then_branch  { emitChildren(node); }

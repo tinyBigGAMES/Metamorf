@@ -12,8 +12,11 @@
 // nested expressions — all compiling to C++23 via std::print/println.
 // ---------------------------------------------------------------------------
 
-@platform win64
+//@platform win64 | linux64
+//@platform linux64
+
 @optimize debug
+
 @subsystem console
 
 program Hello;

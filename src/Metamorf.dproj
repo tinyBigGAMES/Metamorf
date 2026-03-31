@@ -106,31 +106,23 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="Metamorf.API.pas"/>
         <DCCReference Include="Metamorf.Build.pas"/>
-        <DCCReference Include="Metamorf.CodeGen.pas"/>
-        <DCCReference Include="Metamorf.Common.pas"/>
         <DCCReference Include="Metamorf.Config.pas"/>
-        <DCCReference Include="Metamorf.Cpp.CodeGen.pas"/>
-        <DCCReference Include="Metamorf.Cpp.Grammar.pas"/>
-        <DCCReference Include="Metamorf.Cpp.Lexer.pas"/>
-        <DCCReference Include="Metamorf.Cpp.pas"/>
-        <DCCReference Include="Metamorf.IR.pas"/>
-        <DCCReference Include="Metamorf.Lang.CLI.pas"/>
-        <DCCReference Include="Metamorf.Lang.CodeGen.pas"/>
-        <DCCReference Include="Metamorf.Lang.Common.pas"/>
-        <DCCReference Include="Metamorf.Lang.Grammar.pas"/>
-        <DCCReference Include="Metamorf.Lang.Interp.pas"/>
-        <DCCReference Include="Metamorf.Lang.Lexer.pas"/>
-        <DCCReference Include="Metamorf.Lang.pas"/>
-        <DCCReference Include="Metamorf.Lang.Semantics.pas"/>
-        <DCCReference Include="Metamorf.LangConfig.pas"/>
-        <DCCReference Include="Metamorf.Lexer.pas"/>
-        <DCCReference Include="Metamorf.Parser.pas"/>
         <DCCReference Include="Metamorf.Resources.pas"/>
-        <DCCReference Include="Metamorf.Semantics.pas"/>
         <DCCReference Include="Metamorf.TOML.pas"/>
         <DCCReference Include="Metamorf.Utils.pas"/>
+        <DCCReference Include="Metamorf.AST.pas"/>
+        <DCCReference Include="Metamorf.Common.pas"/>
+        <DCCReference Include="Metamorf.Cpp.pas"/>
+        <DCCReference Include="Metamorf.Engine.pas"/>
+        <DCCReference Include="Metamorf.Environment.pas"/>
+        <DCCReference Include="Metamorf.GenericLexer.pas"/>
+        <DCCReference Include="Metamorf.GenericParser.pas"/>
+        <DCCReference Include="Metamorf.Interpreter.pas"/>
+        <DCCReference Include="Metamorf.Lexer.pas"/>
+        <DCCReference Include="Metamorf.CodeGen.pas"/>
+        <DCCReference Include="Metamorf.Parser.pas"/>
+        <DCCReference Include="Metamorf.Scopes.pas"/>
         <DCCReference Include="UMetamorf.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

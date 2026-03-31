@@ -100,3 +100,4 @@ checkpoint_base.zip
 _delphifmt.cmd
 delphifmt.yml
 bin/res/libs/raylib/imports/raylib_pp.c
+_checkpoint_base.cmd

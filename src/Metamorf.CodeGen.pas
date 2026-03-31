@@ -21,329 +21,775 @@ uses
   System.IOUtils,
   System.Generics.Collections,
   Metamorf.Utils,
-  Metamorf.Resources,
-  Metamorf.Common,
-  Metamorf.LangConfig,
-  Metamorf.IR;
+  Metamorf.AST;
 
 type
 
-  { TCodeGen }
-  TCodeGen = class(TCodeGenBase)
+  { TOutputTarget }
+  TOutputTarget = (otHeader, otSource);
+
+  { TEmitNodeProc - callback to interpreter for node dispatch }
+  TEmitNodeProc = procedure(const ANode: TASTNode) of object;
+
+  { TCodeOutput }
+  TCodeOutput = class(TBaseObject)
   private
-    // Keyed by unit name — each entry is an owned TIR with its own
-    // header + source buffers. Single-unit mode uses the key 'default'.
-    FUnits:     TObjectDictionary<string, TIR>;
-
-    // Preserves the order in which units were emitted. SaveAllFiles()
-    // writes them in this order so dependencies appear before dependents.
-    FUnitOrder: TStringList;
-
-    // Points to whichever TIR is currently being written to.
-    // Set by GenerateUnit() before walking the AST. Not owned separately.
-    FCurrentIR: TIR;
-
-    // Language config — not owned. Passed through to each TIR.
-    FConfig:    TLangConfig;
-
-    // Mirrors the line directive setting — applied to each TIR in AcquireIR().
+    FHeaderBuffer: TStringBuilder;
+    FSourceBuffer: TStringBuilder;
+    FIndentLevel: Integer;
+    FInFuncSignature: Boolean;
+    FContext: TDictionary<string, string>;
     FLineDirectives: Boolean;
+    FLastLineFile: string;
+    FLastLineNum: Integer;
+    FCaptureStack: TList<TStringBuilder>;
+    FEmitNodeCallback: TEmitNodeProc;
 
-    // Creates a new TIR for AUnitName, wires errors + config,
-    // registers it in FUnits + FUnitOrder, and sets FCurrentIR.
-    // Returns the new IR instance.
-    function AcquireIR(const AUnitName: string): TIR;
+    function GetBuffer(const ATarget: TOutputTarget): TStringBuilder;
+    function GetActiveBuffer(): TStringBuilder;
+    function GetIndent(): string;
+    procedure CloseFuncSignature();
 
   public
     constructor Create(); override;
     destructor Destroy(); override;
 
-    // Configuration — must be set before Generate() / GenerateUnit()
-    procedure SetConfig(const AConfig: TLangConfig);
+    // Capture mode for exprToString
+    procedure BeginCapture();
+    function EndCapture(): string;
 
-    // Enable or disable #line directive emission. Applied to each TIR
-    // instance created by AcquireIR().
+    // Delegation to interpreter for node dispatch
+    procedure SetEmitNodeCallback(const ACallback: TEmitNodeProc);
+    procedure EmitNode(const ANode: TASTNode);
+    procedure EmitChildren(const ANode: TASTNode);
+
+    // Line directives
     procedure SetLineDirectives(const AEnabled: Boolean);
 
-    // ---- Single-unit path ----
+    // Low-level output
+    procedure EmitLine(const AText: string; const ATarget: TOutputTarget = otSource); overload;
+    procedure EmitLine(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget = otSource); overload;
+    procedure Emit(const AText: string; const ATarget: TOutputTarget = otSource); overload;
+    procedure Emit(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget = otSource); overload;
+    procedure EmitRaw(const AText: string; const ATarget: TOutputTarget = otSource); overload;
+    procedure EmitRaw(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget = otSource); overload;
 
-    // TCodeGenBase override. Creates IR under 'default', walks tree.
-    // Equivalent to GenerateUnit('default', ARoot).
-    function Generate(const ARoot: TASTNodeBase): Boolean; override;
+    // Indentation
+    procedure IndentIn();
+    procedure IndentOut();
 
-    // Single-unit output convenience — reads the 'default' IR
-    procedure SaveToFiles(const AHeaderPath, ASourcePath: string);
+    // Top-level declarations
+    procedure IncludeHeader(const AHeaderName: string; const ATarget: TOutputTarget = otHeader);
+    procedure StructBegin(const AStructName: string; const ATarget: TOutputTarget = otHeader);
+    procedure AddField(const AFieldName: string; const AFieldType: string);
+    procedure StructEnd();
+    procedure DeclConst(const AConstName: string; const AConstType: string; const AValueExpr: string; const ATarget: TOutputTarget = otHeader);
+    procedure GlobalVar(const AGlobalName: string; const AGlobalType: string; const AInitExpr: string; const ATarget: TOutputTarget = otSource);
+    procedure UsingDecl(const AAlias: string; const AOriginal: string; const ATarget: TOutputTarget = otHeader);
+    procedure NamespaceBegin(const ANamespaceName: string; const ATarget: TOutputTarget = otHeader);
+    procedure NamespaceEnd(const ATarget: TOutputTarget = otHeader);
+    procedure ExternCDecl(const AFuncName: string; const AReturnType: string; const AParams: string; const ATarget: TOutputTarget = otHeader);
+
+    // Function builder
+    procedure Func(const AFuncName: string; const AReturnType: string);
+    procedure Param(const AParamName: string; const AParamType: string);
+    procedure EndFunc();
+
+    // Statement methods
+    procedure DeclVar(const AVarName: string; const AVarType: string); overload;
+    procedure DeclVar(const AVarName: string; const AVarType: string; const AInitExpr: string); overload;
+    procedure Assign(const ALhs: string; const AExpr: string);
+    procedure AssignTo(const ATargetExpr: string; const AValueExpr: string);
+    procedure CallStmt(const AFuncName: string; const AArgs: string);
+    procedure Stmt(const ARawText: string); overload;
+    procedure Stmt(const ARawText: string; const AArgs: array of const); overload;
+    procedure ReturnStmt(); overload;
+    procedure ReturnStmt(const AExpr: string); overload;
+    procedure IfStmt(const ACondExpr: string);
+    procedure ElseIfStmt(const ACondExpr: string);
+    procedure ElseStmt();
+    procedure EndIf();
+    procedure WhileStmt(const ACondExpr: string);
+    procedure EndWhile();
+    procedure ForStmt(const AVarName: string; const AInitExpr: string; const ACondExpr: string; const AStepExpr: string);
+    procedure EndFor();
+    procedure BreakStmt();
+    procedure ContinueStmt();
+    procedure BlankLine(const ATarget: TOutputTarget = otSource);
+
+    // Expression builders (return C++ text fragments)
+    function Lit(const AValue: Integer): string; overload;
+    function Lit(const AValue: Int64): string; overload;
+    function FloatLit(const AValue: Double): string;
+    function StrLit(const AValue: string): string;
+    function BoolLit(const AValue: Boolean): string;
+    function NullLit(): string;
+    function Get(const AVarName: string): string;
+    function Field(const AObj: string; const AMember: string): string;
+    function Deref(const APtr: string; const AMember: string): string; overload;
+    function Deref(const APtr: string): string; overload;
+    function AddrOf(const AVarName: string): string;
+    function IndexExpr(const AArr: string; const AIndexExpr: string): string;
+    function CastExpr(const ATypeName: string; const AExpr: string): string;
+    function Invoke(const AFuncName: string; const AArgs: string): string;
+    function Add(const ALeft: string; const ARight: string): string;
+    function Sub(const ALeft: string; const ARight: string): string;
+    function Mul(const ALeft: string; const ARight: string): string;
+    function DivExpr(const ALeft: string; const ARight: string): string;
+    function ModExpr(const ALeft: string; const ARight: string): string;
+    function Neg(const AExpr: string): string;
+
+    // Comparison
+    function Eq(const ALeft: string; const ARight: string): string;
+    function Ne(const ALeft: string; const ARight: string): string;
+    function Lt(const ALeft: string; const ARight: string): string;
+    function Le(const ALeft: string; const ARight: string): string;
+    function Gt(const ALeft: string; const ARight: string): string;
+    function Ge(const ALeft: string; const ARight: string): string;
+
+    // Logical
+    function AndExpr(const ALeft: string; const ARight: string): string;
+    function OrExpr(const ALeft: string; const ARight: string): string;
+    function NotExpr(const AExpr: string): string;
+
+    // Bitwise
+    function BitAnd(const ALeft: string; const ARight: string): string;
+    function BitOr(const ALeft: string; const ARight: string): string;
+    function BitXor(const ALeft: string; const ARight: string): string;
+    function BitNot(const AExpr: string): string;
+    function ShlExpr(const ALeft: string; const ARight: string): string;
+    function ShrExpr(const ALeft: string; const ARight: string): string;
+
+    // Output
+    procedure SaveToFiles(const AHeaderPath: string; const ASourcePath: string);
     function GetHeaderContent(): string;
     function GetSourceContent(): string;
 
-    // ---- Multi-unit path ----
+    // Context store
+    procedure SetContext(const AKey: string; const AValue: string);
+    function GetContext(const AKey: string; const ADefault: string = ''): string;
 
-    // Process one unit's AST. Call once per unit in dependency order.
-    // If AUnitName was already emitted, the call is silently skipped
-    // (returns True). Returns False on error.
-    function GenerateUnit(const AUnitName: string;
-      const ARoot: TASTNodeBase): Boolean;
-
-    // Write every unit's .h + .cpp pair into AOutputDir.
-    // Files are named AUnitName.h and AUnitName.cpp.
-    // Written in dependency order (the order GenerateUnit was called).
-    procedure SaveAllFiles(const AOutputDir: string);
-
-    // ---- Access ----
-
-    // Returns the IR for a given unit name, or nil if not found
-    function GetIR(const AUnitName: string): TIR;
-
-    // Returns the IR currently being written to (set by GenerateUnit)
-    function GetCurrentIR(): TIR;
-
-    // Number of units emitted so far
-    function GetUnitCount(): Integer;
-
-    // Unit name by emission order index (0-based)
-    function GetUnitNameByIndex(const AIndex: Integer): string;
-
-    // True if a unit with this name has already been emitted
-    function HasUnit(const AUnitName: string): Boolean;
-
-    // Debug
-    function Dump(const AId: Integer = 0): string; override;
+    // Clear buffers
+    procedure Clear();
   end;
 
 implementation
 
-const
-  // Default unit name for the single-unit Generate() path
-  DEFAULT_UNIT_NAME = 'default';
+{ TCodeOutput }
 
-{ TCodeGen }
-
-constructor TCodeGen.Create();
+constructor TCodeOutput.Create();
 begin
   inherited;
-  FUnits     := TObjectDictionary<string, TIR>.Create([doOwnsValues]);
-  FUnitOrder := TStringList.Create();
-  FCurrentIR      := nil;
-  FConfig         := nil;
+  FHeaderBuffer := TStringBuilder.Create();
+  FSourceBuffer := TStringBuilder.Create();
+  FIndentLevel := 0;
+  FInFuncSignature := False;
+  FContext := TDictionary<string, string>.Create();
   FLineDirectives := False;
+  FLastLineFile := '';
+  FLastLineNum := 0;
+  FCaptureStack := TList<TStringBuilder>.Create();
+  FEmitNodeCallback := nil;
 end;
 
-destructor TCodeGen.Destroy();
+destructor TCodeOutput.Destroy();
+var
+  LI: Integer;
 begin
-  FCurrentIR := nil;
-  FConfig    := nil;
-  FreeAndNil(FUnitOrder);
-  FreeAndNil(FUnits);
+  for LI := 0 to FCaptureStack.Count - 1 do
+    FCaptureStack[LI].Free();
+  FreeAndNil(FCaptureStack);
+  FreeAndNil(FContext);
+  FreeAndNil(FSourceBuffer);
+  FreeAndNil(FHeaderBuffer);
   inherited;
 end;
 
-procedure TCodeGen.SetConfig(const AConfig: TLangConfig);
+function TCodeOutput.GetBuffer(const ATarget: TOutputTarget): TStringBuilder;
 begin
-  FConfig := AConfig;
+  // If capturing, redirect ALL output to capture buffer
+  if FCaptureStack.Count > 0 then
+    Exit(FCaptureStack[FCaptureStack.Count - 1]);
+  if ATarget = otHeader then
+    Result := FHeaderBuffer
+  else
+    Result := FSourceBuffer;
 end;
 
-procedure TCodeGen.SetLineDirectives(const AEnabled: Boolean);
+function TCodeOutput.GetActiveBuffer(): TStringBuilder;
+begin
+  Result := GetBuffer(otSource);
+end;
+
+function TCodeOutput.GetIndent(): string;
+begin
+  Result := StringOfChar(' ', FIndentLevel * 2);
+end;
+
+procedure TCodeOutput.CloseFuncSignature();
+begin
+  if FInFuncSignature then
+  begin
+    FInFuncSignature := False;
+    GetBuffer(otSource).AppendLine(') {');
+    IndentIn();
+  end;
+end;
+
+{ Capture mode }
+
+procedure TCodeOutput.BeginCapture();
+begin
+  FCaptureStack.Add(TStringBuilder.Create());
+end;
+
+function TCodeOutput.EndCapture(): string;
+var
+  LBuf: TStringBuilder;
+begin
+  if FCaptureStack.Count = 0 then
+    Exit('');
+  LBuf := FCaptureStack[FCaptureStack.Count - 1];
+  FCaptureStack.Delete(FCaptureStack.Count - 1);
+  Result := LBuf.ToString();
+  LBuf.Free();
+end;
+
+{ Node dispatch delegation }
+
+procedure TCodeOutput.SetEmitNodeCallback(const ACallback: TEmitNodeProc);
+begin
+  FEmitNodeCallback := ACallback;
+end;
+
+procedure TCodeOutput.EmitNode(const ANode: TASTNode);
+begin
+  if ANode = nil then
+    Exit;
+  if Assigned(FEmitNodeCallback) then
+    FEmitNodeCallback(ANode)
+  else
+    EmitChildren(ANode);
+end;
+
+procedure TCodeOutput.EmitChildren(const ANode: TASTNode);
+var
+  LI: Integer;
+begin
+  if ANode = nil then
+    Exit;
+  for LI := 0 to ANode.ChildCount() - 1 do
+    EmitNode(ANode.GetChild(LI));
+end;
+
+procedure TCodeOutput.SetLineDirectives(const AEnabled: Boolean);
 begin
   FLineDirectives := AEnabled;
 end;
 
-function TCodeGen.AcquireIR(const AUnitName: string): TIR;
-var
-  LIR:     TIR;
-  LErrors: TErrors;
+{ Low-level output }
+
+procedure TCodeOutput.EmitLine(const AText: string; const ATarget: TOutputTarget);
 begin
-  LIR := TIR.Create();
-
-  // Wire shared errors so IR validation failures surface to the caller
-  LErrors := GetErrors();
-  if LErrors <> nil then
-    LIR.SetErrors(LErrors);
-
-  // Wire language config so IR can dispatch emit handlers
-  if FConfig <> nil then
-    LIR.SetConfig(FConfig);
-
-  // Wire line directive setting
-  LIR.SetLineDirectives(FLineDirectives);
-
-  // Register and track
-  FUnits.Add(AUnitName, LIR);
-  FUnitOrder.Add(AUnitName);
-
-  // Set as current
-  FCurrentIR := LIR;
-
-  Result := LIR;
+  GetBuffer(ATarget).AppendLine(GetIndent() + AText);
 end;
 
-// ---- Single-unit path ----
-
-function TCodeGen.Generate(
-  const ARoot: TASTNodeBase): Boolean;
+procedure TCodeOutput.EmitLine(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget);
 begin
-  // Report the filename so the user can see what is being compiled to C++23
-  if ARoot <> nil then
-    Status('Generating code for %s...', [ARoot.GetToken().Filename])
+  EmitLine(Format(AText, AArgs), ATarget);
+end;
+
+procedure TCodeOutput.Emit(const AText: string; const ATarget: TOutputTarget);
+begin
+  GetBuffer(ATarget).Append(AText);
+end;
+
+procedure TCodeOutput.Emit(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget);
+begin
+  Emit(Format(AText, AArgs), ATarget);
+end;
+
+procedure TCodeOutput.EmitRaw(const AText: string; const ATarget: TOutputTarget);
+begin
+  GetBuffer(ATarget).Append(AText);
+end;
+
+procedure TCodeOutput.EmitRaw(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget);
+begin
+  EmitRaw(Format(AText, AArgs), ATarget);
+end;
+
+procedure TCodeOutput.IndentIn();
+begin
+  Inc(FIndentLevel);
+end;
+
+procedure TCodeOutput.IndentOut();
+begin
+  if FIndentLevel > 0 then
+    Dec(FIndentLevel);
+end;
+
+{ Top-level declarations }
+
+procedure TCodeOutput.IncludeHeader(const AHeaderName: string; const ATarget: TOutputTarget);
+begin
+  if (AHeaderName <> '') and (AHeaderName[1] <> '"') and (AHeaderName[1] <> '<') then
+    EmitLine('#include <' + AHeaderName + '>', ATarget)
   else
-    Status('Generating code...');
-  Result := GenerateUnit(DEFAULT_UNIT_NAME, ARoot);
+    EmitLine('#include ' + AHeaderName, ATarget);
 end;
 
-procedure TCodeGen.SaveToFiles(const AHeaderPath,
-  ASourcePath: string);
-var
-  LIR: TIR;
+procedure TCodeOutput.StructBegin(const AStructName: string; const ATarget: TOutputTarget);
 begin
-  LIR := GetIR(DEFAULT_UNIT_NAME);
-  if LIR <> nil then
-    LIR.SaveToFiles(AHeaderPath, ASourcePath);
+  EmitLine('struct ' + AStructName + ' {', ATarget);
+  IndentIn();
 end;
 
-function TCodeGen.GetHeaderContent(): string;
-var
-  LIR: TIR;
+procedure TCodeOutput.AddField(const AFieldName: string; const AFieldType: string);
 begin
-  LIR := GetIR(DEFAULT_UNIT_NAME);
-  if LIR <> nil then
-    Result := LIR.GetHeaderContent()
+  EmitLine(AFieldType + ' ' + AFieldName + ';', otHeader);
+end;
+
+procedure TCodeOutput.StructEnd();
+begin
+  IndentOut();
+  EmitLine('};', otHeader);
+end;
+
+procedure TCodeOutput.DeclConst(const AConstName: string; const AConstType: string; const AValueExpr: string; const ATarget: TOutputTarget);
+begin
+  if AConstType = '' then
+    EmitLine('constexpr auto ' + AConstName + ' = ' + AValueExpr + ';', ATarget)
   else
-    Result := '';
+    EmitLine('constexpr ' + AConstType + ' ' + AConstName + ' = ' + AValueExpr + ';', ATarget);
 end;
 
-function TCodeGen.GetSourceContent(): string;
-var
-  LIR: TIR;
+procedure TCodeOutput.GlobalVar(const AGlobalName: string; const AGlobalType: string; const AInitExpr: string; const ATarget: TOutputTarget);
 begin
-  LIR := GetIR(DEFAULT_UNIT_NAME);
-  if LIR <> nil then
-    Result := LIR.GetSourceContent()
+  if AInitExpr = '' then
+    EmitLine(AGlobalType + ' ' + AGlobalName + ';', ATarget)
   else
-    Result := '';
+    EmitLine(AGlobalType + ' ' + AGlobalName + ' = ' + AInitExpr + ';', ATarget);
 end;
 
-// ---- Multi-unit path ----
+procedure TCodeOutput.UsingDecl(const AAlias: string; const AOriginal: string; const ATarget: TOutputTarget);
+begin
+  EmitLine('using ' + AAlias + ' = ' + AOriginal + ';', ATarget);
+end;
 
-function TCodeGen.GenerateUnit(const AUnitName: string;
-  const ARoot: TASTNodeBase): Boolean;
+procedure TCodeOutput.NamespaceBegin(const ANamespaceName: string; const ATarget: TOutputTarget);
+begin
+  EmitLine('namespace ' + ANamespaceName + ' {', ATarget);
+  IndentIn();
+end;
+
+procedure TCodeOutput.NamespaceEnd(const ATarget: TOutputTarget);
+begin
+  IndentOut();
+  EmitLine('} // namespace', ATarget);
+end;
+
+procedure TCodeOutput.ExternCDecl(const AFuncName: string; const AReturnType: string; const AParams: string; const ATarget: TOutputTarget);
+begin
+  EmitLine('extern "C" ' + AReturnType + ' ' + AFuncName + '(' + AParams + ');', ATarget);
+end;
+
+{ Function builder }
+
+procedure TCodeOutput.Func(const AFuncName: string; const AReturnType: string);
+begin
+  FInFuncSignature := True;
+  Emit(GetIndent() + AReturnType + ' ' + AFuncName + '(', otSource);
+end;
+
+procedure TCodeOutput.Param(const AParamName: string; const AParamType: string);
 var
-  LErrors: TErrors;
-  LIR:     TIR;
+  LBuf: TStringBuilder;
 begin
-  Result := False;
-  LErrors := GetErrors();
-
-  // Validate unit name
-  if AUnitName = '' then
+  LBuf := GetBuffer(otSource);
+  if LBuf.Length > 0 then
   begin
-    if LErrors <> nil then
-      LErrors.Add(esError, ERR_CODEGEN_EMPTY_UNIT, RSCodeGenEmptyUnit);
-    Exit;
+    if LBuf.Chars[LBuf.Length - 1] = '(' then
+      Emit(AParamType + ' ' + AParamName, otSource)
+    else
+      Emit(', ' + AParamType + ' ' + AParamName, otSource);
   end;
-
-  // Deduplicate — if this unit was already emitted, skip silently
-  if FUnits.ContainsKey(AUnitName) then
-  begin
-    Result := True;
-    Exit;
-  end;
-
-  // Validate AST root
-  if ARoot = nil then
-  begin
-    if LErrors <> nil then
-      LErrors.Add(esError, ERR_CODEGEN_NIL_ROOT, RSCodeGenNilRoot);
-    Exit;
-  end;
-
-  // Validate config
-  if FConfig = nil then
-  begin
-    if LErrors <> nil then
-      LErrors.Add(esError, ERR_CODEGEN_NO_CONFIG, RSCodeGenNoConfig);
-    Exit;
-  end;
-
-  // Create the IR for this unit and walk the AST
-  LIR := AcquireIR(AUnitName);
-  Result := LIR.Generate(ARoot);
 end;
 
-procedure TCodeGen.SaveAllFiles(const AOutputDir: string);
+procedure TCodeOutput.EndFunc();
+begin
+  CloseFuncSignature();
+  IndentOut();
+  EmitLine('}', otSource);
+  GetBuffer(otSource).AppendLine('');
+end;
+
+{ Statement methods }
+
+procedure TCodeOutput.DeclVar(const AVarName: string; const AVarType: string);
+begin
+  CloseFuncSignature();
+  EmitLine(AVarType + ' ' + AVarName + ';', otSource);
+end;
+
+procedure TCodeOutput.DeclVar(const AVarName: string; const AVarType: string; const AInitExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine(AVarType + ' ' + AVarName + ' = ' + AInitExpr + ';', otSource);
+end;
+
+procedure TCodeOutput.Assign(const ALhs: string; const AExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine(ALhs + ' = ' + AExpr + ';', otSource);
+end;
+
+procedure TCodeOutput.AssignTo(const ATargetExpr: string; const AValueExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine(ATargetExpr + ' = ' + AValueExpr + ';', otSource);
+end;
+
+procedure TCodeOutput.CallStmt(const AFuncName: string; const AArgs: string);
+begin
+  CloseFuncSignature();
+  EmitLine(AFuncName + '(' + AArgs + ');', otSource);
+end;
+
+procedure TCodeOutput.Stmt(const ARawText: string);
+begin
+  CloseFuncSignature();
+  EmitLine(ARawText, otSource);
+end;
+
+procedure TCodeOutput.Stmt(const ARawText: string; const AArgs: array of const);
+begin
+  Stmt(Format(ARawText, AArgs));
+end;
+
+procedure TCodeOutput.ReturnStmt();
+begin
+  CloseFuncSignature();
+  EmitLine('return;', otSource);
+end;
+
+procedure TCodeOutput.ReturnStmt(const AExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine('return ' + AExpr + ';', otSource);
+end;
+
+procedure TCodeOutput.IfStmt(const ACondExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine('if (' + ACondExpr + ') {', otSource);
+  IndentIn();
+end;
+
+procedure TCodeOutput.ElseIfStmt(const ACondExpr: string);
+begin
+  IndentOut();
+  EmitLine('} else if (' + ACondExpr + ') {', otSource);
+  IndentIn();
+end;
+
+procedure TCodeOutput.ElseStmt();
+begin
+  IndentOut();
+  EmitLine('} else {', otSource);
+  IndentIn();
+end;
+
+procedure TCodeOutput.EndIf();
+begin
+  IndentOut();
+  EmitLine('}', otSource);
+end;
+
+procedure TCodeOutput.WhileStmt(const ACondExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine('while (' + ACondExpr + ') {', otSource);
+  IndentIn();
+end;
+
+procedure TCodeOutput.EndWhile();
+begin
+  IndentOut();
+  EmitLine('}', otSource);
+end;
+
+procedure TCodeOutput.ForStmt(const AVarName: string; const AInitExpr: string; const ACondExpr: string; const AStepExpr: string);
+begin
+  CloseFuncSignature();
+  EmitLine('for (' + AVarName + ' = ' + AInitExpr + '; ' + ACondExpr + '; ' + AStepExpr + ') {', otSource);
+  IndentIn();
+end;
+
+procedure TCodeOutput.EndFor();
+begin
+  IndentOut();
+  EmitLine('}', otSource);
+end;
+
+procedure TCodeOutput.BreakStmt();
+begin
+  CloseFuncSignature();
+  EmitLine('break;', otSource);
+end;
+
+procedure TCodeOutput.ContinueStmt();
+begin
+  CloseFuncSignature();
+  EmitLine('continue;', otSource);
+end;
+
+procedure TCodeOutput.BlankLine(const ATarget: TOutputTarget);
+begin
+  GetBuffer(ATarget).AppendLine('');
+end;
+
+{ Expression builders }
+
+function TCodeOutput.Lit(const AValue: Integer): string;
+begin
+  Result := IntToStr(AValue);
+end;
+
+function TCodeOutput.Lit(const AValue: Int64): string;
+begin
+  Result := IntToStr(AValue) + 'LL';
+end;
+
+function TCodeOutput.FloatLit(const AValue: Double): string;
 var
-  LI:         Integer;
-  LUnitName:  string;
-  LIR:        TIR;
-  LHeaderPath: string;
-  LSourcePath: string;
+  LFS: TFormatSettings;
 begin
-  // Ensure output directory exists (creates full chain)
-  if AOutputDir <> '' then
-    TUtils.CreateDirInPath(AOutputDir);
-
-  // Write each unit in dependency order
-  for LI := 0 to FUnitOrder.Count - 1 do
-  begin
-    LUnitName := FUnitOrder[LI];
-    if FUnits.TryGetValue(LUnitName, LIR) then
-    begin
-      LHeaderPath := TPath.Combine(AOutputDir, LUnitName + '.h');
-      LSourcePath := TPath.Combine(AOutputDir, LUnitName + '.cpp');
-      LIR.SaveToFiles(LHeaderPath, LSourcePath);
-    end;
-  end;
+  LFS := TFormatSettings.Create();
+  LFS.DecimalSeparator := '.';
+  Result := FormatFloat('0.0###############', AValue, LFS);
 end;
 
-// ---- Access ----
-
-function TCodeGen.GetIR(const AUnitName: string): TIR;
+function TCodeOutput.StrLit(const AValue: string): string;
 begin
-  if not FUnits.TryGetValue(AUnitName, Result) then
-    Result := nil;
+  Result := '"' + AValue + '"';
 end;
 
-function TCodeGen.GetCurrentIR(): TIR;
+function TCodeOutput.BoolLit(const AValue: Boolean): string;
 begin
-  Result := FCurrentIR;
-end;
-
-function TCodeGen.GetUnitCount(): Integer;
-begin
-  Result := FUnitOrder.Count;
-end;
-
-function TCodeGen.GetUnitNameByIndex(
-  const AIndex: Integer): string;
-begin
-  if (AIndex >= 0) and (AIndex < FUnitOrder.Count) then
-    Result := FUnitOrder[AIndex]
+  if AValue then
+    Result := 'true'
   else
-    Result := '';
+    Result := 'false';
 end;
 
-function TCodeGen.HasUnit(const AUnitName: string): Boolean;
+function TCodeOutput.NullLit(): string;
 begin
-  Result := FUnits.ContainsKey(AUnitName);
+  Result := 'nullptr';
 end;
 
-// ---- Debug ----
+function TCodeOutput.Get(const AVarName: string): string;
+begin
+  Result := AVarName;
+end;
 
-function TCodeGen.Dump(const AId: Integer): string;
+function TCodeOutput.Field(const AObj: string; const AMember: string): string;
+begin
+  Result := AObj + '.' + AMember;
+end;
+
+function TCodeOutput.Deref(const APtr: string; const AMember: string): string;
+begin
+  Result := APtr + '->' + AMember;
+end;
+
+function TCodeOutput.Deref(const APtr: string): string;
+begin
+  Result := '*' + APtr;
+end;
+
+function TCodeOutput.AddrOf(const AVarName: string): string;
+begin
+  Result := '&' + AVarName;
+end;
+
+function TCodeOutput.IndexExpr(const AArr: string; const AIndexExpr: string): string;
+begin
+  Result := AArr + '[' + AIndexExpr + ']';
+end;
+
+function TCodeOutput.CastExpr(const ATypeName: string; const AExpr: string): string;
+begin
+  Result := '(' + ATypeName + ')(' + AExpr + ')';
+end;
+
+function TCodeOutput.Invoke(const AFuncName: string; const AArgs: string): string;
+begin
+  Result := AFuncName + '(' + AArgs + ')';
+end;
+
+function TCodeOutput.Add(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' + ' + ARight;
+end;
+
+function TCodeOutput.Sub(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' - ' + ARight;
+end;
+
+function TCodeOutput.Mul(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' * ' + ARight;
+end;
+
+function TCodeOutput.DivExpr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' / ' + ARight;
+end;
+
+function TCodeOutput.ModExpr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' % ' + ARight;
+end;
+
+function TCodeOutput.Neg(const AExpr: string): string;
+begin
+  Result := '-' + AExpr;
+end;
+
+function TCodeOutput.Eq(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' == ' + ARight;
+end;
+
+function TCodeOutput.Ne(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' != ' + ARight;
+end;
+
+function TCodeOutput.Lt(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' < ' + ARight;
+end;
+
+function TCodeOutput.Le(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' <= ' + ARight;
+end;
+
+function TCodeOutput.Gt(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' > ' + ARight;
+end;
+
+function TCodeOutput.Ge(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' >= ' + ARight;
+end;
+
+function TCodeOutput.AndExpr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' && ' + ARight;
+end;
+
+function TCodeOutput.OrExpr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' || ' + ARight;
+end;
+
+function TCodeOutput.NotExpr(const AExpr: string): string;
+begin
+  Result := '!' + AExpr;
+end;
+
+function TCodeOutput.BitAnd(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' & ' + ARight;
+end;
+
+function TCodeOutput.BitOr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' | ' + ARight;
+end;
+
+function TCodeOutput.BitXor(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' ^ ' + ARight;
+end;
+
+function TCodeOutput.BitNot(const AExpr: string): string;
+begin
+  Result := '~' + AExpr;
+end;
+
+function TCodeOutput.ShlExpr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' << ' + ARight;
+end;
+
+function TCodeOutput.ShrExpr(const ALeft: string; const ARight: string): string;
+begin
+  Result := ALeft + ' >> ' + ARight;
+end;
+
+{ Output }
+
+procedure TCodeOutput.SaveToFiles(const AHeaderPath: string; const ASourcePath: string);
 var
-  LI:        Integer;
-  LUnitName: string;
-  LIR:       TIR;
+  LHeaderDir: string;
+  LSourceDir: string;
+  LHeaderName: string;
 begin
-  Result := '';
-  for LI := 0 to FUnitOrder.Count - 1 do
-  begin
-    LUnitName := FUnitOrder[LI];
-    if FUnits.TryGetValue(LUnitName, LIR) then
-    begin
-      Result := Result +
-        '=== UNIT: ' + LUnitName + ' ===' + sLineBreak +
-        LIR.Dump(AId) + sLineBreak;
-    end;
-  end;
+  LHeaderDir := ExtractFilePath(AHeaderPath);
+  if (LHeaderDir <> '') and (not TDirectory.Exists(LHeaderDir)) then
+    TDirectory.CreateDirectory(LHeaderDir);
+
+  LSourceDir := ExtractFilePath(ASourcePath);
+  if (LSourceDir <> '') and (not TDirectory.Exists(LSourceDir)) then
+    TDirectory.CreateDirectory(LSourceDir);
+
+  TFile.WriteAllText(AHeaderPath, FHeaderBuffer.ToString(), TEncoding.UTF8);
+
+  LHeaderName := ExtractFileName(AHeaderPath);
+  TFile.WriteAllText(ASourcePath,
+    '#include "' + LHeaderName + '"' + sLineBreak + sLineBreak +
+    FSourceBuffer.ToString(), TEncoding.UTF8);
+end;
+
+function TCodeOutput.GetHeaderContent(): string;
+begin
+  Result := FHeaderBuffer.ToString();
+end;
+
+function TCodeOutput.GetSourceContent(): string;
+begin
+  Result := FSourceBuffer.ToString();
+end;
+
+{ Context store }
+
+procedure TCodeOutput.SetContext(const AKey: string; const AValue: string);
+begin
+  FContext.AddOrSetValue(AKey, AValue);
+end;
+
+function TCodeOutput.GetContext(const AKey: string; const ADefault: string): string;
+begin
+  if not FContext.TryGetValue(AKey, Result) then
+    Result := ADefault;
+end;
+
+procedure TCodeOutput.Clear();
+begin
+  FHeaderBuffer.Clear();
+  FSourceBuffer.Clear();
+  FIndentLevel := 0;
+  FInFuncSignature := False;
+  FContext.Clear();
+  FLastLineFile := '';
+  FLastLineNum := 0;
 end;
 
 end.

@@ -20,10 +20,9 @@ implementation
 uses
   System.SysUtils,
   System.IOUtils,
-  Metamorf.Common,
-  Metamorf.API,
-  Metamorf.Lang,
-  Metamorf.Lang.CLI;
+  Metamorf.Utils,
+  Metamorf.Engine,
+  Metamorf.Build;
 
 // =========================================================================
 // CLI MODE (Release)
@@ -31,17 +30,51 @@ uses
 
 procedure RunCLI();
 var
-  LCLI: TMetamorfLangCLI;
+  LEngine: TMorEngine;
+  LMorFile: string;
+  LSrcFile: string;
+  LOutputPath: string;
 begin
   ExitCode := 0;
-  LCLI := nil;
 
+  if ParamCount() < 2 then
+  begin
+    TUtils.PrintLn('Usage: metamorf <lang.mor> <source> [output_path]');
+    ExitCode := 1;
+    Exit;
+  end;
+
+  LMorFile := ParamStr(1);
+  LSrcFile := ParamStr(2);
+  if ParamCount() >= 3 then
+    LOutputPath := ParamStr(3)
+  else
+    LOutputPath := 'output';
+
+  LEngine := TMorEngine.Create();
   try
-    LCLI := TMetamorfLangCLI.Create();
     try
-      LCLI.Execute();
+      LEngine.SetStatusCallback(
+        procedure(const AMsg: string; const AUserData: Pointer)
+        begin
+          TUtils.PrintLn(AMsg);
+        end);
+
+      LEngine.GetBuild().SetOutputCallback(
+        procedure(const ALine: string; const AUserData: Pointer)
+        begin
+          TUtils.Print(ALine);
+        end);
+
+      LEngine.Compile(LMorFile, LSrcFile, LOutputPath, True);
+
+      if LEngine.GetErrors().HasErrors() then
+      begin
+        TUtils.PrintLn(LEngine.GetErrors().Dump());
+        ExitCode := 1;
+      end;
     finally
-      FreeAndNil(LCLI);
+      FreeAndNil(LEngine);
     end;
   except
     on E: Exception do
@@ -59,48 +92,46 @@ end;
 // TESTBED MODE (Debug / IDE)
 // =========================================================================
 
-function TestLang(const ALangFile, ASrcFile: string): Boolean;
+function TestLang(const ALangFile: string;
+  const ASrcFile: string): Boolean;
 var
-  LCompiler: TMetamorfLang;
+  LEngine: TMorEngine;
   LLangFile: string;
   LSrcFile: string;
 begin
   Result := False;
-  LCompiler := TMetamorfLang.Create();
+  LEngine := TMorEngine.Create();
   try
-    LCompiler.SetStatusCallback(
+    LEngine.SetStatusCallback(
       procedure(const AMsg: string; const AUserData: Pointer)
       begin
         TUtils.PrintLn(AMsg);
       end);
 
-    // Print program output (no newline — output drives its own line endings)
-    LCompiler.SetOutputCallback(
+    // Print program output (no newline - output drives its own line endings)
+    LEngine.GetBuild().SetOutputCallback(
       procedure(const ALine: string; const AUserData: Pointer)
       begin
         TUtils.Print(ALine);
       end);
-    // — -
-    LLangFile := TPath.Combine('..\tests', TPath.ChangeExtension(ALangFile, METAMORF_LANG_EXT));
-    //LLangFile := TPath.ChangeExtension(ALangFile, METAMORF_LANG_EXT).Replace('\', '/');
 
+    LLangFile := TPath.Combine('..\tests',
+      TPath.ChangeExtension(ALangFile, '.mor'));
     LSrcFile := TPath.Combine('..\tests', ASrcFile);
-    //LSrcFile := ASrcFile.Replace('\', '/');
 
     if not TFile.Exists(LLangFile) then Exit;
     if not TFile.Exists(LSrcFile) then Exit;
 
-    LCompiler.SetLangFile(LLangFile);
-    LCompiler.SetSourceFile(LSrcFile);
-    LCompiler.SetOutputPath('output');
-    LCompiler.SetLineDirectives(True);
+    //LEngine.GetBuild().SetTarget(tpLinux64);
 
-    Result := LCompiler.Compile(True, True);
+    LEngine.Compile(LLangFile, LSrcFile, 'output', True);
 
-    if LCompiler.HasErrors() then
-      TUtils.PrintLn(LCompiler.GetErrors().Dump());
+    Result := not LEngine.GetErrors().HasErrors();
+
+    if LEngine.GetErrors().HasErrors() then
+      TUtils.PrintLn(LEngine.GetErrors().Dump());
   finally
-    LCompiler.Free();
+    LEngine.Free();
   end;
 end;
 
@@ -109,7 +140,7 @@ var
   LNum: Integer;
 begin
   try
-    LNum := 6;
+    LNum := 1;
 
     case LNum of
       01: TestLang('..\tests\pascal', '..\tests\hello.pas');
@@ -118,6 +149,7 @@ begin
       04: TestLang('..\tests\scheme', '..\tests\hello.scm');
       05: TestLang('..\tests\mylang', '..\tests\hello.ml');
       06: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_hello.myra');
+      07: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_mixedmode.myra');
     end;
 
   except
