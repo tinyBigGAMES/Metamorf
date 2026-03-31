@@ -118,6 +118,9 @@ type
   { TCompileModuleFunc - callback to engine for module compilation }
   TCompileModuleFunc = function(const AModuleName: string): Boolean of object;
 
+  { TImportMorFunc - callback to engine for .mor file import }
+  TImportMorFunc = function(const AMorPath: string): TASTNode of object;
+
   { TMorInterpreter }
   TMorInterpreter = class(TErrorsObject)
   private
@@ -169,8 +172,10 @@ type
     FOutput: TCodeOutput;
     FBuild: TObject;
     FActiveParser: TObject;
+    FRuleErrorSnapshot: Integer;
     FModuleExtension: string;
     FCompileModuleFunc: TCompileModuleFunc;
+    FImportMorFunc: TImportMorFunc;
 
     // Native handler dictionaries (for C++ passthrough)
     FNativePrefixRules: TDictionary<string, TNativePrefixHandler>;
@@ -242,6 +247,7 @@ type
     function GetOutput(): TCodeOutput;
     function GetActiveParser(): TObject;
     procedure SetCompileModuleFunc(const AFunc: TCompileModuleFunc);
+    procedure SetImportMorFunc(const AFunc: TImportMorFunc);
     function GetModuleExtension(): string;
 
     // Native handler registration (called by Mor.Cpp)
@@ -281,6 +287,8 @@ type
 implementation
 
 uses
+  Metamorf.Lexer,
+  Metamorf.Parser,
   Metamorf.GenericParser,
   Metamorf.Build;
 
@@ -403,6 +411,8 @@ var
   LI: Integer;
   LChild: TASTNode;
   LKind: string;
+  LImportAST: TASTNode;
+  LFragAST: TASTNode;
 begin
   for LI := 0 to ARoot.ChildCount() - 1 do
   begin
@@ -430,9 +440,29 @@ begin
     else if LKind = 'meta.fragment' then
       WalkFragmentDecl(LChild)
     else if LKind = 'meta.import' then
-      // TODO: handle imports in Phase 9
+    begin
+      // Import external .mor file: lex/parse via engine callback, walk its declarations
+      if Assigned(FImportMorFunc) then
+      begin
+        LImportAST := FImportMorFunc(LChild.GetAttr('path'));
+        if Assigned(LImportAST) then
+          WalkMorRoot(LImportAST);
+      end;
+    end
     else if LKind = 'meta.include' then
-      // TODO: handle includes in Phase 9
+    begin
+      // Top-level fragment expansion
+      if FFragments.TryGetValue(LChild.GetAttr('path'), LFragAST) then
+        if LFragAST.ChildCount() > 0 then
+          WalkMorRoot(LFragAST.GetChild(0));
+    end
+    else if LKind = 'meta.guard' then
+    begin
+      // Conditional feature inclusion: evaluate condition, walk body if true
+      if MorIsTrue(EvalExpr(LChild.GetChild(0))) then
+        if LChild.ChildCount() > 1 then
+          WalkMorRoot(LChild.GetChild(1));
+    end
     ;
   end;
 end;
@@ -441,6 +471,7 @@ procedure TMorInterpreter.WalkTokensBlock(const ABlock: TASTNode);
 var
   LI: Integer;
   LChild: TASTNode;
+  LFragAST: TASTNode;
   LKind: string;
   LTokenKind: string;
   LText: string;
@@ -452,6 +483,15 @@ begin
   begin
     LChild := ABlock.GetChild(LI);
     LKind := LChild.GetKind();
+
+    // Fragment include expansion
+    if LKind = 'meta.include' then
+    begin
+      if FFragments.TryGetValue(LChild.GetAttr('path'), LFragAST) then
+        if LFragAST.ChildCount() > 0 then
+          WalkTokensBlock(LFragAST.GetChild(0));
+      Continue;
+    end;
 
     if LKind = 'meta.token_decl' then
     begin
@@ -518,6 +558,7 @@ procedure TMorInterpreter.WalkTypesBlock(const ABlock: TASTNode);
 var
   LI: Integer;
   LChild: TASTNode;
+  LFragAST: TASTNode;
   LKind: string;
   LKey: string;
   LValue: string;
@@ -529,6 +570,15 @@ begin
     LKind := LChild.GetKind();
     LKey := LChild.GetAttr('key');
     LValue := LChild.GetAttr('value');
+
+    // Fragment include expansion
+    if LKind = 'meta.include' then
+    begin
+      if FFragments.TryGetValue(LChild.GetAttr('path'), LFragAST) then
+        if LFragAST.ChildCount() > 0 then
+          WalkTypesBlock(LFragAST.GetChild(0));
+      Continue;
+    end;
 
     if LKind = 'meta.type_map' then
       FTypeMappings.AddOrSetValue(LKey, LValue)
@@ -558,6 +608,7 @@ procedure TMorInterpreter.WalkGrammarBlock(const ABlock: TASTNode);
 var
   LI: Integer;
   LChild: TASTNode;
+  LFragAST: TASTNode;
   LNodeKind: string;
   LTrigger: string;
   LTriggers: TArray<string>;
@@ -567,6 +618,16 @@ begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
     LChild := ABlock.GetChild(LI);
+
+    // Fragment include expansion
+    if LChild.GetKind() = 'meta.include' then
+    begin
+      if FFragments.TryGetValue(LChild.GetAttr('path'), LFragAST) then
+        if LFragAST.ChildCount() > 0 then
+          WalkGrammarBlock(LFragAST.GetChild(0));
+      Continue;
+    end;
+
     if LChild.GetKind() <> 'meta.rule' then
       Continue;
 
@@ -683,6 +744,7 @@ procedure TMorInterpreter.WalkSemanticsBlock(const ABlock: TASTNode);
 var
   LI: Integer;
   LChild: TASTNode;
+  LFragAST: TASTNode;
   LKind: string;
   LPass: TSemanticPass;
   LJ: Integer;
@@ -691,6 +753,15 @@ begin
   begin
     LChild := ABlock.GetChild(LI);
     LKind := LChild.GetKind();
+
+    // Fragment include expansion
+    if LKind = 'meta.include' then
+    begin
+      if FFragments.TryGetValue(LChild.GetAttr('path'), LFragAST) then
+        if LFragAST.ChildCount() > 0 then
+          WalkSemanticsBlock(LFragAST.GetChild(0));
+      Continue;
+    end;
 
     if LKind = 'meta.on_handler' then
       FSemanticHandlers.AddOrSetValue(LChild.GetAttr('node_kind'), LChild)
@@ -716,6 +787,7 @@ procedure TMorInterpreter.WalkEmittersBlock(const ABlock: TASTNode);
 var
   LI: Integer;
   LChild: TASTNode;
+  LFragAST: TASTNode;
   LKind: string;
   LSection: TSectionEntry;
 begin
@@ -723,6 +795,15 @@ begin
   begin
     LChild := ABlock.GetChild(LI);
     LKind := LChild.GetKind();
+
+    // Fragment include expansion
+    if LKind = 'meta.include' then
+    begin
+      if FFragments.TryGetValue(LChild.GetAttr('path'), LFragAST) then
+        if LFragAST.ChildCount() > 0 then
+          WalkEmittersBlock(LFragAST.GetChild(0));
+      Continue;
+    end;
 
     if LKind = 'meta.on_handler' then
       FEmitHandlers.AddOrSetValue(LChild.GetAttr('node_kind'), LChild)
@@ -1148,8 +1229,7 @@ begin
     if Assigned(FActiveParser) then
     begin
       LGenParser := TGenericParser(FActiveParser);
-      LSavedPos := LGenParser.Current().Line; // Save approximate position
-      // TODO: Full parser position save/restore needs FPos accessor
+      LSavedPos := LGenParser.GetPos();
       try
         ExecBlock(ANode.GetChild(0));
       except
@@ -1157,7 +1237,8 @@ begin
           raise;
         on E: Exception do
         begin
-          // Parse failed, silently ignore (optional)
+          // Parse failed, restore parser position and silently ignore
+          LGenParser.SetPos(LSavedPos);
         end;
       end;
     end
@@ -1202,7 +1283,7 @@ begin
       LAttrName := ANode.GetAttr('name_attr');
       LVarName := FCurrentNode.GetAttr(LAttrName);
       LMode := ANode.GetAttr('sym_kind');
-      FScopes.Declare(LVarName, LMode);
+      FScopes.Declare(LVarName, LMode, FCurrentNode);
       // Optional typed declaration
       if ANode.HasAttr('type_attr') then
       begin
@@ -1294,7 +1375,8 @@ begin
   // sync token_kind { ... } (grammar context -- error recovery)
   else if LKind = 'meta.sync' then
   begin
-    if Assigned(FActiveParser) then
+    if Assigned(FActiveParser) and Assigned(FErrors) and
+       (FErrors.ErrorCount() > FRuleErrorSnapshot) then
     begin
       LGenParser := TGenericParser(FActiveParser);
       LTokenKind := ANode.GetAttr('token_kind');
@@ -1304,12 +1386,85 @@ begin
         if LGenParser.Check(LTokenKind) then Break;
         LGenParser.DoAdvance();
       end;
+      // Consume the sync token itself
+      if not LGenParser.AtEnd() then
+        LGenParser.DoAdvance();
     end;
     if ANode.ChildCount() > 0 then
       ExecBlock(ANode.GetChild(0));
   end;
 
   // Unknown node kinds are silently ignored for forward compatibility
+end;
+
+{ Triple-Quoted String Indent Trimming }
+
+function TrimCommonIndent(const AText: string): string;
+var
+  LLines: TArray<string>;
+  LMinIndent: Integer;
+  LIndent: Integer;
+  LI: Integer;
+  LJ: Integer;
+  LLine: string;
+  LFirst: Integer;
+  LLast: Integer;
+begin
+  LLines := AText.Split([#10]);
+
+  // Find first and last non-empty line boundaries
+  LFirst := 0;
+  LLast := Length(LLines) - 1;
+
+  // Strip leading empty line (newline right after opening ''')
+  if (LFirst <= LLast) and (Trim(LLines[LFirst]) = '') then
+    Inc(LFirst);
+
+  // Strip trailing whitespace-only line (indent before closing ''')
+  if (LLast >= LFirst) and (Trim(LLines[LLast]) = '') then
+    Dec(LLast);
+
+  if LFirst > LLast then
+  begin
+    Result := '';
+    Exit;
+  end;
+
+  // Find minimum indent across non-empty lines
+  LMinIndent := MaxInt;
+  for LI := LFirst to LLast do
+  begin
+    LLine := LLines[LI];
+    if Trim(LLine) = '' then
+      Continue;
+    LIndent := 0;
+    for LJ := 1 to Length(LLine) do
+    begin
+      if (LLine[LJ] = ' ') or (LLine[LJ] = #9) then
+        Inc(LIndent)
+      else
+        Break;
+    end;
+    if LIndent < LMinIndent then
+      LMinIndent := LIndent;
+  end;
+
+  if LMinIndent = MaxInt then
+    LMinIndent := 0;
+
+  // Strip common indent and rebuild
+  Result := '';
+  for LI := LFirst to LLast do
+  begin
+    LLine := LLines[LI];
+    if Length(LLine) > LMinIndent then
+      LLine := Copy(LLine, LMinIndent + 1, Length(LLine) - LMinIndent)
+    else if Trim(LLine) = '' then
+      LLine := '';
+    if LI > LFirst then
+      Result := Result + #10;
+    Result := Result + LLine;
+  end;
 end;
 
 { Expression Evaluator }
@@ -1342,9 +1497,9 @@ begin
   else if LKind = 'expr.string' then
     Result := TValue.From<string>(Interpolate(ANode.GetAttr('value')))
 
-  // Triple-quoted string (no interpolation)
+  // Triple-quoted string (no interpolation, common indent trimmed)
   else if LKind = 'expr.triplestring' then
-    Result := TValue.From<string>(ANode.GetAttr('value'))
+    Result := TValue.From<string>(TrimCommonIndent(ANode.GetAttr('value')))
 
   // Boolean
   else if LKind = 'expr.bool' then
@@ -1585,6 +1740,10 @@ var
   LCh: Char;
   LExprText: string;
   LDepth: Integer;
+  LTempLexer: TMorLexer;
+  LTempParser: TMorParser;
+  LTempTokens: TList<TToken>;
+  LTempExpr: TASTNode;
 begin
   Result := '';
   LI := 1;
@@ -1645,15 +1804,37 @@ begin
             LExprText := LExprText + ARawText[LI];
           Inc(LI);
         end;
-        // For now, treat the expression text as a variable name lookup
-        // Full expression parsing will be added when needed
-        if FEnv.HasVar(LExprText) then
-          Result := Result + MorToString(FEnv.GetVar(LExprText))
-        else if FConstants.ContainsKey(LExprText) then
-          Result := Result + MorToString(FConstants[LExprText])
-        else
-          Result := Result + '{' + LExprText + '}';
-      end;
+        // Full expression interpolation: lex, parse, evaluate
+        try
+          LTempLexer := TMorLexer.Create();
+          try
+            LTempParser := TMorParser.Create();
+            try
+              LTempTokens := LTempLexer.Tokenize(LExprText);
+              try
+                LTempExpr := LTempParser.ParseSingleExpr(LTempTokens);
+                if LTempExpr <> nil then
+                  Result := Result + MorToString(EvalExpr(LTempExpr))
+                else
+                  Result := Result + '{' + LExprText + '}';
+              finally
+                LTempTokens.Free();
+              end;
+            finally
+              LTempParser.Free();
+            end;
+          finally
+            LTempLexer.Free();
+          end;
+        except
+          // Fallback: variable/constant lookup on parse failure
+          if FEnv.HasVar(LExprText) then
+            Result := Result + MorToString(FEnv.GetVar(LExprText))
+          else if FConstants.ContainsKey(LExprText) then
+            Result := Result + MorToString(FConstants[LExprText])
+          else
+            Result := Result + '{' + LExprText + '}';
+        end;      end;
       Continue;
     end;
 
@@ -2288,6 +2469,38 @@ begin
     Result := TValue.Empty;
   end
 
+  // elseIfStmt(cond)
+  else if AName = 'elseIfStmt' then
+  begin
+    if Assigned(FOutput) and (Length(AArgs) >= 1) then
+      FOutput.ElseIfStmt(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  // breakStmt()
+  else if AName = 'breakStmt' then
+  begin
+    if Assigned(FOutput) then
+      FOutput.BreakStmt();
+    Result := TValue.Empty;
+  end
+
+  // continueStmt()
+  else if AName = 'continueStmt' then
+  begin
+    if Assigned(FOutput) then
+      FOutput.ContinueStmt();
+    Result := TValue.Empty;
+  end
+
+  // returnVoid()
+  else if AName = 'returnVoid' then
+  begin
+    if Assigned(FOutput) then
+      FOutput.ReturnStmt();
+    Result := TValue.Empty;
+  end
+
   // returnVal(expr)
   else if AName = 'returnVal' then
   begin
@@ -2320,8 +2533,11 @@ begin
   // demoteCLinkageForPrefix(prefix) -> int
   else if AName = 'demoteCLinkageForPrefix' then
   begin
-    // TODO: Implement when C linkage demotion is needed
-    Result := TValue.From<Int64>(0);
+    if Assigned(FScopes) and (Length(AArgs) > 0) then
+      Result := TValue.From<Int64>(
+        FScopes.DemoteCLinkageForPrefix(MorToString(AArgs[0])))
+    else
+      Result := TValue.From<Int64>(0);
   end
 
   // compileModule(name) -> bool
@@ -2401,6 +2617,92 @@ begin
       else if LS = 'gui' then
         TBuild(FBuild).SetSubsystem(stGUI);
     end;
+    Result := TValue.Empty;
+  end
+
+  // Type system builtins
+  else if AName = 'typeTextToKind' then
+  begin
+    if not FTypeKeywords.TryGetValue(MorToString(AArgs[0]), LS) then
+      LS := '';
+    Result := TValue.From<string>(LS);
+  end
+
+  else if AName = 'typeToIR' then
+  begin
+    if not FTypeMappings.TryGetValue(MorToString(AArgs[0]), LS) then
+      LS := '';
+    Result := TValue.From<string>(LS);
+  end
+
+  // Version info builtins
+  else if AName = 'setAddVerInfo' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetAddVersionInfo(MorIsTrue(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setExeIcon' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetExeIcon(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setVersionMajor' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVIMajor(Word(AArgs[0].AsInt64()));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setVersionMinor' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVIMinor(Word(AArgs[0].AsInt64()));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setVersionPatch' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVIPatch(Word(AArgs[0].AsInt64()));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setProductName' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVIProductName(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setFileDescription' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVIDescription(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setVIFilename' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVIFilename(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setCompanyName' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVICompanyName(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setLegalCopyright' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TBuild(FBuild).SetVICopyright(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
@@ -2584,6 +2886,11 @@ begin
   FCompileModuleFunc := AFunc;
 end;
 
+procedure TMorInterpreter.SetImportMorFunc(const AFunc: TImportMorFunc);
+begin
+  FImportMorFunc := AFunc;
+end;
+
 function TMorInterpreter.GetModuleExtension(): string;
 begin
   Result := FModuleExtension;
@@ -2668,6 +2975,7 @@ function TMorInterpreter.ExecuteGrammarRule(const ARuleAST: TASTNode;
 var
   LNodeKind: string;
   LSavedResultNode: TASTNode;
+  LSavedSnapshot: Integer;
   LI: Integer;
 begin
   LNodeKind := ARuleAST.GetAttr('node_kind');
@@ -2679,7 +2987,12 @@ begin
 
   // Save and set context
   LSavedResultNode := FResultNode;
+  LSavedSnapshot := FRuleErrorSnapshot;
   FResultNode := Result;
+  if Assigned(FErrors) then
+    FRuleErrorSnapshot := FErrors.ErrorCount()
+  else
+    FRuleErrorSnapshot := 0;
 
   // If this is an infix rule, the left operand is child 0
   if Assigned(ALeft) then
@@ -2698,6 +3011,7 @@ begin
   finally
     FEnv.Pop();
     FResultNode := LSavedResultNode;
+    FRuleErrorSnapshot := LSavedSnapshot;
   end;
 end;
 
@@ -2784,8 +3098,16 @@ begin
       if Assigned(FErrors) and FErrors.ReachedMaxErrors() then Break;
       RunEmitHandler(AUserNode.GetChild(LI));
     end;
+  end
+  else if AUserNode.HasAttr('operator') and (AUserNode.ChildCount() = 2) then
+  begin
+    // Default binary expression fallback: left op right
+    RunEmitHandler(AUserNode.GetChild(0));
+    if Assigned(FOutput) then
+      FOutput.Emit(' ' + AUserNode.GetAttr('operator') + ' ');
+    RunEmitHandler(AUserNode.GetChild(1));
   end;
-  // No handler: silently skip
+  // No handler and no default fallback: silently skip
 end;
 
 { Pipeline Entry Points }

@@ -140,7 +140,7 @@ var
   LNum: Integer;
 begin
   try
-    LNum := 1;
+    LNum := 8;
 
     case LNum of
       01: TestLang('..\tests\pascal', '..\tests\hello.pas');
@@ -150,6 +150,8 @@ begin
       05: TestLang('..\tests\mylang', '..\tests\hello.ml');
       06: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_hello.myra');
       07: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_mixedmode.myra');
+      08: TestLang('..\tests\pascal2', '..\tests\hello2.pas');
+
     end;
 
   except

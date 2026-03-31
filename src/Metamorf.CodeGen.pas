@@ -46,7 +46,9 @@ type
     FEmitNodeCallback: TEmitNodeProc;
 
     function GetBuffer(const ATarget: TOutputTarget): TStringBuilder;
+    {$HINTS OFF}
     function GetActiveBuffer(): TStringBuilder;
+    {$HINTS ON}
     function GetIndent(): string;
     procedure CloseFuncSignature();
 

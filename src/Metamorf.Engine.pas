@@ -33,6 +33,11 @@ uses
   Metamorf.GenericParser,
   Metamorf.Cpp;
 
+const
+  // Engine Error Codes (E001-E099)
+  ERR_ENGINE_FILE_NOT_FOUND   = 'E001';
+  ERR_ENGINE_MODULE_NOT_FOUND = 'E002';
+
 type
 
   { TMorEngine }
@@ -43,12 +48,18 @@ type
     FMorParser: TMorParser;
     FInterp: TMorInterpreter;
     FProcessedFiles: TDictionary<string, Boolean>;
+    FImportedMorFiles: TDictionary<string, Boolean>;
     FMasterRoot: TASTNode;
+    FMorMasterRoot: TASTNode;
     FSourceDir: string;
+    FMorFileDir: string;
     FOutputPath: string;
 
     // Module compilation callback (called by interpreter during semantics)
     function CompileModule(const AModuleName: string): Boolean;
+
+    // .mor import callback (called by interpreter during setup)
+    function ImportMorFile(const AMorPath: string): TASTNode;
 
   public
     constructor Create(); override;
@@ -89,10 +100,12 @@ begin
   FInterp.SetBuild(FBuild);
 
   FProcessedFiles := TDictionary<string, Boolean>.Create();
+  FImportedMorFiles := TDictionary<string, Boolean>.Create();
 end;
 
 destructor TMorEngine.Destroy();
 begin
+  FreeAndNil(FImportedMorFiles);
   FreeAndNil(FProcessedFiles);
   FreeAndNil(FInterp);
   FreeAndNil(FMorParser);
@@ -130,6 +143,7 @@ var
 begin
   FErrors.Clear();
   FProcessedFiles.Clear();
+  FImportedMorFiles.Clear();
 
   LMorDisplay := TUtils.DisplayPath(AMorFile);
   LSrcDisplay := TUtils.DisplayPath(ASourceFile);
@@ -137,7 +151,7 @@ begin
   // --- Phase 1: Read and parse .mor file ---
   if not TFile.Exists(AMorFile) then
   begin
-    FErrors.Add(esFatal, 'E001',
+    FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LMorDisplay]);
     Exit;
   end;
@@ -156,7 +170,18 @@ begin
 
   // --- Phase 2: Setup interpreter tables ---
   Status(RSMorInterpSetup);
+  FMorFileDir := TPath.GetDirectoryName(TPath.GetFullPath(AMorFile));
+  FImportedMorFiles.Add(TPath.GetFullPath(AMorFile), True);
+
+  // Build .mor master root -- owns all .mor ASTs (main + imports)
+  FMorMasterRoot := TASTNode.Create();
+  FMorMasterRoot.SetKind('mor.master');
+  FMorMasterRoot.AddChild(LMorAST);
+
+  FInterp.SetImportMorFunc(ImportMorFile);
   FInterp.RunSetup(LMorAST);
+  FInterp.SetImportMorFunc(nil);
+  FreeAndNil(FMorMasterRoot);
   if FErrors.HasErrors() then Exit;
 
   // Register C++ passthrough (AFTER custom lang setup)
@@ -165,7 +190,7 @@ begin
   // --- Phase 3: Read and process user source ---
   if not TFile.Exists(ASourceFile) then
   begin
-    FErrors.Add(esFatal, 'E001',
+    FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LSrcDisplay]);
     Exit;
   end;
@@ -305,8 +330,6 @@ var
   LTokens: TList<TToken>;
   LBranch: TASTNode;
 begin
-  Result := False;
-
   // Resolve filename using module extension
   LModuleFile := AModuleName + '.' + FInterp.GetModuleExtension();
   LModulePath := TPath.Combine(FSourceDir, LModuleFile);
@@ -319,7 +342,7 @@ begin
   // Check existence
   if not TFile.Exists(LModulePath) then
   begin
-    FErrors.Add(esError, 'E002',
+    FErrors.Add(esError, ERR_ENGINE_MODULE_NOT_FOUND,
       RSFatalFileNotFound, [LModuleDisplay]);
     Exit(False);
   end;
@@ -359,6 +382,57 @@ begin
   FInterp.RunSemanticHandler(LBranch);
 
   Result := True;
+end;
+
+function TMorEngine.ImportMorFile(const AMorPath: string): TASTNode;
+var
+  LFullPath: string;
+  LDisplay: string;
+  LSource: string;
+  LTokens: TList<TToken>;
+  LAST: TASTNode;
+begin
+  Result := nil;
+
+  // Resolve relative to .mor file directory
+  if TPath.IsRelativePath(AMorPath) then
+    LFullPath := TPath.GetFullPath(TPath.Combine(FMorFileDir, AMorPath))
+  else
+    LFullPath := TPath.GetFullPath(AMorPath);
+
+  LDisplay := TUtils.DisplayPath(LFullPath);
+
+  // Dedup check
+  if FImportedMorFiles.ContainsKey(LFullPath) then
+    Exit;
+
+  // Check existence
+  if not TFile.Exists(LFullPath) then
+  begin
+    FErrors.Add(esError, ERR_ENGINE_FILE_NOT_FOUND,
+      RSFatalFileNotFound, [LDisplay]);
+    Exit;
+  end;
+
+  // Mark as imported
+  FImportedMorFiles.Add(LFullPath, True);
+
+  LSource := TFile.ReadAllText(LFullPath, TEncoding.UTF8);
+
+  // Lex imported .mor file
+  Status(RSMorLexerTokenizing, [LDisplay]);
+  LTokens := FMorLexer.Tokenize(LSource, LDisplay);
+  if FErrors.HasErrors() then Exit;
+
+  // Parse imported .mor file
+  Status(RSMorParserParsing, [LDisplay]);
+  LAST := FMorParser.Parse(LTokens, LDisplay);
+  if FErrors.HasErrors() then Exit;
+
+  // Add to .mor master root for lifetime management
+  FMorMasterRoot.AddChild(LAST);
+
+  Result := LAST;
 end;
 
 function TMorEngine.GetBuild(): TBuild;

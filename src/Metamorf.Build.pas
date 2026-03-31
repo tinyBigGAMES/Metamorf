@@ -81,6 +81,18 @@ type
     FLastExitCode: DWORD;
     FRawOutput: Boolean;
 
+    // Version info / post-build resources
+    FAddVersionInfo: Boolean;
+    FVIMajor: Word;
+    FVIMinor: Word;
+    FVIPatch: Word;
+    FVIProductName: string;
+    FVIDescription: string;
+    FVIFilename: string;
+    FVICompanyName: string;
+    FVICopyright: string;
+    FExeIcon: string;
+
     function GenerateBuildZig(): string;
     function BuildFlagsString(): string;
     function GetZigTargetString(): string;
@@ -92,6 +104,7 @@ type
     function FindDefineIndex(const ADefineName: string): Integer;
     procedure ParseFlagsLine(const ALine: string);
     function FilterOutputBuffer(const ABuffer: string): string;
+    procedure ApplyPostBuildResources(const AExePath: string);
 
   public
     constructor Create(); override;
@@ -176,6 +189,28 @@ type
     function GetDllExtension(): string;
     function GetLibExtension(): string;
     function GetOutputFilename(): string;
+
+    // Version info / post-build resources
+    procedure SetAddVersionInfo(const AValue: Boolean);
+    function GetAddVersionInfo(): Boolean;
+    procedure SetVIMajor(const AValue: Word);
+    function GetVIMajor(): Word;
+    procedure SetVIMinor(const AValue: Word);
+    function GetVIMinor(): Word;
+    procedure SetVIPatch(const AValue: Word);
+    function GetVIPatch(): Word;
+    procedure SetVIProductName(const AValue: string);
+    function GetVIProductName(): string;
+    procedure SetVIDescription(const AValue: string);
+    function GetVIDescription(): string;
+    procedure SetVIFilename(const AValue: string);
+    function GetVIFilename(): string;
+    procedure SetVICompanyName(const AValue: string);
+    function GetVICompanyName(): string;
+    procedure SetVICopyright(const AValue: string);
+    function GetVICopyright(): string;
+    procedure SetExeIcon(const AValue: string);
+    function GetExeIcon(): string;
   end;
 
 implementation
@@ -202,6 +237,18 @@ begin
   FErrors := nil;
   FLastExitCode := 0;
   FRawOutput := False;
+
+  // Version info defaults
+  FAddVersionInfo := False;
+  FVIMajor := 0;
+  FVIMinor := 0;
+  FVIPatch := 0;
+  FVIProductName := '';
+  FVIDescription := '';
+  FVIFilename := '';
+  FVICompanyName := '';
+  FVICopyright := '';
+  FExeIcon := '';
 end;
 
 destructor TBuild.Destroy();
@@ -557,6 +604,18 @@ begin
   FTarget := tpWin64;
   FSubsystem := stConsole;
   FLastExitCode := 0;
+
+  // Reset version info
+  FAddVersionInfo := False;
+  FVIMajor := 0;
+  FVIMinor := 0;
+  FVIPatch := 0;
+  FVIProductName := '';
+  FVIDescription := '';
+  FVIFilename := '';
+  FVICompanyName := '';
+  FVICopyright := '';
+  FExeIcon := '';
 end;
 
 function TBuild.GetLastExitCode(): DWORD;
@@ -1458,6 +1517,9 @@ begin
     end;
   end;
 
+  // Apply post-build resources (manifest, icon, version info)
+  ApplyPostBuildResources(LOutputFile);
+
   if AAutoRun then
     Result := Run()
   else
@@ -1564,6 +1626,145 @@ begin
   LOutputDir := TPath.Combine(FOutputPath, 'zig-out');
   if TDirectory.Exists(LOutputDir) then
     TDirectory.Delete(LOutputDir, True);
+end;
+
+// Version info / post-build resources
+
+procedure TBuild.ApplyPostBuildResources(const AExePath: string);
+var
+  LIsExe: Boolean;
+  LIsDll: Boolean;
+begin
+  LIsExe := AExePath.EndsWith('.exe', True);
+  LIsDll := AExePath.EndsWith('.dll', True);
+  if not LIsExe and not LIsDll then
+    Exit;
+
+  // Add manifest to executable
+  if LIsExe then
+  begin
+    if TUtils.ResourceExist('EXE_MANIFEST') then
+      if not TUtils.AddResManifestFromResource('EXE_MANIFEST', AExePath) then
+        if Assigned(FErrors) then
+          FErrors.Add(esWarning, 'W980',
+            'Failed to add manifest to executable', []);
+  end;
+
+  // Embed icon
+  if LIsExe and (FExeIcon <> '') then
+  begin
+    if TFile.Exists(FExeIcon) then
+      TUtils.UpdateIconResource(AExePath, FExeIcon)
+    else if Assigned(FErrors) then
+      FErrors.Add(esWarning, 'W982',
+        'Icon file not found: %s', [FExeIcon]);
+  end;
+
+  // Stamp version info
+  if FAddVersionInfo then
+    TUtils.UpdateVersionInfoResource(AExePath,
+      FVIMajor, FVIMinor, FVIPatch, FVIProductName,
+      FVIDescription, FVIFilename, FVICompanyName, FVICopyright);
+end;
+
+procedure TBuild.SetAddVersionInfo(const AValue: Boolean);
+begin
+  FAddVersionInfo := AValue;
+end;
+
+function TBuild.GetAddVersionInfo(): Boolean;
+begin
+  Result := FAddVersionInfo;
+end;
+
+procedure TBuild.SetVIMajor(const AValue: Word);
+begin
+  FVIMajor := AValue;
+end;
+
+function TBuild.GetVIMajor(): Word;
+begin
+  Result := FVIMajor;
+end;
+
+procedure TBuild.SetVIMinor(const AValue: Word);
+begin
+  FVIMinor := AValue;
+end;
+
+function TBuild.GetVIMinor(): Word;
+begin
+  Result := FVIMinor;
+end;
+
+procedure TBuild.SetVIPatch(const AValue: Word);
+begin
+  FVIPatch := AValue;
+end;
+
+function TBuild.GetVIPatch(): Word;
+begin
+  Result := FVIPatch;
+end;
+
+procedure TBuild.SetVIProductName(const AValue: string);
+begin
+  FVIProductName := AValue;
+end;
+
+function TBuild.GetVIProductName(): string;
+begin
+  Result := FVIProductName;
+end;
+
+procedure TBuild.SetVIDescription(const AValue: string);
+begin
+  FVIDescription := AValue;
+end;
+
+function TBuild.GetVIDescription(): string;
+begin
+  Result := FVIDescription;
+end;
+
+procedure TBuild.SetVIFilename(const AValue: string);
+begin
+  FVIFilename := AValue;
+end;
+
+function TBuild.GetVIFilename(): string;
+begin
+  Result := FVIFilename;
+end;
+
+procedure TBuild.SetVICompanyName(const AValue: string);
+begin
+  FVICompanyName := AValue;
+end;
+
+function TBuild.GetVICompanyName(): string;
+begin
+  Result := FVICompanyName;
+end;
+
+procedure TBuild.SetVICopyright(const AValue: string);
+begin
+  FVICopyright := AValue;
+end;
+
+function TBuild.GetVICopyright(): string;
+begin
+  Result := FVICopyright;
+end;
+
+procedure TBuild.SetExeIcon(const AValue: string);
+begin
+  FExeIcon := AValue;
+end;
+
+function TBuild.GetExeIcon(): string;
+begin
+  Result := FExeIcon;
 end;
 
 end.

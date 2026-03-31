@@ -37,6 +37,7 @@ type
     FSymKind: string;
     FTypeName: string;
     FAttrs: TDictionary<string, string>;
+    FDeclNode: TObject;
   public
     constructor Create(const AName: string; const ASymKind: string);
     destructor Destroy(); override;
@@ -47,6 +48,8 @@ type
     function GetSymAttr(const AKey: string): string;
     procedure SetSymAttr(const AKey: string; const AValue: string);
     function HasSymAttr(const AKey: string): Boolean;
+    function GetDeclNode(): TObject;
+    procedure SetDeclNode(const ANode: TObject);
   end;
 
   { TScope }
@@ -60,7 +63,7 @@ type
     destructor Destroy(); override;
     function GetScopeName(): string;
     function GetParent(): TScope;
-    procedure DeclareSymbol(const AName: string; const ASymKind: string);
+    procedure DeclareSymbol(const AName: string; const ASymKind: string; const ADeclNode: TObject = nil);
     function LookupLocal(const AName: string): TSymbol;
   end;
 
@@ -76,13 +79,17 @@ type
     procedure Push(const AName: string);
     procedure Pop();
     procedure Reset();
-    procedure Declare(const AName: string; const ASymKind: string);
+    procedure Declare(const AName: string; const ASymKind: string; const ADeclNode: TObject = nil);
     function Lookup(const AName: string): TSymbol;
     function SymbolExistsWithPrefix(const APrefix: string): Boolean;
+    function DemoteCLinkageForPrefix(const APrefix: string): Integer;
     function GetCurrent(): TScope;
   end;
 
 implementation
+
+uses
+  Metamorf.AST;
 
 { TSymbol }
 
@@ -93,6 +100,7 @@ begin
   FSymKind := ASymKind;
   FTypeName := '';
   FAttrs := TDictionary<string, string>.Create();
+  FDeclNode := nil;
 end;
 
 destructor TSymbol.Destroy();
@@ -137,6 +145,16 @@ begin
   Result := FAttrs.ContainsKey(AKey);
 end;
 
+function TSymbol.GetDeclNode(): TObject;
+begin
+  Result := FDeclNode;
+end;
+
+procedure TSymbol.SetDeclNode(const ANode: TObject);
+begin
+  FDeclNode := ANode;
+end;
+
 { TScope }
 
 constructor TScope.Create(const AName: string; const AParent: TScope);
@@ -164,11 +182,12 @@ begin
 end;
 
 
-procedure TScope.DeclareSymbol(const AName: string; const ASymKind: string);
+procedure TScope.DeclareSymbol(const AName: string; const ASymKind: string; const ADeclNode: TObject);
 var
   LSym: TSymbol;
 begin
   LSym := TSymbol.Create(AName, ASymKind);
+  LSym.SetDeclNode(ADeclNode);
   FSymbols.AddOrSetValue(AName, LSym);
 end;
 
@@ -235,10 +254,10 @@ begin
   end;
 end;
 
-procedure TScopeManager.Declare(const AName: string; const ASymKind: string);
+procedure TScopeManager.Declare(const AName: string; const ASymKind: string; const ADeclNode: TObject);
 begin
   if FCurrent <> nil then
-    FCurrent.DeclareSymbol(AName, ASymKind);
+    FCurrent.DeclareSymbol(AName, ASymKind, ADeclNode);
 end;
 
 function TScopeManager.Lookup(const AName: string): TSymbol;
@@ -272,6 +291,34 @@ begin
     LScope := LScope.GetParent();
   end;
   Result := False;
+end;
+
+function TScopeManager.DemoteCLinkageForPrefix(const APrefix: string): Integer;
+var
+  LScope: TScope;
+  LPair: TPair<string, TSymbol>;
+  LNode: TASTNode;
+begin
+  Result := 0;
+  LScope := FCurrent;
+  while LScope <> nil do
+  begin
+    for LPair in LScope.FSymbols do
+    begin
+      if LPair.Key.StartsWith(APrefix) and
+         (LPair.Value.GetDeclNode() <> nil) then
+      begin
+        LNode := TASTNode(LPair.Value.GetDeclNode());
+        if LNode.HasAttr('decl.linkage') and
+           (LNode.GetAttr('decl.linkage') = '"C"') then
+        begin
+          LNode.SetAttr('decl.linkage', '');
+          Inc(Result);
+        end;
+      end;
+    end;
+    LScope := LScope.GetParent();
+  end;
 end;
 
 function TScopeManager.GetCurrent(): TScope;

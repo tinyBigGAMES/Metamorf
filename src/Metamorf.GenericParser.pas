@@ -55,6 +55,10 @@ type
     procedure DoAdvance();
     procedure Expect(const AKind: string);
 
+    // Position save/restore (for optional backtracking)
+    function GetPos(): Integer;
+    procedure SetPos(const APos: Integer);
+
     // Parsing entry points
     function ParseExpression(const AMinPower: Integer): TASTNode;
     function ParseStatement(): TASTNode;
@@ -146,6 +150,16 @@ begin
     FErrors.Add(FFilename, Current().Line, Current().Col,
       esError, ERR_USERPARSER_EXPECTED_TOKEN,
       RSUserParserExpectedToken, [AKind, Current().Text]);
+end;
+
+function TGenericParser.GetPos(): Integer;
+begin
+  Result := FPos;
+end;
+
+procedure TGenericParser.SetPos(const APos: Integer);
+begin
+  FPos := APos;
 end;
 
 function TGenericParser.ParseExpression(const AMinPower: Integer): TASTNode;
