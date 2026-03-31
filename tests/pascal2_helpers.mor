@@ -1,0 +1,36 @@
+// ===========================================================================
+//  pascal2_helpers.mor -- Shared routines and fragments for Pascal2
+//
+//  Demonstrates: fragments (GROUP 4), triple-quoted strings (GROUP 3) use """
+// ===========================================================================
+
+// Fragment: emit parameters for a function/procedure declaration
+// Used by both stmt.func_decl and stmt.proc_decl emitters
+fragment emit_params {
+  let pi = 0;
+  let pc = child_count() - 2;
+  while pi < pc {
+    let p = getChild(node, pi);
+    param(getAttr(p, "param.name"), typeToIR(typeTextToKind(getAttr(p, "param.type_text"))));
+    pi = pi + 1;
+  }
+}
+
+// Fragment: emit block children
+fragment emit_block_children {
+  let bi = 0;
+  let bn = child_count(blk);
+  while bi < bn {
+    emitNode(getChild(blk, bi));
+    bi = bi + 1;
+  }
+}
+
+// Helper routine: emit a block's children
+routine emitBlock(blk: node) {
+  let i = 0;
+  while i < child_count(blk) {
+    emitNode(getChild(blk, i));
+    i = i + 1;
+  }
+}

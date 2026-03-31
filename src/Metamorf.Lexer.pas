@@ -336,23 +336,23 @@ var
   LText: string;
 begin
   Result := False;
-  // Check for ''' (three single quotes)
-  if (Current() = '''') and (PeekAt(1) = '''') and (PeekAt(2) = '''') then
+  // Check for """ (three double quotes)
+  if (Current() = '"') and (PeekAt(1) = '"') and (PeekAt(2) = '"') then
   begin
     Result := True;
     LStartLine := FLine;
     LStartCol := FCol;
-    Advance(); // skip first '
-    Advance(); // skip second '
-    Advance(); // skip third '
+    Advance(); // skip first "
+    Advance(); // skip second "
+    Advance(); // skip third "
     LText := '';
     while not AtEnd() do
     begin
-      if (Current() = '''') and (PeekAt(1) = '''') and (PeekAt(2) = '''') then
+      if (Current() = '"') and (PeekAt(1) = '"') and (PeekAt(2) = '"') then
       begin
-        Advance(); // skip first '
-        Advance(); // skip second '
-        Advance(); // skip third '
+        Advance(); // skip first "
+        Advance(); // skip second "
+        Advance(); // skip third "
         AToken := MakeToken('literal.triplestring', LText, LStartLine, LStartCol);
         Exit;
       end;

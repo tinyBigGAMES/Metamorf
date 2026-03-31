@@ -1,0 +1,28 @@
+// ===========================================================================
+//  pascal2.mor -- Modular Pascal language definition for Metamorf
+//
+//  Demonstrates advanced .mor features:
+//    - Multi-file imports (GROUP 5)
+//    - Top-level guards (GROUP 6)
+//    - Type system builtins (GROUP 7)
+//    - String interpolation (GROUP 2)
+//    - Triple-quoted strings (GROUP 3)
+//    - Fragments (GROUP 4)
+//    - Overload detection (GROUP 10)
+//    - Version info builtins (GROUP 11)
+//    - Default exprToString fallback (GROUP 8/9)
+//
+//  Test source: hello2.pas
+// ===========================================================================
+
+language Pascal2 version "2.0";
+
+const {
+  ENABLE_OVERLOADS = true;
+}
+
+import "pascal2_tokens.mor";
+import "pascal2_helpers.mor";
+import "pascal2_grammar.mor";
+import "pascal2_semantics.mor";
+import "pascal2_emitters.mor";

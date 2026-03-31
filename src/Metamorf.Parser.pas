@@ -50,10 +50,14 @@ type
 
     // Token navigation
     function Current(): TToken;
+    {$HINTS OFF}
     function Peek(): TToken;
+    {$HINTS ON}
     function AtEnd(): Boolean;
     function Check(const AKind: string): Boolean;
+    {$HINTS OFF}
     function CheckKeyword(const AText: string): Boolean;
+    {$HINTS ON}
     function Match(const AKind: string): Boolean;
     procedure DoAdvance();
     procedure Expect(const AKind: string);
@@ -129,6 +133,7 @@ type
 
     function Parse(const ATokens: TList<TToken>;
       const AFilename: string = ''): TASTNode;
+    function ParseSingleExpr(const ATokens: TList<TToken>): TASTNode;
   end;
 
 implementation
@@ -668,6 +673,8 @@ begin
   begin
     if Check('kw.token') then
       LNode.AddChild(ParseTokenDecl())
+    else if Check('kw.include') then
+      LNode.AddChild(ParseInclude())
     else
       LNode.AddChild(ParseConfigEntry());
   end;
@@ -730,7 +737,11 @@ begin
   LKey := Current().Text;
   DoAdvance();
   LNode.SetAttr('key', LKey);
-  Expect('op.assign');
+  // Accept = or -> as separator
+  if Check('op.arrow') then
+    DoAdvance()
+  else
+    Expect('op.assign');
   // Value can be identifier, dotted ident, string, bool, or integer
   if Check('literal.string') then
   begin
@@ -809,6 +820,14 @@ begin
       LNode.AddChild(ParseConfigEntry());
       LNode.GetChild(LNode.ChildCount() - 1).SetKind('meta.name_mangler');
     end
+    else if Check('kw.type') then
+    begin
+      DoAdvance();
+      LNode.AddChild(ParseConfigEntry());
+      // Stays as meta.config_entry — WalkTypesBlock stores in FTypeKeywords
+    end
+    else if Check('kw.include') then
+      LNode.AddChild(ParseInclude())
     else
       LNode.AddChild(ParseConfigEntry());
   end;
@@ -824,7 +843,12 @@ begin
   DoAdvance(); // skip 'grammar'
   Expect('delimiter.lbrace');
   while not AtEnd() and not Check('delimiter.rbrace') do
-    LNode.AddChild(ParseRule());
+  begin
+    if Check('kw.include') then
+      LNode.AddChild(ParseInclude())
+    else
+      LNode.AddChild(ParseRule());
+  end;
   Expect('delimiter.rbrace');
   Result := LNode;
 end;
@@ -875,6 +899,8 @@ begin
       LNode.AddChild(ParsePassDecl())
     else if Check('kw.on') then
       LNode.AddChild(ParseOnHandler())
+    else if Check('kw.include') then
+      LNode.AddChild(ParseInclude())
     else
       LNode.AddChild(ParseStmt());
   end;
@@ -934,6 +960,8 @@ begin
       LNode.AddChild(ParseBefore())
     else if Check('kw.after') then
       LNode.AddChild(ParseAfter())
+    else if Check('kw.include') then
+      LNode.AddChild(ParseInclude())
     else
       LNode.AddChild(ParseStmt());
   end;
@@ -1090,8 +1118,6 @@ end;
 function TMorParser.ParseIf(): TASTNode;
 var
   LNode: TASTNode;
-  LThen: TASTNode;
-  LElse: TASTNode;
 begin
   LNode := CreateNode('meta.if');
   DoAdvance(); // skip 'if'
@@ -1546,6 +1572,7 @@ begin
     else if LKind = 'kw.fragment' then LRoot.AddChild(ParseFragmentDecl())
     else if LKind = 'kw.import' then LRoot.AddChild(ParseImport())
     else if LKind = 'kw.include' then LRoot.AddChild(ParseInclude())
+    else if LKind = 'kw.guard' then LRoot.AddChild(ParseGuard())
     else
     begin
       if Assigned(FErrors) then
@@ -1557,6 +1584,14 @@ begin
   end;
 
   Result := LRoot;
+end;
+
+function TMorParser.ParseSingleExpr(const ATokens: TList<TToken>): TASTNode;
+begin
+  FTokens := ATokens;
+  FPos := 0;
+  FFilename := '<interpolation>';
+  Result := ParseExpr(0);
 end;
 
 end.

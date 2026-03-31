@@ -1,0 +1,105 @@
+// ===========================================================================
+//  pascal2_semantics.mor -- Semantic analysis for Pascal2
+//
+//  Demonstrates: overload detection (GROUP 10), top-level guards (GROUP 6)
+// ===========================================================================
+
+semantics {
+  on program.root {
+    scope "global" {
+      visit children;
+    }
+  }
+  on stmt.main_block {
+    scope "main" {
+      visit children;
+    }
+  }
+  on stmt.func_decl {
+    let name = getAttr(node, "func_name");
+
+    // Build signature for overload detection
+    let sig = name + "(";
+    let pi = 0;
+    let pc = child_count() - 2;
+    while pi < pc {
+      let p = getChild(node, pi);
+      if pi > 0 {
+        sig = sig + ",";
+      }
+      sig = sig + getAttr(p, "param.type_text");
+      pi = pi + 1;
+    }
+    sig = sig + ")";
+    setAttr(node, "sig", sig);
+
+    // Overload detection guarded by const flag
+    guard ENABLE_OVERLOADS {
+      if symbolExistsWithPrefix(name + "(") {
+        demoteCLinkageForPrefix(name + "(");
+      }
+    }
+
+    declare @sig as routine;
+    scope @func_name {
+      visit children;
+    }
+  }
+  on stmt.proc_decl {
+    let name = getAttr(node, "func_name");
+
+    // Build signature for overload detection
+    let sig = name + "(";
+    let pi = 0;
+    let pc = child_count() - 2;
+    while pi < pc {
+      let p = getChild(node, pi);
+      if pi > 0 {
+        sig = sig + ",";
+      }
+      sig = sig + getAttr(p, "param.type_text");
+      pi = pi + 1;
+    }
+    sig = sig + ")";
+    setAttr(node, "sig", sig);
+
+    // Overload detection guarded by const flag
+    guard ENABLE_OVERLOADS {
+      if symbolExistsWithPrefix(name + "(") {
+        demoteCLinkageForPrefix(name + "(");
+      }
+    }
+
+    declare @sig as routine;
+    scope @func_name {
+      visit children;
+    }
+  }
+  on stmt.var_decl {
+    visit children;
+  }
+  on stmt.single_var {
+    declare @vname as variable;
+    visit children;
+  }
+  on stmt.ident_stmt { visit children; }
+  on stmt.if       { visit children; }
+  on stmt.while    { visit children; }
+  on stmt.for      { visit children; }
+  on stmt.repeat   { visit children; }
+  on stmt.writeln  { }
+  on stmt.write    { }
+  on stmt.directive_platform  { }
+  on stmt.directive_optimize  { }
+  on stmt.directive_subsystem { }
+  on stmt.unit    { }
+  on stmt.uses {
+    setModuleExtension("pas");
+    visit children;
+  }
+  on stmt.uses_item {
+    compileModule(getAttr(node, "unit.name"));
+  }
+  on expr.call     { visit children; }
+  on expr.ident    { }
+}

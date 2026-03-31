@@ -1,0 +1,93 @@
+// ===========================================================================
+//  pascal2_tokens.mor -- Token declarations and type system for Pascal2
+// ===========================================================================
+
+tokens {
+  casesensitive = false;
+
+  token keyword.program   = "program";
+  token keyword.begin     = "begin";
+  token keyword.end       = "end";
+  token keyword.var       = "var";
+  token keyword.const     = "const";
+  token keyword.function  = "function";
+  token keyword.procedure = "procedure";
+  token keyword.if        = "if";
+  token keyword.then      = "then";
+  token keyword.else      = "else";
+  token keyword.while     = "while";
+  token keyword.do        = "do";
+  token keyword.for       = "for";
+  token keyword.to        = "to";
+  token keyword.downto    = "downto";
+  token keyword.repeat    = "repeat";
+  token keyword.until     = "until";
+  token keyword.writeln   = "writeln";
+  token keyword.not       = "not";
+  token keyword.and       = "and";
+  token keyword.or        = "or";
+  token keyword.div       = "div";
+  token keyword.mod       = "mod";
+  token keyword.true      = "true";
+  token keyword.false     = "false";
+  token keyword.nil       = "nil";
+  token keyword.write     = "write";
+  token keyword.unit      = "unit";
+  token keyword.uses      = "uses";
+  token op.assign         = ":=";
+  token op.neq            = "<>";
+  token op.lte            = "<=";
+  token op.gte            = ">=";
+  token op.plus           = "+";
+  token op.minus          = "-";
+  token op.star           = "*";
+  token op.slash          = "/";
+  token op.eq             = "=";
+  token op.lt             = "<";
+  token op.gt             = ">";
+  token delimiter.lparen    = "(";
+  token delimiter.rparen    = ")";
+  token delimiter.lbracket  = "[";
+  token delimiter.rbracket  = "]";
+  token delimiter.comma     = ",";
+  token delimiter.colon     = ":";
+  token delimiter.semicolon = ";";
+  token delimiter.dot       = ".";
+  token comment.line        = "//";
+  token comment.block_open  = "{";
+  token comment.block_close = "}";
+  token string.cstring      = "\"";
+  token string.sstring      = "'";
+  directive_prefix = "@";
+  token directive.platform  = "platform";
+  token directive.optimize  = "optimize";
+  token directive.subsystem = "subsystem";
+}
+
+// Type system using types{} block with typeTextToKind() / typeToIR()
+types {
+  type integer  = "type.integer";
+  type string   = "type.string";
+  type boolean  = "type.boolean";
+  type single   = "type.single";
+  type double   = "type.double";
+  type char     = "type.char";
+  type longint  = "type.longint";
+  type byte     = "type.byte";
+
+  map "type.integer" -> "int64_t";
+  map "type.string"  -> "std::string";
+  map "type.boolean" -> "bool";
+  map "type.single"  -> "float";
+  map "type.double"  -> "double";
+  map "type.char"    -> "char";
+  map "type.longint" -> "int64_t";
+  map "type.byte"    -> "uint8_t";
+
+  literal "expr.integer" = "type.integer";
+  literal "expr.float"   = "type.single";
+  literal "expr.cstring" = "type.string";
+  literal "expr.sstring" = "type.string";
+  literal "expr.bool_true"  = "type.boolean";
+  literal "expr.bool_false" = "type.boolean";
+}

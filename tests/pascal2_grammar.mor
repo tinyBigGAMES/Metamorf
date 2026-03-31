@@ -1,0 +1,278 @@
+// ===========================================================================
+//  pascal2_grammar.mor -- Grammar rules for Pascal2
+// ===========================================================================
+
+grammar {
+  // --- Prefix expression rules ---
+  rule expr.ident {
+    consume identifier -> @name;
+  }
+  rule expr.cstring {
+    consume string.cstring -> @value;
+  }
+  rule expr.sstring {
+    consume string.sstring -> @value;
+  }
+  rule expr.bool_true {
+    expect keyword.true;
+  }
+  rule expr.bool_false {
+    expect keyword.false;
+  }
+  rule expr.nil {
+    expect keyword.nil;
+  }
+  rule expr.integer {
+    consume literal.integer -> @value;
+  }
+  rule expr.float {
+    consume literal.float -> @value;
+  }
+  rule expr.grouped {
+    expect delimiter.lparen;
+    parse expr -> @inner;
+    expect delimiter.rparen;
+  }
+  rule expr.negate {
+    expect op.minus;
+    parse expr -> @operand;
+  }
+  rule expr.not {
+    expect keyword.not;
+    parse expr -> @operand;
+  }
+
+  // --- Infix expression rules ---
+  rule expr.add precedence left 20 {
+    consume [op.plus, op.minus] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.mul precedence left 30 {
+    consume [op.star, op.slash] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.compare precedence left 10 {
+    consume [op.eq, op.neq, op.lt, op.gt, op.lte, op.gte] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.div_mod precedence left 30 {
+    consume [keyword.div, keyword.mod] -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.and precedence left 5 {
+    expect keyword.and;
+    parse expr -> @right;
+  }
+  rule expr.or precedence left 3 {
+    expect keyword.or;
+    parse expr -> @right;
+  }
+  rule expr.call precedence left 80 {
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+  }
+
+  // --- Directive rules ---
+  rule stmt.directive_platform {
+    expect directive.platform;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_optimize {
+    expect directive.optimize;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_subsystem {
+    expect directive.subsystem;
+    consume identifier -> @value;
+  }
+
+  // --- Statement rules ---
+  rule stmt.program {
+    expect keyword.program;
+    consume identifier -> @name;
+    expect delimiter.semicolon;
+  }
+  rule stmt.unit {
+    expect keyword.unit;
+    consume identifier -> @name;
+    expect delimiter.semicolon;
+  }
+  rule stmt.uses {
+    expect keyword.uses;
+    let nd = getResultNode();
+    let u = createNode("stmt.uses_item");
+    setAttr(u, "unit.name", currentText());
+    advance();
+    addChild(nd, u);
+    while matchToken("delimiter.comma") {
+      let u2 = createNode("stmt.uses_item");
+      setAttr(u2, "unit.name", currentText());
+      advance();
+      addChild(nd, u2);
+    }
+    requireToken("delimiter.semicolon");
+  }
+  rule stmt.main_block {
+    expect keyword.begin;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+    matchToken("delimiter.dot");
+  }
+  rule stmt.var_decl {
+    expect keyword.var;
+    let nd = getResultNode();
+    let more = true;
+    while more {
+      if checkToken("keyword.var") { more = false; }
+      if checkToken("keyword.const") { more = false; }
+      if checkToken("keyword.begin") { more = false; }
+      if checkToken("keyword.function") { more = false; }
+      if checkToken("keyword.procedure") { more = false; }
+      if checkToken("keyword.end") { more = false; }
+      if checkToken("keyword.uses") { more = false; }
+      if checkToken("keyword.if") { more = false; }
+      if checkToken("keyword.while") { more = false; }
+      if checkToken("keyword.for") { more = false; }
+      if checkToken("keyword.repeat") { more = false; }
+      if not checkToken("identifier") { more = false; }
+
+      if more {
+        let v = createNode("stmt.single_var");
+        setAttr(v, "vname", currentText());
+        advance();
+        requireToken("delimiter.colon");
+        setAttr(v, "vtype", currentText());
+        advance();
+        if checkToken("op.assign") {
+          advance();
+          let init = parseExpr(0);
+          addChild(v, init);
+        }
+        requireToken("delimiter.semicolon");
+        addChild(nd, v);
+      }
+    }
+  }
+  rule stmt.ident_stmt {
+    let lhs = parseExpr(0);
+    let nd = getResultNode();
+    if checkToken("op.assign") {
+      advance();
+      let rhs = parseExpr(0);
+      setAttr(nd, "is_assign", "true");
+      addChild(nd, lhs);
+      addChild(nd, rhs);
+    } else {
+      setAttr(nd, "is_assign", "false");
+      addChild(nd, lhs);
+    }
+    requireToken("delimiter.semicolon");
+  }
+  rule stmt.writeln {
+    expect keyword.writeln;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    setAttr(nd, "raw_args", collectUntil("delimiter.rparen"));
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+  }
+  rule stmt.write {
+    expect keyword.write;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    setAttr(nd, "raw_args", collectUntil("delimiter.rparen"));
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+  }
+  rule stmt.if {
+    expect keyword.if;
+    parse expr -> @condition;
+    expect keyword.then;
+    parse many stmt until [keyword.else, keyword.end] -> @then_body;
+    optional {
+      expect keyword.else;
+      parse many stmt until keyword.end -> @else_body;
+    }
+    expect keyword.end;
+  }
+  rule stmt.while {
+    expect keyword.while;
+    parse expr -> @condition;
+    expect keyword.do;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+  }
+  rule stmt.for {
+    expect keyword.for;
+    consume identifier -> @var;
+    expect op.assign;
+    parse expr -> @start;
+    consume [keyword.to, keyword.downto] -> @dir;
+    parse expr -> @finish;
+    expect keyword.do;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+  }
+  rule stmt.repeat {
+    expect keyword.repeat;
+    parse many stmt until keyword.until -> @body;
+    expect keyword.until;
+    parse expr -> @condition;
+    expect delimiter.semicolon;
+  }
+  rule stmt.func_decl {
+    expect keyword.function;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("delimiter.colon");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      addChild(nd, p);
+      matchToken("delimiter.comma");
+    }
+    expect delimiter.rparen;
+    expect delimiter.colon;
+    consume identifier -> @return_type;
+    expect delimiter.semicolon;
+    parse many stmt until keyword.begin -> @decls;
+    expect keyword.begin;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.proc_decl {
+    expect keyword.procedure;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("delimiter.colon");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      addChild(nd, p);
+      matchToken("delimiter.comma");
+    }
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+    parse many stmt until keyword.begin -> @decls;
+    expect keyword.begin;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+    matchToken("delimiter.semicolon");
+  }
+}
