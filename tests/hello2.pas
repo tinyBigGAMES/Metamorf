@@ -2,6 +2,18 @@
 
 @subsystem console
 
+@optimize releasesmall
+
+@exeicon "res\assets\icons\metamorf.ico"
+@vermajor 2
+@verminor 0
+@verpatch 0
+@product "Hello2"
+@description "Pascal2 test program compiled by Metamorf"
+@filename "hello2.exe"
+@company "tinyBigGAMES LLC"
+@copyright "Copyright (c) 2025 tinyBigGAMES LLC"
+
 program Hello2;
 
 @platform win64

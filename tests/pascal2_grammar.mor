@@ -92,6 +92,42 @@ grammar {
     expect directive.subsystem;
     consume identifier -> @value;
   }
+  rule stmt.directive_exeicon {
+    expect directive.exeicon;
+    consume string.cstring -> @value;
+  }
+  rule stmt.directive_vermajor {
+    expect directive.vermajor;
+    consume literal.integer -> @value;
+  }
+  rule stmt.directive_verminor {
+    expect directive.verminor;
+    consume literal.integer -> @value;
+  }
+  rule stmt.directive_verpatch {
+    expect directive.verpatch;
+    consume literal.integer -> @value;
+  }
+  rule stmt.directive_product {
+    expect directive.product;
+    consume string.cstring -> @value;
+  }
+  rule stmt.directive_description {
+    expect directive.description;
+    consume string.cstring -> @value;
+  }
+  rule stmt.directive_filename {
+    expect directive.filename;
+    consume string.cstring -> @value;
+  }
+  rule stmt.directive_company {
+    expect directive.company;
+    consume string.cstring -> @value;
+  }
+  rule stmt.directive_copyright {
+    expect directive.copyright;
+    consume string.cstring -> @value;
+  }
 
   // --- Statement rules ---
   rule stmt.program {

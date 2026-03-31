@@ -2653,21 +2653,21 @@ begin
   else if AName = 'setVersionMajor' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIMajor(Word(AArgs[0].AsInt64()));
+      TBuild(FBuild).SetVIMajor(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
     Result := TValue.Empty;
   end
 
   else if AName = 'setVersionMinor' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIMinor(Word(AArgs[0].AsInt64()));
+      TBuild(FBuild).SetVIMinor(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
     Result := TValue.Empty;
   end
 
   else if AName = 'setVersionPatch' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIPatch(Word(AArgs[0].AsInt64()));
+      TBuild(FBuild).SetVIPatch(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
     Result := TValue.Empty;
   end
 

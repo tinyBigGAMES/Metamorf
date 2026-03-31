@@ -92,6 +92,15 @@ semantics {
   on stmt.directive_platform  { }
   on stmt.directive_optimize  { }
   on stmt.directive_subsystem { }
+  on stmt.directive_exeicon     { }
+  on stmt.directive_vermajor    { }
+  on stmt.directive_verminor    { }
+  on stmt.directive_verpatch    { }
+  on stmt.directive_product     { }
+  on stmt.directive_description { }
+  on stmt.directive_filename    { }
+  on stmt.directive_company     { }
+  on stmt.directive_copyright   { }
   on stmt.unit    { }
   on stmt.uses {
     setModuleExtension("pas");

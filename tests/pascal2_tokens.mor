@@ -62,6 +62,15 @@ tokens {
   token directive.platform  = "platform";
   token directive.optimize  = "optimize";
   token directive.subsystem = "subsystem";
+  token directive.exeicon     = "exeicon";
+  token directive.vermajor    = "vermajor";
+  token directive.verminor    = "verminor";
+  token directive.verpatch    = "verpatch";
+  token directive.product     = "product";
+  token directive.description = "description";
+  token directive.filename    = "filename";
+  token directive.company     = "company";
+  token directive.copyright   = "copyright";
 }
 
 // Type system using types{} block with typeTextToKind() / typeToIR()
