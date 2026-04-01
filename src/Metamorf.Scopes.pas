@@ -58,11 +58,13 @@ type
     FScopeName: string;
     FSymbols: TObjectDictionary<string, TSymbol>;
     FParent: TScope;
+    FChildren: TObjectList<TScope>;
   public
     constructor Create(const AName: string; const AParent: TScope);
     destructor Destroy(); override;
     function GetScopeName(): string;
     function GetParent(): TScope;
+    function FindChild(const AName: string): TScope;
     procedure DeclareSymbol(const AName: string; const ASymKind: string; const ADeclNode: TObject = nil);
     function LookupLocal(const AName: string): TSymbol;
   end;
@@ -163,10 +165,14 @@ begin
   FScopeName := AName;
   FParent := AParent;
   FSymbols := TObjectDictionary<string, TSymbol>.Create([doOwnsValues]);
+  FChildren := TObjectList<TScope>.Create(True); // owns children
+  if Assigned(AParent) then
+    AParent.FChildren.Add(Self);
 end;
 
 destructor TScope.Destroy();
 begin
+  FreeAndNil(FChildren); // recursively frees all child scopes
   FreeAndNil(FSymbols);
   inherited;
 end;
@@ -179,6 +185,18 @@ end;
 function TScope.GetParent(): TScope;
 begin
   Result := FParent;
+end;
+
+function TScope.FindChild(const AName: string): TScope;
+var
+  LI: Integer;
+begin
+  for LI := 0 to FChildren.Count - 1 do
+  begin
+    if FChildren[LI].FScopeName = AName then
+      Exit(FChildren[LI]);
+  end;
+  Result := nil;
 end;
 
 
@@ -207,51 +225,41 @@ begin
 end;
 
 destructor TScopeManager.Destroy();
-var
-  LScope: TScope;
 begin
-  // Walk up from current to root, freeing non-root scopes
-  while FCurrent <> FRoot do
-  begin
-    LScope := FCurrent;
-    FCurrent := FCurrent.GetParent();
-    LScope.Free();
-  end;
-  FreeAndNil(FRoot);
+  // Root owns all children via TObjectList -- just free root
   FCurrent := nil;
+  FreeAndNil(FRoot);
   inherited;
 end;
 
 procedure TScopeManager.Push(const AName: string);
 var
+  LExisting: TScope;
   LNewScope: TScope;
 begin
-  LNewScope := TScope.Create(AName, FCurrent);
-  FCurrent := LNewScope;
+  // Reuse existing child scope if found (for multi-pass re-entry)
+  LExisting := FCurrent.FindChild(AName);
+  if Assigned(LExisting) then
+    FCurrent := LExisting
+  else
+  begin
+    LNewScope := TScope.Create(AName, FCurrent);
+    FCurrent := LNewScope;
+  end;
 end;
 
 procedure TScopeManager.Pop();
-var
-  LOld: TScope;
 begin
   if FCurrent = FRoot then
     Exit;
-  LOld := FCurrent;
   FCurrent := FCurrent.GetParent();
-  LOld.Free();
 end;
 
 procedure TScopeManager.Reset();
-var
-  LScope: TScope;
 begin
-  // Pop all scopes back to root (for multi-pass)
-  while FCurrent <> FRoot do
-  begin
-    LScope := FCurrent;
-    FCurrent := FCurrent.GetParent();
-    LScope.Free();
-  end;
+  // Reset current pointer to root without freeing child scopes.
+  // Scope tree persists so multi-pass can revisit named scopes.
+  FCurrent := FRoot;
 end;
 
 procedure TScopeManager.Declare(const AName: string; const ASymKind: string; const ADeclNode: TObject);

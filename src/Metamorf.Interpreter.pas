@@ -368,6 +368,8 @@ begin
 end;
 
 destructor TMorInterpreter.Destroy();
+var
+  LI: Integer;
 begin
   FreeAndNil(FNativeEmitHandlers);
   FreeAndNil(FNativeStmtRules);
@@ -379,6 +381,12 @@ begin
   FreeAndNil(FRoutines);
   FreeAndNil(FSections);
   FreeAndNil(FEmitHandlers);
+  // Free per-pass handler dictionaries before freeing the list
+  if Assigned(FSemanticPasses) then
+  begin
+    for LI := 0 to FSemanticPasses.Count - 1 do
+      FSemanticPasses[LI].Handlers.Free();
+  end;
   FreeAndNil(FSemanticPasses);
   FreeAndNil(FSemanticHandlers);
   FreeAndNil(FStmtRules);
