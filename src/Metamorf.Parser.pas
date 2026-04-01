@@ -1340,6 +1340,12 @@ begin
   begin
     Expect('kw.expr');
     LNode.SetAttr('mode', 'expr');
+    // Optional binding power: parse expr 35 -> @operand;
+    if Check('literal.integer') then
+    begin
+      LNode.SetAttr('bind_power', Current().Text);
+      DoAdvance();
+    end;
   end;
 
   // -> @target

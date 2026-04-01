@@ -1183,7 +1183,8 @@ begin
       LAttrName := ANode.GetAttr('target_attr');
       if LMode = 'expr' then
       begin
-        LExprNode := LGenParser.ParseExpression(0);
+        LExprNode := LGenParser.ParseExpression(
+          StrToIntDef(ANode.GetAttr('bind_power'), 0));
         if Assigned(FResultNode) then
         begin
           FResultNode.AddChild(LExprNode);

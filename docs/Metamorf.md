@@ -2673,7 +2673,7 @@ RuleStmt       = ExpectStmt | ConsumeStmt | ParseStmt | SetAttrStmt
 
 ExpectStmt     = "expect" TokenRef ";" .
 ConsumeStmt    = "consume" TokenRef "->" "@" ident ";" .
-ParseStmt      = "parse" ( "expr" | "stmt" ) "->" "@" ident ";"
+ParseStmt      = "parse" ( "expr" | "stmt" ) [ integer ] "->" "@" ident ";"
                | "parse" "many" ( "expr" | "stmt" )
                  [ "until" UntilSpec ] "->" "@" ident ";" .
 UntilSpec      = TokenKind | "[" TokenKind { "," TokenKind } "]" .
