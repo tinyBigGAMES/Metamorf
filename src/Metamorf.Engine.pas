@@ -172,7 +172,11 @@ begin
   Status(RSMorParserParsing, [LMorDisplay]);
   LMorAST := FMorParser.Parse(LMorTokens, LMorDisplay);
   LMorTokens.Free();
-  if FErrors.HasErrors() then Exit;
+  if FErrors.HasErrors() then
+  begin
+    LMorAST.Free();
+    Exit;
+  end;
 
   // --- Phase 2: Setup interpreter tables ---
   Status(RSMorInterpSetup);
@@ -467,7 +471,11 @@ begin
   Status(RSMorParserParsing, [LDisplay]);
   LAST := FMorParser.Parse(LTokens, LDisplay);
   LTokens.Free();
-  if FErrors.HasErrors() then Exit;
+  if FErrors.HasErrors() then
+  begin
+    LAST.Free();
+    Exit;
+  end;
 
   // Add to .mor master root for lifetime management
   FMorMasterRoot.AddChild(LAST);

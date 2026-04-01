@@ -770,6 +770,7 @@ end;
 function TMorParser.ParseTypesBlock(): TASTNode;
 var
   LNode: TASTNode;
+  LChild: TASTNode;
 begin
   LNode := CreateNode('meta.types_block');
   DoAdvance(); // skip 'types'
@@ -792,33 +793,64 @@ begin
     end
     else if Check('kw.compatible') then
     begin
+      // compatible string "," string [ "->" string ] ";"
       DoAdvance();
-      LNode.AddChild(ParseConfigEntry());
-      LNode.GetChild(LNode.ChildCount() - 1).SetKind('meta.compatible');
+      LChild := CreateNode('meta.compatible');
+      LChild.SetAttr('key', Current().Text);
+      DoAdvance();
+      Expect('delimiter.comma');
+      LChild.SetAttr('value', Current().Text);
+      DoAdvance();
+      if Check('op.arrow') then
+      begin
+        DoAdvance();
+        LChild.SetAttr('coerce', Current().Text);
+        DoAdvance();
+      end;
+      Expect('delimiter.semicolon');
+      LNode.AddChild(LChild);
     end
     else if Check('kw.decl_kind') then
     begin
+      // decl_kind string ";"
       DoAdvance();
-      LNode.AddChild(ParseConfigEntry());
-      LNode.GetChild(LNode.ChildCount() - 1).SetKind('meta.decl_kind');
+      LChild := CreateNode('meta.decl_kind');
+      LChild.SetAttr('value', Current().Text);
+      DoAdvance();
+      Expect('delimiter.semicolon');
+      LNode.AddChild(LChild);
     end
     else if Check('kw.call_kind') then
     begin
+      // call_kind string ";"
       DoAdvance();
-      LNode.AddChild(ParseConfigEntry());
-      LNode.GetChild(LNode.ChildCount() - 1).SetKind('meta.call_kind');
+      LChild := CreateNode('meta.call_kind');
+      LChild.SetAttr('value', Current().Text);
+      DoAdvance();
+      Expect('delimiter.semicolon');
+      LNode.AddChild(LChild);
     end
     else if Check('kw.call_name_attr') then
     begin
+      // call_name_attr "=" string ";"
       DoAdvance();
-      LNode.AddChild(ParseConfigEntry());
-      LNode.GetChild(LNode.ChildCount() - 1).SetKind('meta.call_name_attr');
+      LChild := CreateNode('meta.call_name_attr');
+      Expect('op.assign');
+      LChild.SetAttr('value', Current().Text);
+      DoAdvance();
+      Expect('delimiter.semicolon');
+      LNode.AddChild(LChild);
     end
     else if Check('kw.name_mangler') then
     begin
+      // name_mangler "=" ident ";"
       DoAdvance();
-      LNode.AddChild(ParseConfigEntry());
-      LNode.GetChild(LNode.ChildCount() - 1).SetKind('meta.name_mangler');
+      LChild := CreateNode('meta.name_mangler');
+      Expect('op.assign');
+      LChild.SetAttr('value', Current().Text);
+      DoAdvance();
+      Expect('delimiter.semicolon');
+      LNode.AddChild(LChild);
     end
     else if Check('kw.type') then
     begin
