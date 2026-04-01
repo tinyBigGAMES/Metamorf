@@ -101,3 +101,4 @@ _delphifmt.cmd
 delphifmt.yml
 bin/res/libs/raylib/imports/raylib_pp.c
 _checkpoint_base.cmd
+docs/Metamorf.pdf

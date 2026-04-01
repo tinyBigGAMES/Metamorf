@@ -46,8 +46,7 @@ end;
 // TESTBED MODE (Debug / IDE)
 // =========================================================================
 
-function TestLang(const ALangFile: string;
-  const ASrcFile: string): Boolean;
+function TestLang(const ALangFile: string; const ASrcFile: string): Boolean;
 var
   LEngine: TMorEngine;
   LLangFile: string;
@@ -94,7 +93,7 @@ var
   LNum: Integer;
 begin
   try
-    LNum := 4;
+    LNum := 7;
 
     case LNum of
       01: TestLang('..\tests\pascal', '..\tests\hello.pas');

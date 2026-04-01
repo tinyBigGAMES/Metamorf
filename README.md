@@ -10,56 +10,41 @@
 
 ## What is Metamorf?
 
-**Metamorf** is a compiler construction meta-language written in [Delphi](https://www.embarcadero.com/products/delphi). You describe a complete programming language, its tokens, types, grammar rules, semantic analysis, and C++23 code generation, in a single `.mor` file. Metamorf reads that file, builds a fully configured compiler in memory, and immediately uses it to compile source files to native Win64/Linux64 binaries via Zig/Clang.
+**Metamorf** is a Turing complete programming language for building compilers. You describe a complete programming language in a `.mor` file, covering tokens, types, grammar rules, semantic analysis, and C++23 code generation. Metamorf reads that file and immediately uses it to compile source files to native Win64/Linux64 binaries via Zig/Clang.
 
 ```bash
-Metamorf -s pascal.mor hello.pas
+Metamorf -l pascal.mor -s hello.pas -r
 ```
 
-One file defines your language. One command compiles your program.
+One file defines your language. One command compiles and runs your program.
 
 ## Why Metamorf?
 
-Most language definition tools (YACC, ANTLR, traditional BNF grammars) give you a declarative grammar and then punt to a host language for anything non-trivial. Metamorf is different. It is a **complete, unified compiler-construction language**. It has variables, assignment, unbounded loops, conditionals, arithmetic, string operations, and user-defined routines with recursion, all first-class constructs alongside declarative grammar rules and token definitions.
+Most language definition tools (YACC, ANTLR, traditional BNF grammars) give you a declarative grammar and then punt to a host language for anything non-trivial. Metamorf is different. It is a **complete, Turing complete language** with variables, assignment, unbounded loops, conditionals, arithmetic, string operations, and user-defined routines with recursion, all first-class constructs alongside declarative grammar rules and token definitions.
 
 No host language glue code. No build system integration. No escape hatch to C, Java, or Python. A single `.mor` file is a complete, portable, standalone language specification that produces native binaries.
 
 **What you get:**
 
 - **Single-file language definitions** covering the entire pipeline: lexer tokens, Pratt parser grammar, semantic analysis, and C++23 code generation
-- **Turing complete language** with variables, loops, conditionals, recursion, and string operations as first-class constructs, not a bolt-on scripting layer
+- **Turing complete language** with variables, loops, conditionals, recursion, and string operations as first-class constructs
 - **Pratt parser grammar rules** with declarative prefix/infix/statement patterns and full imperative constructs for complex parsing
-- **IR builder code generation** producing structured C++23 through typed builders, not raw string concatenation
+- **IR builder code generation** producing structured C++23 through typed builders
 - **Automatic C++ passthrough** so your language can interoperate with C/C++ without any `.mor` configuration
+- **Modular imports** for splitting large language definitions across multiple `.mor` files
 - **Native binary output** for Win64 and Linux64 via Zig/Clang, with cross-compilation through WSL2
 
 ## How It Works
 
-Metamorf operates in two sequential phases. Phase 1 reads your `.mor` file and configures a compiler. Phase 2 uses that compiler to build your source into a native binary.
+Metamorf reads your `.mor` file, populates its internal dispatch tables (token definitions, grammar rules, semantic handlers, emitter handlers), then uses those tables to lex, parse, analyze, and generate C++23 from your source file. The generated C++ is compiled to a native binary via Zig/Clang.
 
 ```
-                    PHASE 1: Bootstrap
-                    ==================
-mylang.mor  ──►  Metamorf bootstrap  ──►  Configured compiler (your language)
-                                                    │
-                    PHASE 2: Compilation             │
-                    ====================             │
-myprogram.src  ─────────────────────────────────────►│──►  Lex ► Parse ► Semantics ► C++23 ► Zig/Clang
+mylang.mor  ──►  .mor parser  ──►  dispatch tables  ──►  lex ► parse ► semantics ► C++23 ► Zig/Clang
                                                                                           │
-                                                                                    native binary
+myprogram.src  ────────────────────────────────────────────────────────────────────►      native binary
 ```
-
-The `.mor` language is itself built using the same `TMetamorf` API it exposes to embedders, dogfooding its own engine every time it runs.
 
 See the [Metamorf Manual](docs/Metamorf.md) for the complete guide: architecture, grammar rules, semantic analysis, code emission, type inference, worked examples, and a checklist for building a new language.
-
-## Sub-Projects
-
-Metamorf includes two sub-project libraries built on the core engine:
-
-- **[DelphiFmt](docs/DelphiFmt.md)**: A Delphi source code formatter. Parses `.pas`, `.dpr`, `.dpk`, and `.inc` files into an AST using Metamorf's lexer and parser, then reconstructs the source using over 75 configurable formatting rules covering indentation, spacing, line breaks, capitalization, and alignment.
-
-- **[DelphiCImp](docs/DelphiCImp.md)**: A C header to Delphi import unit generator. Preprocesses C headers via `zig cc`, parses structs, enums, typedefs, and function declarations, then generates complete Delphi units with type mappings, constants, and external function bindings. Supports TOML configuration files for reproducible builds.
 
 ## Getting Started
 
@@ -70,7 +55,13 @@ Metamorf ships as a self-contained release with everything included. No separate
 3. Write a `.mor` language definition and a source file, then compile:
 
 ```bash
-Metamorf -s pascal.mor hello.pas
+Metamorf -l mylang.mor -s hello.src
+```
+
+To build and run in one step:
+
+```bash
+Metamorf -l mylang.mor -s hello.src -r
 ```
 
 To target Linux from Windows, install WSL2 with Ubuntu:
@@ -87,10 +78,10 @@ git clone https://github.com/tinyBigGAMES/Metamorf.git
 
 ```
 Metamorf/repo/
-  src/              ← Metamorf core sources
-  tests/            ← Test files including pascal.mor
-  docs/             ← Reference documentation
-  bin/              ← Executables run from here
+  src/              <- Metamorf core sources
+  tests/            <- Test files including pascal.mor, lua.mor, scheme.mor
+  docs/             <- Reference documentation
+  bin/              <- Executables run from here
 ```
 
 ## System Requirements
@@ -110,17 +101,17 @@ Metamorf/repo/
    ```
 3. Extract the source into the root of the release directory; this places the Delphi source alongside the build tools at their expected relative paths
 4. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 Athens
-5. Build all projects in the group
+5. Build the project
 
 > [!IMPORTANT]
-> This repository is under active development. APIs, file layouts, and language surfaces may change without notice. Each release aims to be stable and usable as we work toward v1.0. Follow the repo or join the [Discord](https://discord.gg/Wb6z8Wam7p) to track progress.
+> This repository is under active development. Language surfaces may change without notice. Each release aims to be stable and usable as we work toward v1.0. Follow the repo or join the [Discord](https://discord.gg/Wb6z8Wam7p) to track progress.
 
 ## Contributing
 
-Metamorf is an open project. Whether you are fixing a bug, improving documentation, adding a new showcase language, or proposing a framework feature, contributions are welcome.
+Metamorf is an open project. Whether you are fixing a bug, improving documentation, adding a new showcase language, or proposing a feature, contributions are welcome.
 
 - **Report bugs**: Open an issue with a minimal reproduction. The smaller the example, the faster the fix.
-- **Suggest features**: Describe the use case first, then the API shape you have in mind. Features that emerge from real problems get traction fastest.
+- **Suggest features**: Describe the use case first. Features that emerge from real problems get traction fastest.
 - **Submit pull requests**: Bug fixes, documentation improvements, new language examples, and well-scoped features are all welcome. Keep changes focused.
 
 Join the [Discord](https://discord.gg/Wb6z8Wam7p) to discuss development, ask questions, and share what you are building.
