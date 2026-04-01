@@ -1,0 +1,399 @@
+// ===========================================================================
+//  testbed.mor -- Minimal language definition for testing multipass semantics
+//
+//  Tests: forward references via pass 1 (declarations) / pass 2 (analysis)
+//  Test source: testbed.pas
+// ===========================================================================
+
+language Testbed version "1.0";
+
+tokens {
+  casesensitive = false;
+
+  token keyword.program   = "program";
+  token keyword.begin     = "begin";
+  token keyword.end       = "end";
+  token keyword.var       = "var";
+  token keyword.function  = "function";
+  token keyword.writeln   = "writeln";
+
+  token op.assign         = ":=";
+  token op.plus           = "+";
+  token op.star           = "*";
+
+  token delimiter.lparen    = "(";
+  token delimiter.rparen    = ")";
+  token delimiter.comma     = ",";
+  token delimiter.colon     = ":";
+  token delimiter.semicolon = ";";
+  token delimiter.dot       = ".";
+
+  token comment.line        = "//";
+  token comment.block_open  = "{";
+  token comment.block_close = "}";
+  token string.cstring      = "\"";
+  token string.sstring      = "'";
+}
+
+types {
+  type integer  = "type.integer";
+  type string   = "type.string";
+
+  map "type.integer" -> "int64_t";
+  map "type.string"  -> "std::string";
+
+  literal "expr.integer" = "type.integer";
+  literal "expr.cstring" = "type.string";
+  literal "expr.sstring" = "type.string";
+}
+
+grammar {
+  // --- Prefix expression rules ---
+  rule expr.ident {
+    consume identifier -> @name;
+  }
+  rule expr.cstring {
+    consume string.cstring -> @value;
+  }
+  rule expr.sstring {
+    consume string.sstring -> @value;
+  }
+  rule expr.integer {
+    consume literal.integer -> @value;
+  }
+  rule expr.grouped {
+    expect delimiter.lparen;
+    parse expr -> @inner;
+    expect delimiter.rparen;
+  }
+
+  // --- Infix expression rules ---
+  rule expr.add precedence left 20 {
+    consume op.plus -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.mul precedence left 30 {
+    consume op.star -> @operator;
+    parse expr -> @right;
+  }
+  rule expr.call precedence left 80 {
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    if not checkToken("delimiter.rparen") {
+      addChild(nd, parseExpr(0));
+      while matchToken("delimiter.comma") {
+        addChild(nd, parseExpr(0));
+      }
+    }
+    expect delimiter.rparen;
+  }
+
+  // --- Statement rules ---
+  rule stmt.program {
+    expect keyword.program;
+    consume identifier -> @name;
+    expect delimiter.semicolon;
+  }
+  rule stmt.main_block {
+    expect keyword.begin;
+    parse many stmt until keyword.end -> @body;
+    expect keyword.end;
+    matchToken("delimiter.dot");
+  }
+  rule stmt.var_decl {
+    expect keyword.var;
+    let nd = getResultNode();
+    let more = true;
+    while more {
+      if checkToken("keyword.begin") { more = false; }
+      if checkToken("keyword.function") { more = false; }
+      if checkToken("keyword.end") { more = false; }
+      if not checkToken("identifier") { more = false; }
+      if more {
+        let v = createNode("stmt.single_var");
+        setAttr(v, "vname", currentText());
+        advance();
+        requireToken("delimiter.colon");
+        setAttr(v, "vtype", currentText());
+        advance();
+        if checkToken("op.assign") {
+          advance();
+          let init = parseExpr(0);
+          addChild(v, init);
+        }
+        requireToken("delimiter.semicolon");
+        addChild(nd, v);
+      }
+    }
+  }
+  rule stmt.func_decl {
+    expect keyword.function;
+    consume identifier -> @func_name;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    while not checkToken("delimiter.rparen") {
+      let p = createNode("stmt.param");
+      setAttr(p, "param.name", currentText());
+      advance();
+      requireToken("delimiter.colon");
+      setAttr(p, "param.type_text", currentText());
+      advance();
+      addChild(nd, p);
+      matchToken("delimiter.comma");
+    }
+    expect delimiter.rparen;
+    expect delimiter.colon;
+    consume identifier -> @return_type;
+    expect delimiter.semicolon;
+    parse many stmt until keyword.begin -> @decls;
+    expect keyword.begin;
+    parse many stmt until keyword.end -> @func_body;
+    expect keyword.end;
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.writeln {
+    expect keyword.writeln;
+    expect delimiter.lparen;
+    let nd = getResultNode();
+    setAttr(nd, "raw_args", collectUntil("delimiter.rparen"));
+    expect delimiter.rparen;
+    expect delimiter.semicolon;
+  }
+  rule stmt.ident_stmt {
+    let lhs = parseExpr(0);
+    let nd = getResultNode();
+    if checkToken("op.assign") {
+      advance();
+      let rhs = parseExpr(0);
+      setAttr(nd, "is_assign", "true");
+      addChild(nd, lhs);
+      addChild(nd, rhs);
+    } else {
+      setAttr(nd, "is_assign", "false");
+      addChild(nd, lhs);
+    }
+    requireToken("delimiter.semicolon");
+  }
+}
+
+// ===========================================================================
+//  MULTIPASS SEMANTICS -- the key feature being tested
+//
+//  Pass 1: declare all routines and variables (no lookups)
+//  Pass 2: resolve references (lookups can find pass 1 symbols)
+//
+//  This enables forward references: function A can call function B
+//  even when B is declared after A in the source file.
+// ===========================================================================
+
+semantics {
+  pass 1 "declarations" {
+    on program.root {
+      scope "global" {
+        visit children;
+      }
+    }
+    on stmt.main_block {
+      scope "main" {
+        visit children;
+      }
+    }
+    on stmt.func_decl {
+      declare @func_name as routine;
+    }
+    on stmt.var_decl {
+      visit children;
+    }
+    on stmt.single_var {
+      declare @vname as variable;
+    }
+  }
+
+  pass 2 "analysis" {
+    on program.root {
+      scope "global" {
+        visit children;
+      }
+    }
+    on stmt.main_block {
+      scope "main" {
+        visit children;
+      }
+    }
+    on stmt.func_decl {
+      scope @func_name {
+        visit children;
+      }
+    }
+    on stmt.ident_stmt { visit children; }
+    on stmt.writeln  { }
+    on expr.call     { visit children; }
+    on expr.ident    { }
+  }
+}
+
+emitters {
+  on program.root {
+    emitLine("#include <cstdint>");
+    emitLine("#include <print>");
+
+    // Forward declarations for all functions (enables C++ forward refs)
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.func_decl" {
+        let retType = typeToIR(typeTextToKind(getAttr(ch, "return_type")));
+        let fname = getAttr(ch, "func_name");
+        let sig = retType + " " + fname + "(";
+        let pi = 0;
+        let pc = childCount(ch) - 2;
+        while pi < pc {
+          let p = getChild(ch, pi);
+          if pi > 0 {
+            sig = sig + ", ";
+          }
+          sig = sig + typeToIR(typeTextToKind(getAttr(p, "param.type_text"))) + " " + getAttr(p, "param.name");
+          pi = pi + 1;
+        }
+        sig = sig + ");";
+        emitLine(sig);
+      }
+      i = i + 1;
+    }
+
+    // Emit function definitions
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.func_decl" {
+        emitNode(ch);
+      }
+      i = i + 1;
+    }
+
+    // Pass 2: emit main
+    func("main", "int");
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.var_decl" {
+        emitNode(ch);
+      }
+      i = i + 1;
+    }
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.main_block" {
+        emitChildren(ch);
+      }
+      i = i + 1;
+    }
+    returnVal("0");
+    endFunc();
+  }
+
+  on stmt.program {
+    setBuildMode("exe");
+  }
+
+  on stmt.var_decl {
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let v = getChild(node, i);
+      let ctype = typeToIR(typeTextToKind(getAttr(v, "vtype")));
+      let vname = getAttr(v, "vname");
+      if childCount(v) > 0 {
+        declVar(vname, ctype, exprToString(getChild(v, 0)));
+      } else {
+        declVar(vname, ctype);
+      }
+      i = i + 1;
+    }
+  }
+
+  on stmt.ident_stmt {
+    if getAttr(node, "is_assign") == "true" {
+      let target = exprToString(getChild(node, 0));
+      let val = exprToString(getChild(node, 1));
+      assign(target, val);
+    } else {
+      stmt(exprToString(getChild(node, 0)) + ";");
+    }
+  }
+
+  on stmt.writeln {
+    let args = getAttr(node, "raw_args");
+    if args == "" {
+      stmt("std::println(\"\");");
+    } else {
+      stmt("std::println(" + args + ");");
+    }
+  }
+
+  on stmt.func_decl {
+    let retType = typeToIR(typeTextToKind(getAttr(node, "return_type")));
+    let fname = getAttr(node, "func_name");
+    func(fname, retType);
+    let pi = 0;
+    let pc = child_count() - 2;
+    while pi < pc {
+      let p = getChild(node, pi);
+      param(getAttr(p, "param.name"), typeToIR(typeTextToKind(getAttr(p, "param.type_text"))));
+      pi = pi + 1;
+    }
+    if retType != "void" {
+      declVar("Result", retType);
+    }
+    // Local declarations
+    emitBlock(getChild(node, child_count() - 2));
+    // Body
+    emitBlock(getChild(node, child_count() - 1));
+    if retType != "void" {
+      returnVal("Result");
+    }
+    endFunc();
+    blankLine();
+  }
+
+  // --- Expression emitters ---
+  on expr.cstring {
+    emit "\"" + @value + "\"";
+  }
+  on expr.sstring {
+    emit "\"" + @value + "\"";
+  }
+  on expr.integer {
+    emit @value;
+  }
+  on expr.ident {
+    emit @name;
+  }
+  on expr.call {
+    let fname = exprToString(getChild(node, 0));
+    let args = "";
+    let i = 1;
+    while i < child_count() {
+      if i > 1 {
+        args = args + ", ";
+      }
+      args = args + exprToString(getChild(node, i));
+      i = i + 1;
+    }
+    emit fname + "(" + args + ")";
+  }
+  on expr.grouped {
+    emit "(" + exprToString(getChild(node, 0)) + ")";
+  }
+}
+
+// Helper routine for emitting block children
+routine emitBlock(blk: node) {
+  let i = 0;
+  while i < child_count(blk) {
+    emitNode(getChild(blk, i));
+    i = i + 1;
+  }
+}
