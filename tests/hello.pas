@@ -16,9 +16,7 @@
 //@platform linux64
 
 @optimize debug
-
 @subsystem console
-
 program Hello;
 
 uses mathutils;

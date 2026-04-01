@@ -1,12 +1,58 @@
 // ===========================================================================
 //  pascal2_emitters.mor -- Code generation for Pascal2
 //
-//  Demonstrates:
-//    - String interpolation (GROUP 2): {varName} in emit strings
-//    - Triple-quoted strings (GROUP 3): """...""" for multi-line output
-//    - Version info builtins (GROUP 11)
-//    - Default exprToString fallback (GROUP 8/9): expr.add, expr.mul omitted
-//    - Fragment inclusion (GROUP 4): include emit_params
+//  Defines emitter handlers that produce C++23 output from the user AST.
+//  This is the most complex part of the Pascal2 definition, handling
+//  multi-pass code emission, structured IR builder calls, and source-level
+//  build configuration through directives.
+//
+//  Advanced .mor features demonstrated:
+//
+//    String interpolation    {varName} inside emit strings expands to
+//                            the variable's value at emit time.
+//
+//    Triple-quoted strings   """...""" for multi-line C++ output,
+//                            used in the program.root handler to emit
+//                            a multi-line header comment.
+//
+//    Version info builtins   setVersionMajor(), setVersionMinor(), etc.
+//                            are called from directive emitters to embed
+//                            version resources in the compiled binary.
+//
+//    Default exprToString    expr.add and expr.mul emitters are
+//                            intentionally OMITTED. The engine's fallback
+//                            automatically produces "left op right" for
+//                            binary expression nodes with an @operator
+//                            attribute and two children.
+//
+//    Fragment inclusion      include emit_params inlines the fragment
+//                            defined in pascal2_helpers.mor (though the
+//                            actual emitters inline the logic directly
+//                            for clarity).
+//
+//  Emission passes in program.root:
+//    Pass 0    Directives, preprocessor, program/unit, uses declarations
+//    Pass 1    Function and procedure definitions
+//    Pass 1.5  Header forward declarations (unit mode only) -- emits
+//              function signatures to the .h file so other units can
+//              call them
+//    Pass 2    Main program body (program mode only) -- wraps var
+//              declarations and begin..end in int main() { }
+//
+//  Build configuration:
+//    stmt.program calls setBuildMode("exe")
+//    stmt.unit calls setBuildMode("lib")
+//    Directive emitters call setPlatform(), setOptimize(), setSubsystem(),
+//    setExeIcon(), setVersionMajor(), etc. to configure the Zig/Clang
+//    build pipeline from source-level @ directives.
+//
+//  Type resolution pattern:
+//    typeToIR(typeTextToKind(text)) is the standard two-step pattern.
+//    typeTextToKind() maps source text ("integer") to a type kind
+//    ("type.integer"). typeToIR() maps the kind to C++ ("int64_t").
+//    Both use the types{} block registrations from pascal2_tokens.mor.
+//
+//  Compile with:  Metamorf -l pascal2.mor -s hello2.pas -r
 // ===========================================================================
 
 emitters {

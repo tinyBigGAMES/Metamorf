@@ -1,7 +1,31 @@
 // ===========================================================================
 //  pascal2_helpers.mor -- Shared routines and fragments for Pascal2
 //
-//  Demonstrates: fragments (GROUP 4), triple-quoted strings (GROUP 3) use """
+//  Demonstrates two code-reuse mechanisms in the .mor language:
+//
+//  Fragments:
+//    fragment emit_params       Emits function/procedure parameters using
+//                               param() IR builder. Iterates child nodes
+//                               (excluding the last two, which are decls
+//                               and body) and calls param(name, type) for
+//                               each. Can be inlined via "include emit_params".
+//
+//    fragment emit_block_children  Emits all children of a named block node.
+//                               Useful for emitting begin..end bodies.
+//
+//  Routines:
+//    routine emitBlock(blk: node)  Helper that walks all children of a
+//                               block node and calls emitNode() on each.
+//                               Callable from any handler via emitBlock(node).
+//                               This is the routine form of emit_block_children.
+//
+//  Fragments vs. routines: Fragments are textually inlined at the include
+//  site (like macros). Routines are callable functions with parameters and
+//  their own scope. Use fragments for small repeated patterns within a
+//  single block type; use routines for logic shared across multiple handlers.
+//
+//  Note: Triple-quoted strings (GROUP 3) use """...""" syntax for
+//  multi-line string literals, demonstrated in pascal2_emitters.mor.
 // ===========================================================================
 
 // Fragment: emit parameters for a function/procedure declaration

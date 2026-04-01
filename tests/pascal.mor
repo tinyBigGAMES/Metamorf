@@ -38,6 +38,17 @@
 //  naturally. S-expression languages like Scheme cannot use this pattern
 //  and instead use collectRaw() for passthrough -- see scheme.mor.
 //
+//  C++ TOKEN AVOIDANCE
+//
+//  Block comments use /* */ instead of traditional Pascal { } because
+//  ConfigCpp registers { and } as delimiter.lbrace/rbrace for C++
+//  brace handling. If { were a comment opener, the lexer would consume
+//  it before the operator table could see it, breaking C++ passthrough
+//  for brace-delimited constructs. [ ] are provided by ConfigCpp as
+//  delimiter.lbracket/rbracket and are not declared in this tokens block.
+//  Pascal type names (integer, string, boolean) do not conflict with
+//  C++ keywords, so no renaming is needed.
+//
 //  Test source: hello.pas
 // ===========================================================================
 
@@ -86,8 +97,7 @@ tokens {
   token op.gt             = ">";
   token delimiter.lparen    = "(";
   token delimiter.rparen    = ")";
-  token delimiter.lbracket  = "[";
-  token delimiter.rbracket  = "]";
+  // [ ] are provided by ConfigCpp as delimiter.lbracket/rbracket.
   token delimiter.comma     = ",";
   token delimiter.colon     = ":";
   token delimiter.semicolon = ";";

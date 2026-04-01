@@ -1,18 +1,33 @@
 // ===========================================================================
 //  pascal2.mor -- Modular Pascal language definition for Metamorf
 //
-//  Demonstrates advanced .mor features:
-//    - Multi-file imports (GROUP 5)
-//    - Top-level guards (GROUP 6)
-//    - Type system builtins (GROUP 7)
-//    - String interpolation (GROUP 2)
-//    - Triple-quoted strings (GROUP 3)
-//    - Fragments (GROUP 4)
-//    - Overload detection (GROUP 10)
-//    - Version info builtins (GROUP 11)
-//    - Default exprToString fallback (GROUP 8/9)
+//  This is the advanced companion to pascal.mor. While pascal.mor is a
+//  single self-contained file, pascal2.mor demonstrates how to split a
+//  language definition across multiple .mor files using import statements.
+//  Each imported file handles one pipeline stage:
 //
-//  Test source: hello2.pas
+//    pascal2_tokens.mor     Token declarations and type system
+//    pascal2_helpers.mor    Shared routines and fragments
+//    pascal2_grammar.mor    All grammar rules (prefix, infix, statement)
+//    pascal2_semantics.mor  Semantic analysis with overload detection
+//    pascal2_emitters.mor   Code generation with multi-pass output
+//
+//  Advanced .mor features demonstrated:
+//
+//    Multi-file imports     import "file.mor" splits large definitions
+//    Top-level guards       guard CONST_FLAG { ... } for conditional code
+//    Type system builtins   typeTextToKind() and typeToIR() for type resolution
+//    String interpolation   {varName} inside emit strings
+//    Triple-quoted strings  """...""" for multi-line C++ output
+//    Fragments              fragment name { ... } with include name
+//    Overload detection     symbolExistsWithPrefix() + demoteCLinkageForPrefix()
+//    Version info builtins  setVersionMajor(), setProductName(), setExeIcon(), etc.
+//    Default exprToString   Binary expression emitters omitted intentionally;
+//                           the engine's fallback produces "left op right"
+//    Module compilation     compileModule() + setModuleExtension() for uses/unit
+//
+//  Compile with:  Metamorf -l pascal2.mor -s hello2.pas -r
+//  Test source:   hello2.pas (program mode) + mathlib.pas (unit mode)
 // ===========================================================================
 
 language Pascal2 version "2.0";

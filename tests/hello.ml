@@ -20,11 +20,11 @@ use mathutils;
 // Mixed-mode: directly include C++ headers to call C++ functions
 #include <cstdio>
 
-fn add(a: int, b: int) -> int {
+fn add(a: i64, b: i64) -> i64 {
   return a + b;
 }
 
-fn factorial(n: int) -> int {
+fn factorial(n: i64) -> i64 {
   if n <= 1 {
     return 1;
   } else {
@@ -32,8 +32,8 @@ fn factorial(n: int) -> int {
   }
 }
 
-let sum: int = 0;
-let i: int = 0;
+let sum: i64 = 0;
+let i: i64 = 0;
 
 // Greeting
 print("Hello from MyLang!");

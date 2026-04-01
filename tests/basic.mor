@@ -36,6 +36,14 @@
 //  constructs parse naturally. S-expression languages like Scheme
 //  cannot use this pattern -- see scheme.mor.
 //
+//  C++ TOKEN AVOIDANCE
+//
+//  BASIC has no C++ token conflicts. Its operators (=, <>, <=, >=)
+//  and comment delimiter (') are all distinct from C++ symbols.
+//  BASIC type names (Integer, String, Single) are case-insensitive
+//  and do not match C++ keywords (int, bool, float). No special
+//  avoidance measures are needed for this language.
+//
 //  Test source: hello.bas
 // ===========================================================================
 

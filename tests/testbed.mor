@@ -1,8 +1,42 @@
 // ===========================================================================
-//  testbed.mor -- Minimal language definition for testing multipass semantics
+//  testbed.mor -- Minimal language for testing multi-pass forward references
 //
-//  Tests: forward references via pass 1 (declarations) / pass 2 (analysis)
-//  Test source: testbed.pas
+//  This is the canonical example of multi-pass semantic analysis in
+//  Metamorf. It defines a minimal Pascal-like language with just enough
+//  constructs to demonstrate forward references: function A calls
+//  function B, but B is declared after A in the source file.
+//
+//  Multi-pass semantics:
+//    pass 1 "declarations"   Walks the AST and declares all function
+//                            names and variables into the symbol table.
+//                            No lookups or reference resolution happens.
+//    pass 2 "analysis"       Re-walks the AST. Now every symbol declared
+//                            in pass 1 is visible, so forward references
+//                            resolve correctly. Enters function scopes
+//                            for child visitation.
+//
+//  Scope tree persistence: The scope tree built in pass 1 persists into
+//  pass 2. The scope stack resets to the root between passes, but named
+//  scopes created in pass 1 are reused (not recreated) in pass 2.
+//
+//  C++ forward declarations: Multi-pass solves forward references at the
+//  Metamorf semantic level, but C++ has its own forward reference rules.
+//  The emitter's program.root handler emits C++ forward declarations for
+//  all functions BEFORE emitting their full definitions. Without this,
+//  the C++ compiler would fail even though Metamorf's semantic analysis
+//  passed. Both pieces (semantic passes + emitter forward decls) are
+//  required for forward references to work end-to-end.
+//
+//  Grammar: Minimal subset -- program, var, function, writeln, assignment,
+//  integer/string literals, +, *, call, grouped expressions, and
+//  source-level directives (@platform, @optimize, @subsystem).
+//  No if/while/for -- this is a semantics test, not a grammar test.
+//
+//  C++ TOKEN AVOIDANCE: Block comments use /* */ (not { }). No C++
+//  operator conflicts. Type names (integer, string) are not C++ keywords.
+//
+//  Compile with:  Metamorf -l testbed.mor -s testbed.pas -r
+//  Test source:   testbed.pas
 // ===========================================================================
 
 language Testbed version "1.0";
@@ -29,10 +63,14 @@ tokens {
   token delimiter.dot       = ".";
 
   token comment.line        = "//";
-  token comment.block_open  = "{";
-  token comment.block_close = "}";
+  token comment.block_open  = "/*";
+  token comment.block_close = "*/";
   token string.cstring      = "\"";
   token string.sstring      = "'";
+  directive_prefix = "@";
+  token directive.platform  = "platform";
+  token directive.optimize  = "optimize";
+  token directive.subsystem = "subsystem";
 }
 
 types {
@@ -174,6 +212,20 @@ grammar {
     }
     requireToken("delimiter.semicolon");
   }
+
+  // --- Directive rules ---
+  rule stmt.directive_platform {
+    expect directive.platform;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_optimize {
+    expect directive.optimize;
+    consume identifier -> @value;
+  }
+  rule stmt.directive_subsystem {
+    expect directive.subsystem;
+    consume identifier -> @value;
+  }
 }
 
 // ===========================================================================
@@ -207,6 +259,9 @@ semantics {
     on stmt.single_var {
       declare @vname as variable;
     }
+    on stmt.directive_platform  { }
+    on stmt.directive_optimize  { }
+    on stmt.directive_subsystem { }
   }
 
   pass 2 "analysis" {
@@ -229,6 +284,9 @@ semantics {
     on stmt.writeln  { }
     on expr.call     { visit children; }
     on expr.ident    { }
+    on stmt.directive_platform  { }
+    on stmt.directive_optimize  { }
+    on stmt.directive_subsystem { }
   }
 }
 
@@ -237,8 +295,19 @@ emitters {
     emitLine("#include <cstdint>");
     emitLine("#include <print>");
 
-    // Forward declarations for all functions (enables C++ forward refs)
+    // Pass 0: directives
     let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.directive_platform" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.directive_optimize" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.directive_subsystem" { emitNode(ch); }
+      i = i + 1;
+    }
+
+    // Forward declarations for all functions (enables C++ forward refs)
+    i = 0;
     let n = child_count();
     while i < n {
       let ch = getChild(node, i);
@@ -296,6 +365,16 @@ emitters {
 
   on stmt.program {
     setBuildMode("exe");
+  }
+
+  on stmt.directive_platform {
+    setPlatform(getAttr(node, "value"));
+  }
+  on stmt.directive_optimize {
+    setOptimize(getAttr(node, "value"));
+  }
+  on stmt.directive_subsystem {
+    setSubsystem(getAttr(node, "value"));
   }
 
   on stmt.var_decl {

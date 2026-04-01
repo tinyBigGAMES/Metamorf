@@ -4,58 +4,59 @@
 
 </div>
 
-## 📖 Table of Contents
+## Table of Contents
 
-1. [Overview](#-overview)
-2. [Getting Started](#-getting-started)
-3. [Architecture](#-architecture)
-4. [File Structure](#-file-structure)
-5. [Tokens Block](#-tokens-block)
-6. [Types Block](#-types-block)
-7. [Grammar Block](#-grammar-block)
-8. [Semantics Block](#-semantics-block)
-9. [Emitters Block](#-emitters-block)
-10. [The Imperative Language](#-the-imperative-language)
-11. [Routines and Constants](#-routines-and-constants)
-12. [Fragments, Imports, and Includes](#-fragments-imports-and-includes)
-13. [Built-in Functions Reference](#-built-in-functions-reference)
-14. [C++ Passthrough](#-c-passthrough)
-15. [Embedding Metamorf](#-embedding-metamorf)
-16. [Formal Grammar (EBNF)](#-formal-grammar-ebnf)
-17. [Design Principles](#-design-principles)
-18. [System Requirements](#-system-requirements)
-19. [Building from Source](#-building-from-source)
-20. [Contributing, Support, and License](#-contributing-support-and-license)
+1. [Overview](#overview)
+2. [Getting Started](#getting-started)
+3. [Architecture](#architecture)
+4. [File Structure](#file-structure)
+5. [Tokens Block](#tokens-block)
+6. [Types Block](#types-block)
+7. [Grammar Block](#grammar-block)
+8. [Semantics Block](#semantics-block)
+9. [Emitters Block](#emitters-block)
+10. [The Imperative Language](#the-imperative-language)
+11. [Routines and Constants](#routines-and-constants)
+12. [Fragments, Imports, and Includes](#fragments-imports-and-includes)
+13. [Built-in Functions Reference](#built-in-functions-reference)
+14. [C++ Passthrough](#c-passthrough)
+15. [Formal Grammar (EBNF)](#formal-grammar-ebnf)
+16. [Design Principles](#design-principles)
+17. [System Requirements](#system-requirements)
+18. [Building from Source](#building-from-source)
+19. [Contributing, Support, and License](#contributing-support-and-license)
 
 
-## 🌟 Overview
+## Overview
 
-Metamorf is a compiler construction meta-language. You describe a complete programming language - its tokens, types, grammar rules, semantic analysis, and C++23 code generation - in a single `.mor` file. Metamorf reads that file, builds a fully configured compiler in memory, and immediately uses it to compile source files to native Win64/Linux64 binaries via Zig/Clang.
-
-**Who is this manual for?** You are a developer who wants to define a programming language using Metamorf. You know what a lexer, parser, and AST are. You do not need to be a compiler expert - this manual will teach you the rest - but you should be comfortable reading code and thinking about how source text becomes structured data.
-
-**From Grammar to Native Binary.** One file defines your language. One command compiles your program:
+Metamorf is a language engineering platform. You describe a complete programming language in a `.mor` file, then compile source files written in that language to native Win64/Linux64 binaries. One file defines your language. One command compiles your program:
 
 ```bash
-Metamorf -s pascal.mor hello.pas
+Metamorf -l pascal.mor -s hello.pas -r
 ```
 
-Most language definition tools (YACC, ANTLR, traditional BNF grammars) give you a declarative grammar and then punt to a host language for anything non-trivial. Metamorf is a **complete, unified compiler-construction language**. It has variables, assignment, unbounded loops, conditionals, arithmetic, string operations, and user-defined routines with recursion — all first-class constructs alongside declarative grammar rules and token definitions. Every aspect of your language — from complex parsing logic to multi-pass code generation — is expressible entirely within the `.mor` file itself. The `.mor` language is itself built using the same `TMetamorf` API it exposes to embedders — it dogfoods its own engine every time it runs.
+A `.mor` file covers the full compiler pipeline: lexer tokens, Pratt parser grammar, multi-pass semantic analysis, and C++23 code generation. The result is a native binary built via Zig/Clang.
+
+**Who is this manual for?** You are a developer who wants to define a programming language using Metamorf. You know what a lexer, parser, and AST are. You do not need to be a compiler expert, but you should be comfortable reading code and thinking about how source text becomes structured data.
+
+**Turing complete by design.** Most language definition tools (YACC, ANTLR, traditional BNF grammars) give you a declarative grammar and then punt to a host language for anything non-trivial. Metamorf is a complete, unified compiler-construction language. It has variables, assignment, unbounded loops, conditionals, arithmetic, string operations, and user-defined routines with recursion. All of these are first-class constructs alongside declarative grammar rules and token definitions. Every handler body uses the same unified language.
 
 No host language glue code. No build system integration. No escape hatch to C, Java, or Python. A single `.mor` file is a complete, portable, standalone language specification that produces native binaries.
 
 **What Metamorf provides:**
 
 - **Single-file language definitions** covering the entire pipeline: lexer tokens, Pratt parser grammar, semantic analysis, and C++23 code generation
-- **Turing complete language** — variables, loops, conditionals, recursion, and string operations are first-class constructs, not a bolt-on scripting layer. Every handler body uses the same unified language
-- **Pratt parser grammar rules** with declarative prefix/infix/statement patterns and full imperative constructs for complex parsing — both are part of one language, neither is primary or fallback
+- **Turing complete language** with variables, loops, conditionals, recursion, and string operations as first-class constructs
+- **Pratt parser grammar rules** with declarative prefix/infix/statement patterns and full imperative constructs for complex parsing
 - **Multi-pass semantic analysis** with scope management, symbol declaration, forward reference resolution, and overload detection
-- **IR builder code generation** producing structured C++23 through `func()`, `declVar()`, `ifStmt()`, and similar typed builders - not raw string concatenation
+- **IR builder code generation** producing structured C++23 through `func()`, `declVar()`, `ifStmt()`, and similar typed builders
 - **Automatic C++ passthrough** so your language can interoperate with C/C++ without any `.mor` configuration
+- **Modular language definitions** via `import` statements, `fragment` blocks, and `include` directives
+- **Source-level build configuration** through directives (platform, optimization, version info, icon embedding)
 - **Native binary output** for Win64 and Linux64 via Zig/Clang, with cross-compilation through WSL2
 
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Using Metamorf
 
@@ -66,10 +67,33 @@ Metamorf ships as a self-contained release with everything included. No separate
 3. Write a `.mor` language definition and a source file, then compile:
 
 ```bash
-Metamorf -s pascal.mor hello.pas
+Metamorf -l pascal.mor -s hello.pas
 ```
 
-The `-s` flag tells Metamorf to compile the source file using the specified language definition. The resulting native binary is placed in the output directory and can be run immediately.
+The `-l` flag specifies the language definition file. The `-s` flag specifies the source file to compile. The resulting native binary is placed in the output directory.
+
+### CLI Reference
+
+```
+Metamorf [options] -l <file> -s <file> [options]
+
+REQUIRED:
+  -l, --lang    <file>   Language definition file (.mor)
+  -s, --source  <file>   Source file to compile
+
+OPTIONS:
+  -o, --output  <path>   Output path (default: output)
+  -r, --autorun          Build and run the compiled binary
+  -h, --help             Display help message
+```
+
+**Examples:**
+
+```bash
+Metamorf -l mylang.mor -s hello.src
+Metamorf -l mylang.mor -s hello.src -o build
+Metamorf -l mylang.mor -s hello.src -r
+```
 
 ### Cross-Compilation via WSL2
 
@@ -87,7 +111,7 @@ Then set the target platform in your source file using a directive (if your lang
 
 ### Getting the Source (Developers)
 
-Clone the repository to get the full source for Metamorf and all sub-projects:
+Clone the repository:
 
 ```bash
 git clone https://github.com/tinyBigGAMES/Metamorf.git
@@ -97,69 +121,93 @@ The repository is organized as:
 
 ```
 Metamorf/repo/
-  src/                          <- Metamorf core sources
-  tests/                        <- Test files including pascal.mor
+  src/                          <- Metamorf compiler sources
+  tests/                        <- Test .mor files and source files
   docs/                         <- Reference documentation
   bin/                          <- Executables run from here
 ```
 
-## ⚙️ Architecture
 
-Metamorf operates in two sequential phases. Think of it like writing a recipe that tells a kitchen how to cook. Phase 1 reads your recipe (the `.mor` file) and configures all the kitchen equipment. Phase 2 uses that equipment to actually cook the meal (compile your source code to a binary). Understanding this two-phase architecture is essential for writing correct `.mor` files, because it determines when your code runs and what it has access to.
+## Architecture
+
+Metamorf compiles your language in a single pass through a table-driven pipeline. The `.mor` file is parsed first, and its contents populate a set of dispatch tables (token registrations, grammar rules, semantic handlers, emitters). These tables then drive the compilation of your user source files.
 
 ```
-                        PHASE 1: Bootstrap
-                        ==================
-mylang.mor  ──► Metamorf bootstrap ──► TMetamorfLangInterpreter.Execute()
-                (TMetamorf instance)              │
-                                       Walks .mor AST, calls
-                                       TLangConfig API to
-                                       configure a blank TMetamorf
-                                             │
-                                       Configured TMetamorf
-                                       (your language)
-                                             │
-                        PHASE 2: Compilation │
-                        ==================== │
-myprogram.src ──────────────────────────────►│──► TMetamorf.Compile()
-                                                     │
-                                               Lex ► Parse ► Semantics ► C++23 ► Zig/Clang
-                                                     │
-                                               native binary (Win64/Linux64)
+                        SETUP
+                        =====
+mylang.mor  -->  .mor Lexer  -->  .mor Parser  -->  .mor AST
+                                                       |
+                                             Interpreter walks AST,
+                                             populates dispatch tables:
+                                               - Token registrations
+                                               - Grammar rules (prefix/infix/stmt)
+                                               - Semantic handlers
+                                               - Emitter handlers
+                                               - Routines, constants, fragments
+                                                       |
+                                             C++ passthrough registered
+                                             (after .mor setup)
+                                                       |
+                        COMPILATION                    |
+                        ===========                    v
+myprogram.src  -->  Generic Lexer  -->  Generic Parser  -->  Semantic Analysis
+                    (table-driven)      (Pratt, dispatches    (multi-pass, scope
+                                        to grammar rules)     management, symbols)
+                                                                    |
+                                                              Code Generation
+                                                              (emitter handlers
+                                                               produce C++23)
+                                                                    |
+                                                              .h + .cpp files
+                                                                    |
+                                                              Zig/Clang build
+                                                                    |
+                                                              Native binary
+                                                              (Win64/Linux64)
 ```
 
-### Phase 1: Bootstrap Compilation
+### Setup Phase
 
-The `.mor` file is compiled by the Metamorf bootstrap parser - itself a `TMetamorf` instance pre-configured with Metamorf's own lexer, grammar, and semantics. The bootstrap parser produces an AST which is then walked by `TMetamorfLangInterpreter`. The interpreter executes your `.mor` file: it reads token declarations, grammar rules, semantic handlers, and emitter handlers, and configures a new blank `TMetamorf` instance by calling `TLangConfig` API methods. All closures registered during this phase capture references to AST nodes from the bootstrap instance.
+The `.mor` file is tokenized and parsed by a dedicated .mor lexer and parser (hard-coded, not table-driven). The resulting AST is walked by the interpreter, which populates dispatch tables: keywords, operators, string styles, comment markers, directives, grammar rules (prefix, infix, statement), semantic handlers, emitter handlers, user-defined routines, constants, enum values, and fragments.
 
-### Phase 2: Source Compilation
+After the .mor setup completes, C++ passthrough tokens, grammar handlers, and emit handlers are registered automatically. This is why every Metamorf language gets C++ interop for free without any `.mor` configuration.
 
-The configured `TMetamorf` instance compiles your source file through the full pipeline: lexing, parsing, semantic analysis, C++23 code generation, Zig/Clang compilation, and optional auto-run. The bootstrap instance and interpreter must remain alive for the entire duration of Phase 2 because the registered closures reference their AST nodes.
+### Compilation Phase
 
-### Lifetime Rules
+With dispatch tables populated, the engine compiles user source files:
 
-The two-phase architecture creates a dependency chain that you need to understand:
+1. **Generic Lexer** tokenizes user source using the registered keywords, operators, string styles, comments, and directives. This lexer is entirely table-driven; it reads its configuration from the interpreter's dispatch tables.
 
-- The bootstrap `TMetamorf` instance owns the Phase 1 AST
-- The interpreter's closures reference Phase 1 AST nodes
-- Phase 2 closures (grammar handlers, semantic rules, emitters) fire during `TMetamorf.Compile()`
-- All three objects (bootstrap, interpreter, custom TMetamorf) must remain alive until Phase 2 completes
-- `TMetamorf` manages this automatically - `FreeInstances()` frees them in correct order
+2. **Generic Parser** is a Pratt parser that dispatches to grammar rules registered during setup. Prefix rules handle tokens that start an expression (identifiers, literals, unary operators). Infix rules handle binary operators with precedence and associativity. Statement rules handle language constructs (if, while, declarations). Each grammar rule is an AST node from the `.mor` file that the interpreter executes on demand.
 
-If the bootstrap instance were freed before Phase 2 completes, every closure would reference dead AST nodes - and your compiler would crash with access violations that are nearly impossible to debug. Metamorf handles this lifetime management for you, but if you are embedding Metamorf in your own application (see [Section 15](#-embedding-metamorf)), you need to keep all three objects alive until compilation finishes.
+3. **Semantic Analysis** walks the user AST and executes semantic handlers. Handlers manage scopes, declare symbols, resolve references, and check types. Multi-pass semantics are supported for forward reference resolution.
 
-### The Closure Bridge
+4. **Code Generation** executes emitter handlers for each AST node. Emitters produce structured C++23 through IR builder functions (`func()`, `declVar()`, `ifStmt()`, etc.) into separate header and source buffers. Output is written to `.h` and `.cpp` files.
 
-Every handler you write in a `.mor` file - every grammar rule body, every semantic handler, every emitter - becomes a Delphi closure that captures the AST node where the handler was defined. When Phase 2 fires a grammar rule, it does not re-parse your `.mor` file. Instead, it executes the interpreter against the captured AST node from Phase 1. This closure bridge is the mechanism that connects your meta-language code to the compiler engine. Your `.mor` code runs at compile time of the user's source, not at definition time.
+5. **Build** generates a `build.zig` file and invokes Zig/Clang to produce a native binary.
+
+### Module Compilation
+
+When a semantic handler calls `compileModule(name)`, the engine resolves the module file (using the extension set by `setModuleExtension()`), lexes and parses it into a new AST branch, attaches that branch to the master root, and runs semantic analysis on it. This can trigger further module compilations recursively.
+
+The master AST has a single `master.root` node with one branch per source file. The main program is always branch 0; imported modules are branches 1, 2, etc. Emitters process module branches first, then the main program branch, so that the main program's build settings (exe mode) take effect last.
+
+### .mor Imports
+
+The `.mor` language supports modular language definitions via `import "file.mor"`. When the interpreter encounters an import, the engine lexes and parses the imported `.mor` file, adds its AST to a .mor master root (for lifetime management), and continues setup. Imported `.mor` files can contain any top-level block: tokens, types, grammar, semantics, emitters, routines, constants, or fragments. This enables splitting large language definitions across multiple files.
 
 
-
-## 📁 File Structure
+## File Structure
 
 A `.mor` file begins with a `language` declaration and contains top-level blocks that describe each aspect of your language. Comments use `//` (line) and `/* ... */` (block). Here is the overall shape:
 
 ```mor
 language MyLang version "1.0";
+
+// Optional: constants must appear before they are referenced
+const {
+  ENABLE_FEATURE = true;
+}
 
 // Optional: fragments must appear before they are included
 fragment common_types {
@@ -185,6 +233,7 @@ grammar {
 
 semantics {
   // Semantic analysis handlers (scope, declare, visit)
+  // Optional: multi-pass with pass N "name" { ... } blocks
 }
 
 emitters {
@@ -199,45 +248,41 @@ routine resolveType(typeText: string) -> string {
 
 // Named constants
 const {
-  MAX_PARAMS = 255;
-  DEFAULT_ALIGN = 8;
+  MAX_PARAMS = 16;
 }
 
-// Enums (members become integer constants: exe=0, dll=1, lib=2)
-enum BuildKind { exe, dll, lib }
+// Enum declarations
+enum BuildMode { exe, lib, dll }
 ```
 
-### Language Declaration
+### Source Unit Map
 
-Every `.mor` file starts with a language name and version. These are stored as internal variables `__language_name` and `__language_version`, accessible from handler logic if you need them.
+The Metamorf compiler is built from these Delphi source units:
 
-```mor
-language Pascal version "1.0";
-```
-
-### Top-Level Declarations
-
-You can place blocks in any order, and blocks of the same kind can appear more than once (for example, two separate `tokens {}` blocks). The interpreter processes them sequentially from top to bottom. The one constraint is that fragments must be defined before they are included, and imports are resolved when encountered. A common convention is: tokens first, then types, grammar, semantics, emitters, and finally helper routines and constants - but this is a readability choice, not a requirement.
-
-| Declaration | Description |
-|-------------|-------------|
-| `language Name version "X.Y";` | Language name and version (required, must be first) |
-| `tokens { ... }` | Lexer configuration: keywords, operators, strings, directives, structural settings |
-| `types { ... }` | Type system: type keywords, type-to-C++ mappings, compatibility rules |
-| `grammar { ... }` | Pratt parser rules: prefix, infix, and statement rules |
-| `semantics { ... }` | Semantic analysis: scope management, symbol declaration, child visitation |
-| `emitters { ... }` | Code generation: IR builders, emit statements, section management |
-| `routine name(...) { ... }` | Reusable helper function callable from any handler |
-| `const { ... }` | Named constants available in all handler contexts |
-| `enum Name { ... }` | Enumeration: members become sequential integer constants (0, 1, 2, ...) |
-| `fragment Name { ... }` | Reusable block of declarations, expanded by `include Name;` |
-| `import "path.mor";` | Import another `.mor` definition file |
-| `include Name;` | Expand a previously defined fragment in place |
-
-Blocks can appear in any order and can appear more than once. The interpreter processes them sequentially. With the file structure in place, the first block most language definitions need is the tokens block - it teaches Metamorf's lexer how to break source code into meaningful pieces.
+| Unit | Purpose |
+|------|---------|
+| `Metamorf.Engine.pas` | `TMorEngine`: single entry point, orchestrates the full compilation pipeline |
+| `Metamorf.CLI.pas` | `TMorCLI`: command-line interface (`-l`, `-s`, `-o`, `-r` flags) |
+| `Metamorf.Lexer.pas` | `TMorLexer`: tokenizes `.mor` source files |
+| `Metamorf.Parser.pas` | `TMorParser`: parses `.mor` source into an AST |
+| `Metamorf.Interpreter.pas` | `TMorInterpreter`: walks `.mor` AST, populates dispatch tables, executes grammar/semantic/emit handlers at compile time |
+| `Metamorf.GenericLexer.pas` | `TGenericLexer`: table-driven lexer for user source files |
+| `Metamorf.GenericParser.pas` | `TGenericParser`: Pratt parser for user source, dispatches to `.mor` grammar rules |
+| `Metamorf.CodeGen.pas` | `TCodeOutput`: C++ code generation with header/source buffers, indentation, and capture mode |
+| `Metamorf.Scopes.pas` | `TScopeManager`, `TScope`, `TSymbol`: symbol table for user-language semantic analysis |
+| `Metamorf.AST.pas` | `TASTNode`, `TToken`: universal AST nodes with string attributes and named children |
+| `Metamorf.Environment.pas` | `TEnvironment`: variable scope stack for `.mor` interpreter runtime |
+| `Metamorf.Cpp.pas` | `ConfigCpp()`: registers C++ passthrough tokens, grammar, and emitters after `.mor` setup |
+| `Metamorf.Build.pas` | `TBuild`: generates `build.zig`, invokes Zig/Clang, handles version info and post-build resources |
+| `Metamorf.Common.pas` | `ReportNodeError()`: helper for positioned error reporting |
+| `Metamorf.Utils.pas` | `TBaseObject`, `TErrorsObject`, `TErrors`, `TUtils`: base class hierarchy and utilities |
+| `Metamorf.Resources.pas` | Resource strings for all user-facing messages |
+| `Metamorf.Config.pas` | Configuration constants |
+| `Metamorf.TOML.pas` | TOML parser for build configuration files |
+| `UMetamorf.pas` | Main testbed/entry point unit |
 
 
-## 🔧 Tokens Block
+## Tokens Block
 
 The `tokens {}` block teaches Metamorf's lexer how to break your source code into meaningful pieces. Before the parser can understand structure, the lexer needs to know what a keyword looks like, what operators your language uses, how strings are delimited, and how comments are formatted. Every `token` entry follows the pattern:
 
@@ -547,7 +592,7 @@ tokens {
 With your tokens defined, Metamorf's lexer can break any source file in your language into a stream of typed tokens. Next, the types block tells the engine how to connect your language's type names to the type system and to C++ output types.
 
 
-## 🧩 Types Block
+## Types Block
 
 The `types {}` block connects three worlds: your language's type names (what the user writes in source code), Metamorf's internal type kinds (how the engine tracks and compares types), and C++ types (what gets generated in the output). When a user writes `var x: integer;`, the types block is what tells the engine that `integer` maps to the internal kind `type.int32`, and that `type.int32` maps to the C++ type `int32_t`.
 
@@ -674,8 +719,7 @@ types {
 | `name_mangler = funcRef;` | `SetNameMangler(func)` | Custom name mangling function |
 
 
-
-## 📐 Grammar Block
+## Grammar Block
 
 The `grammar {}` block defines how your language's token stream is parsed into an AST (abstract syntax tree). Metamorf uses a Pratt parser - a top-down technique where each token can trigger a **prefix** handler (at the start of an expression) or an **infix** handler (between two expressions). If you have never used a Pratt parser, think of it this way: prefix rules say "I start something" and infix rules say "I connect two things." Statement rules are a third category - they fire when their trigger token appears at statement position and do not participate in expression precedence.
 
@@ -909,7 +953,7 @@ The `parse many ... until` construct loops, parsing sub-expressions or sub-state
 
 ### Declarative and Imperative Constructs
 
-Grammar rule bodies use two sets of constructs from the same language. Declarative constructs (`expect`, `consume`, `parse`) handle regular structure concisely. Imperative constructs (`checkToken`, `advance`, `createNode`, `addChild`, `while`, `if`) handle irregular structure with full control. Both are first-class — neither is primary and neither is a fallback. The `stmt.var_decl` example below uses both naturally: it starts with `expect keyword.var;` and then uses token-by-token parsing with `checkToken`, `advance`, `createNode`, and `addChild` for the irregular variable list. Most real languages mix both freely for constructs like variable declaration blocks, function parameter lists, and import statements.
+Grammar rule bodies use two sets of constructs from the same language. Declarative constructs (`expect`, `consume`, `parse`) handle regular structure concisely. Imperative constructs (`checkToken`, `advance`, `createNode`, `addChild`, `while`, `if`) handle irregular structure with full control. Both are first-class  --  neither is primary and neither is a fallback. The `stmt.var_decl` example below uses both naturally: it starts with `expect keyword.var;` and then uses token-by-token parsing with `checkToken`, `advance`, `createNode`, and `addChild` for the irregular variable list. Most real languages mix both freely for constructs like variable declaration blocks, function parameter lists, and import statements.
 
 ```mor
 grammar {
@@ -1005,7 +1049,45 @@ grammar {
 At this point, Metamorf has an AST - a tree of typed nodes with attributes. The grammar block told the parser how to build that tree. The semantics block walks this tree to check that the program makes sense: does every variable have a declaration? Does every function call match a defined function? Are the types compatible?
 
 
-## 🧠 Semantics Block
+### Required: Number Literal Grammar Rules
+
+The generic lexer automatically produces `literal.integer` and `literal.float` tokens for numeric values in user source files. However, the generic parser requires explicit prefix grammar rules to consume these tokens. Without them, any expression containing a number literal (e.g., `if n <= 1`) fails with `Error UP002: Unexpected token in expression`.
+
+Every `.mor` language definition that uses numeric literals MUST include these grammar rules and emitter handlers:
+
+```mor
+grammar {
+  rule expr.integer {
+    consume literal.integer -> @value;
+  }
+  rule expr.float {
+    consume literal.float -> @value;
+  }
+}
+
+emitters {
+  on expr.integer {
+    emit @value;
+  }
+  on expr.float {
+    emit @value;
+  }
+}
+```
+
+These are not optional. The generic lexer produces the tokens automatically; the grammar must declare how to consume them and the emitters must declare how to output them.
+
+If you also use a type system, register the literal types:
+
+```mor
+types {
+  literal "expr.integer" = "type.integer";
+  literal "expr.float"   = "type.single";
+}
+```
+
+
+## Semantics Block
 
 The `semantics {}` block answers the question: is this syntactically valid program also meaningful? A program can parse correctly and still be nonsense - a call to a function that does not exist, a variable used before it is declared, or an assignment of a string to an integer. Semantic handlers walk the AST, manage scopes, declare and look up symbols, and report errors when the program violates the language's rules.
 
@@ -1205,7 +1287,114 @@ Each pass walks the full AST with only that pass's handlers active. The scope tr
 With semantic analysis complete, the AST has been validated - every symbol is declared, every reference resolves, and the types are consistent. The emitters block walks this validated AST one more time to produce C++23 output.
 
 
-## 🔨 Emitters Block
+### Multi-Pass Semantics and C++ Forward Declarations
+
+Multi-pass semantics solve forward references at the Metamorf level: pass 1 declares all symbols, and pass 2 can look them up regardless of source order. However, the generated C++ still emits functions in source order, and C++ has its own forward reference rules. Without explicit C++ forward declarations, forward references will pass semantic analysis but fail C++ compilation.
+
+The correct pattern requires both pieces:
+
+1. **Semantic passes** (described above): `pass 1` declares, `pass 2` resolves. Scope trees persist across passes; the scope stack resets to the root between passes.
+
+2. **Emitter forward declarations**: The emitter's root handler must emit C++ forward declarations for all functions BEFORE emitting their full definitions.
+
+Here is the complete pattern from `testbed.mor`, which enables function A to call function B even when B is declared after A:
+
+```mor
+semantics {
+  pass 1 "declarations" {
+    on program.root {
+      scope "global" { visit children; }
+    }
+    on stmt.func_decl {
+      declare @func_name as routine;
+    }
+    on stmt.var_decl { visit children; }
+    on stmt.single_var { declare @vname as variable; }
+  }
+
+  pass 2 "analysis" {
+    on program.root {
+      scope "global" { visit children; }
+    }
+    on stmt.func_decl {
+      scope @func_name { visit children; }
+    }
+    on stmt.ident_stmt { visit children; }
+    on expr.call { visit children; }
+    on expr.ident { }
+  }
+}
+
+emitters {
+  on program.root {
+    emitLine("#include <cstdint>");
+    emitLine("#include <print>");
+
+    // Forward declarations (enables C++ forward refs)
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.func_decl" {
+        let retType = typeToIR(typeTextToKind(getAttr(ch, "return_type")));
+        let fname = getAttr(ch, "func_name");
+        let sig = retType + " " + fname + "(";
+        let pi = 0;
+        let pc = childCount(ch) - 2;
+        while pi < pc {
+          let p = getChild(ch, pi);
+          if pi > 0 { sig = sig + ", "; }
+          sig = sig + typeToIR(typeTextToKind(getAttr(p, "param.type_text")))
+                + " " + getAttr(p, "param.name");
+          pi = pi + 1;
+        }
+        sig = sig + ");";
+        emitLine(sig);
+      }
+      i = i + 1;
+    }
+
+    // Then emit full function definitions
+    i = 0;
+    while i < n {
+      let ch = getChild(node, i);
+      if nodeKind(ch) == "stmt.func_decl" {
+        emitNode(ch);
+      }
+      i = i + 1;
+    }
+
+    // ... emit main block, etc.
+  }
+}
+```
+
+The test source (`testbed.pas`) demonstrates this:
+
+```pascal
+program Testbed;
+
+function A(x: integer): integer;
+begin
+  Result := B(x + 1);   // B is declared AFTER A
+end;
+
+function B(x: integer): integer;
+begin
+  Result := x * 2;
+end;
+
+begin
+  WriteLn("A(5) = {}", A(5));
+end.
+```
+
+Without multipass semantics, the compiler would report "undefined identifier 'B'" when analyzing function A. Without the C++ forward declarations in the emitter, the C++ compiler would fail because `B` is not yet declared when `A`'s body references it. Both pieces are required.
+
+For a more advanced example with unit-mode header forward declarations, see `pascal2_emitters.mor` (the "Pass 1.5: header forward declarations" pattern).
+
+
+## Emitters Block
 
 The `emitters {}` block is where Metamorf produces output. Each `on` handler fires during code generation when a node of the matching kind is walked. There are two fundamentally different kinds of emitter handlers: **statement emitters** call IR builder procedures (`func()`, `declVar()`, `ifStmt()`) to produce C++ statements, and **expression emitters** produce C++ expression strings that can be composed recursively via `exprToString()`.
 
@@ -1538,10 +1727,9 @@ emitters {
 ```
 
 
+## The Imperative Language
 
-## 💡 The Imperative Language
-
-The `.mor` language is Turing complete. Every handler body — grammar rules, semantic handlers, emitters — has access to variables, unbounded loops, conditionals, recursion, and string/arithmetic operations as first-class constructs. These are not a separate scripting layer bolted onto a declarative core; they are part of one unified language. When your grammar rule needs custom parsing logic, or your emitter needs 100 lines of conditional code generation, you write it in the same language as everything else. No escape hatch to a host language, no build system integration, no glue code. A `.mor` file is self-contained.
+The `.mor` language is Turing complete. Every handler body  --  grammar rules, semantic handlers, emitters  --  has access to variables, unbounded loops, conditionals, recursion, and string/arithmetic operations as first-class constructs. These are not a separate scripting layer bolted onto a declarative core; they are part of one unified language. When your grammar rule needs custom parsing logic, or your emitter needs 100 lines of conditional code generation, you write it in the same language as everything else. No escape hatch to a host language, no build system integration, no glue code. A `.mor` file is self-contained.
 
 ### Why Turing Complete Matters
 
@@ -1781,8 +1969,7 @@ Five severity levels available in semantic and emitter handlers:
 All diagnostics automatically carry source location from the current node. Interpolation is supported: `error "undefined '{@name}'";`
 
 
-
-## 🔁 Routines and Constants
+## Routines and Constants
 
 ### User-Defined Routines
 
@@ -1870,7 +2057,7 @@ enum BuildKind { exe, dll, lib }
 ```
 
 
-## 📦 Fragments, Imports, and Includes
+## Fragments, Imports, and Includes
 
 As your `.mor` file grows, you will want to split it into manageable pieces. Metamorf offers three mechanisms for this, each serving a different purpose.
 
@@ -1951,8 +2138,7 @@ tokens {
 ```
 
 
-
-## 📚 Built-in Functions Reference
+## Built-in Functions Reference
 
 This section is a complete reference for all built-in functions available in the `.mor` language. Functions are grouped by the context where they are available - some work everywhere, while others are specific to grammar rules, semantic handlers, or emitter handlers.
 
@@ -2229,542 +2415,139 @@ A program in that language then configures its build inline:
 With the built-in function reference covered, the next section explains how Metamorf automatically handles C++ interop so your `.mor` file does not have to.
 
 
-## 🔗 C++ Passthrough
+## C++ Passthrough
 
-Metamorf generates C++ 23 code. But what if the user writes C++ directly in their source? Instead of making every `.mor` file handle every C++ keyword and operator, `ConfigCpp()` does it automatically. This is NOT defined in the `.mor` file - it is registered automatically by `TMetamorf` after the interpreter configures the custom `TMetamorf` instance.
+Every language defined in Metamorf automatically gets C++ interoperability. After the `.mor` setup phase completes, the engine registers C++ keywords, operators, delimiters, grammar handlers, and emit handlers into the dispatch tables. These registrations happen after your custom language rules, so your keywords always take priority over C++ ones.
 
-### What ConfigCpp Provides Automatically
+The passthrough uses raw token collection with brace-depth tracking. When the parser encounters a C++ construct (a `#include` directive, a C++ function definition, a `using` declaration, etc.), the registered handlers vacuum up tokens until the construct is balanced. The collected text is emitted verbatim into the generated C++ output.
 
-**Tokens:** All C++ keyword tokens (`cpp.keyword.class`, `cpp.keyword.struct`, `cpp.keyword.void`, etc.), C++ operators (`::`, `->`, `++`, `--`, `==`, `!=`, `&&`, `||`, `!`, `~`, `%`), C++ braces (`{`, `}`), preprocessor hash (`#`).
+This means your language can freely intermix with C++ without any `.mor` configuration. Users can write C++ `#include` directives, define C++ functions, use C++ types, and call C++ library functions directly in their source files. The passthrough handles all of this transparently.
 
-**Grammar:** Statement passthrough for `cpp.keyword.*` tokens, expression prefix handlers for C++ keywords, `::` scope resolution, `->` arrow access, C-style cast detection via `delimiter.lparen` wrapping, `#include`/`#define` preprocessor handlers.
+**What gets registered automatically:**
 
-**Codegen:** Verbatim passthrough emitters for all C++ AST nodes.
+- All 62 C++ keywords (`auto`, `bool`, `break`, `class`, `const`, `if`, `int`, `namespace`, `return`, `struct`, `template`, `void`, `while`, etc.) as `cpp.keyword.*` token kinds, but only for keywords not already claimed by your language
+- C++ operators: `::` (`cpp.op.scope`), `->` (`cpp.op.arrow`), `++` (`cpp.op.increment`), `--` (`cpp.op.decrement`), `<<` (`cpp.op.shl`), `>>` (`cpp.op.shr`), `&&` (`cpp.op.logand`), `||` (`cpp.op.logor`), `==` (`cpp.op.eq`), `!=` (`cpp.op.neq`), `%` (`cpp.op.modulo`), `~` (`cpp.op.bitnot`), `&` (`cpp.op.bitand`), `|` (`cpp.op.bitor`), `^` (`cpp.op.bitxor`), `!` (`cpp.op.lognot`), `#` (`cpp.op.hash`)
+- C++ delimiters: `{` (`delimiter.lbrace`), `}` (`delimiter.rbrace`), `[` (`delimiter.lbracket`), `]` (`delimiter.rbracket`)
+- Grammar handlers for C++ statements (preprocessor directives, extern blocks, namespace blocks, class/struct definitions, etc.)
+- Emit handlers that output collected C++ text verbatim
 
-### What This Means for Language Authors
+All C++ operators and delimiters are registered unconditionally. C++ keywords are registered only if the custom language has not already claimed them. The operator list is re-sorted longest-first after registration, so multi-character operators like `::` and `->` always match before their single-character components.
 
-Your `.mor` file defines ONLY your custom language's constructs. When the user writes `#include <cstdio>` or `printf("hello")` in their source, ConfigCpp captures and emits them verbatim. No `.mor` configuration is needed for C++ interop.
+### The Golden Rule: Do Not Redeclare C++ Tokens
 
-This is why pascal.mor does not declare `class`, `struct`, or `void` as keywords - they come from C++ automatically. If C++ has the keyword, your `.mor` file does not need to declare it. ConfigCpp handles it. Bare identifiers that are not custom-language keywords (like `printf`) are parsed by your expression/statement handlers - they appear as `expr.ident` nodes and pass through to C++ output via `exprToString()`.
+C++ passthrough works because ConfigCpp owns all C++ tokens. Your custom language must not re-register them. This is the single most important rule for C++ passthrough, and violating it produces confusing errors.
 
-### Registration Order
+**What happens if you break this rule:**
 
-Your `.mor` definitions run FIRST. ConfigCpp wraps AFTER. This means your custom keywords take priority over C++ keywords. The order is:
+If your `.mor` file declares `token op.percent = "%"` and ConfigCpp also registers `%` as `cpp.op.modulo`, both entries end up in the operator list. After the longest-first sort, the order among same-length operators is unpredictable. Your grammar rule that expects `op.percent` may receive `cpp.op.modulo` instead, causing parser errors like `Expected op.percent but found '%'` or `Expected delimiter.rparen but found '%'`.
 
-```
-1. Bootstrap: parse .mor file -> AST
-2. Interpreter: walk AST -> configure custom TMetamorf
-3. ConfigCpp: wrap custom TMetamorf with C++ passthrough  (automatic)
-4. Phase 2: custom TMetamorf compiles user source
-```
+**The correct pattern:** If your language needs `%` for modulo, do not register it as a token. Instead, reference ConfigCpp's kind directly in your grammar rule:
 
-`ConfigCpp` is called AFTER the interpreter so it can wrap the custom language's `delimiter.lparen` prefix handler for C-style cast detection.
+```mor
+// WRONG: re-registers % with a conflicting kind
+tokens {
+  token op.percent = "%";    // <-- DO NOT DO THIS
+}
+grammar {
+  rule expr.mul precedence left 30 {
+    consume [op.star, op.slash, op.percent] -> @operator;
+    parse expr -> @right;
+  }
+}
 
-### The Design Rule
-
-If C++ has the keyword, your `.mor` file does not need it. Your `.mor` file owns the custom language surface. C++ owns everything else. There is no conflict because `ConfigCpp` runs after your definitions and handles the remainder. This separation is what makes Metamorf languages interoperate with C++ seamlessly - your language adds new syntax on top of C++, and ConfigCpp ensures the C++ substrate is always there.
-
-
-
-## 🔌 Embedding Metamorf
-
-Metamorf has two embedding surfaces. Both are Delphi classes that you use in your own applications. The relationship between them is the architectural insight that makes the whole project cohere: `TMetamorfLang` uses `TMetamorf` internally, and the `.mor` language itself is built using `TMetamorf` — it dogfoods its own engine every time it runs.
-
-| Surface | Unit | Purpose |
-|---------|------|---------|
-| **`TMetamorf`** | `Metamorf.API` | Core compiler-construction API. Define a language entirely in Delphi code by calling `Config().AddKeyword(...)`, `Config().RegisterStatement(...)`, etc. This is the foundational surface — everything else is built on it. |
-| **`TMetamorfLang`** | `Metamorf.Lang` | Convenience wrapper. Give it a `.mor` file and a source file, call `Compile()`. Handles the two-phase bootstrap internally using `TMetamorf` under the hood. |
-
-If you just want to compile programs written in a `.mor`-defined language, use `TMetamorfLang`. If you want to define a language programmatically in Delphi — or understand how the `.mor` language itself works — use `TMetamorf` directly.
-
-
-### Surface 1: TMetamorfLang (The .mor File Loader)
-
-`TMetamorfLang` is the high-level surface. You give it a `.mor` language definition file and a source file, and it handles everything: parsing the `.mor` file, configuring a `TMetamorf` instance, and compiling the source to a native binary.
-
-```delphi
-uses
-  Metamorf.Lang;
-
-var
-  LLang: TMetamorfLang;
-begin
-  LLang := TMetamorfLang.Create();
-  try
-    LLang.SetLangFile('pascal.mor');
-    LLang.SetSourceFile('hello.pas');
-    LLang.SetOutputPath('output');
-
-    LLang.SetStatusCallback(
-      procedure(const ALine: string; const AUserData: Pointer)
-      begin
-        WriteLn(ALine);
-      end);
-
-    if LLang.Compile(True, False) then
-      LLang.Run()
-    else
-      WriteLn('Compilation failed');
-  finally
-    LLang.Free();
-  end;
-end;
-```
-
-**TMetamorfLang API:**
-
-| Method | Description |
-|--------|-------------|
-| `SetLangFile(filename)` | Path to the `.mor` language definition file |
-| `SetSourceFile(filename)` | Path to the source file to compile |
-| `SetOutputPath(path)` | Output directory for generated files and binary |
-| `SetLineDirectives(enabled)` | Emit `#line` directives in generated C++ |
-| `SetStatusCallback(cb, data)` | Callback for status/progress messages |
-| `SetOutputCallback(cb, data)` | Callback for program output capture |
-| `Compile(build, autoRun)` | Run Phase 1 + Phase 2; returns True on success |
-| `Run()` | Run the last successfully compiled binary |
-| `GetLastExitCode()` | Exit code from last `Run()` |
-| `HasErrors()` | True if last `Compile()` produced errors |
-| `GetErrors()` | Error collection from last phase |
-| `GetVersionStr()` | Metamorf version string |
-
-
-### Surface 2: TMetamorf (The Core Delphi API)
-
-`TMetamorf` is the foundational surface. Every language built on Metamorf — including the `.mor` meta-language itself — is defined by calling methods on `TMetamorf` and its `TLangConfig` object. The `Metamorf.Lang.Lexer.pas`, `Metamorf.Lang.Grammar.pas`, and `Metamorf.Lang.Semantics.pas` units use exactly this API to build the `.mor` language's own lexer, grammar, and semantics. When a `.mor` file runs, `TMetamorfLangInterpreter` walks the AST and calls the same `TLangConfig` methods on a fresh `TMetamorf` instance.
-
-A single `TMetamorf` object drives every stage. There is no language knowledge hardcoded anywhere in the toolkit. The config is the language.
-
-```
-Source Text
-    │
-    ▼
-┌─────────┐  token stream   ┌─────────┐   AST        ┌───────────┐
-│  Lexer  │ ──────────────► │ Parser  │ ───────────► │ Semantics │
-└─────────┘                 └─────────┘              └───────────┘
-                                                           │
-                                              enriched AST (ATTR_*)
-                                                           │
-                                                           ▼
-                                                    ┌───────────┐
-                                                    │  CodeGen  │ ──► .h + .cpp
-                                                    └───────────┘          │
-                                                                           ▼
-                                                                      ┌──────────┐
-                                                                      │   Zig    │ ──► native binary
-                                                                      └──────────┘
-```
-
-
-#### The Configuration Surfaces
-
-`TMetamorf.Config()` returns a `TLangConfig` object with four configuration surfaces. Every method returns `TLangConfig` for fluent chaining:
-
-| Surface | What it controls | Who reads it |
-|---------|------------------|--------------|
-| **Lexer** | What tokens exist: keywords, operators, string styles, comments, number formats | `TLexer` |
-| **Grammar** | How tokens combine into AST nodes: prefix/infix/statement handlers | `TParser` |
-| **Semantic** | Scope analysis, symbol resolution, type checking | `TSemantics` |
-| **Emit** | How AST nodes become C++23 text | `TCodeGen` |
-
-```delphi
-LMeta.Config()
-  .AddKeyword(...)        // lexer surface
-  .AddOperator(...)       // lexer surface
-  .RegisterStatement(...) // grammar surface
-  .RegisterEmitter(...)   // emit surface
-  .RegisterSemanticRule(...)  // semantic surface
-```
-
-
-#### Token Kinds: The Contract String
-
-The single most important concept is the **token kind string** — a plain string like `'keyword.if'` or `'op.plus'` that connects every stage. The lexer assigns kind strings to tokens. The parser dispatches handlers based on kind strings. The semantic engine and codegen dispatch based on AST node kind strings. You invent the kind strings. There is no required naming convention, but the convention used throughout the examples is `category.name` (e.g. `keyword.if`, `expr.binary`, `stmt.while`, `type.integer`).
-
-
-#### Lexer Surface
-
-```delphi
-LMeta.Config()
-  // Case sensitivity
-  .CaseSensitiveKeywords(False)
-
-  // Character classes for identifiers
-  .IdentifierStart('a-zA-Z_')
-  .IdentifierPart('a-zA-Z0-9_')
-
-  // Keywords
-  .AddKeyword('if',    'keyword.if')
-  .AddKeyword('while', 'keyword.while')
-  .AddKeyword('begin', 'keyword.begin')
-  .AddKeyword('end',   'keyword.end')
-
-  // Operators (auto-sorted longest-first internally)
-  .AddOperator(':=', 'op.assign')
-  .AddOperator('+',  'op.plus')
-  .AddOperator(';',  'delimiter.semicolon')
-
-  // String literal styles
-  .AddStringStyle(, , KIND_STRING, False)  // Pascal: no escapes
-
-  // Comments
-  .AddLineComment('//')
-  .AddBlockComment('{', '}')
-
-  // Number prefixes
-  .SetHexPrefix('$', 'literal.integer')      // Pascal hex
-  .SetBinaryPrefix('0b', 'literal.integer')
-
-  // Directive prefix
-  .SetDirectivePrefix('$', 'directive')
-
-  // Structural tokens
-  .SetStatementTerminator('delimiter.semicolon')
-  .SetBlockOpen('keyword.begin')
-  .SetBlockClose('keyword.end');
-```
-
-
-#### Grammar Surface (Pratt Parsing)
-
-The grammar surface uses Pratt parsing. Every token has a potential prefix meaning (starts an expression) and/or infix meaning (continues an expression). You register handlers for each role.
-
-**Handler types:**
-
-| Registration | When it fires | Handler signature |
-|-------------|---------------|-------------------|
-| `RegisterPrefix(kind, nodeKind, handler)` | Token at expression-start position | `function(AParser: TParserBase): TASTNodeBase` |
-| `RegisterInfixLeft(kind, power, nodeKind, handler)` | Token after a left expression (left-assoc) | `function(AParser: TParserBase; ALeft: TASTNodeBase): TASTNodeBase` |
-| `RegisterInfixRight(kind, power, nodeKind, handler)` | Token after a left expression (right-assoc) | `function(AParser: TParserBase; ALeft: TASTNodeBase): TASTNodeBase` |
-| `RegisterStatement(kind, nodeKind, handler)` | Token at statement position | `function(AParser: TParserBase): TASTNodeBase` |
-
-**Building a node inside a handler:**
-
-1. `AParser.CreateNode()` — kind from dispatch context, token = current
-2. `AParser.CreateNode(ANodeKind)` — explicit kind, token = current
-3. `AParser.CreateNode(ANodeKind, AToken)` — explicit kind and token
-4. `LNode.SetAttr(key, TValue.From<string>(value))` — store data on the node
-5. `LNode.AddChild(TASTNode(AParser.ParseExpression(0)))` — parse and attach sub-expression
-6. `AParser.Expect(kind)` — consume token or record error
-7. `AParser.Consume()` — consume current token and advance
-
-**Convenience:** `RegisterBinaryOp('op.plus', 20, '+')` creates a left-associative `expr.binary` node with `op` attribute. `RegisterLiteralPrefixes()` registers prefix handlers for identifier, integer, real, and string.
-
-**Example — binary operator:**
-
-```delphi
-LMeta.Config().RegisterInfixLeft('op.plus', 20, 'expr.binary',
-  function(AParser: TParserBase;
-    ALeft: TASTNodeBase): TASTNodeBase
-  var
-    LNode: TASTNode;
-  begin
-    LNode := AParser.CreateNode();
-    LNode.SetAttr('op', TValue.From<string>('+'));
-    AParser.Consume();
-    LNode.AddChild(TASTNode(ALeft));
-    LNode.AddChild(TASTNode(
-      AParser.ParseExpression(AParser.CurrentInfixPower())));
-    Result := LNode;
-  end);
-```
-
-**Example — statement handler (while):**
-
-```delphi
-LMeta.Config().RegisterStatement('keyword.while', 'stmt.while',
-  function(AParser: TParserBase): TASTNodeBase
-  var
-    LNode: TASTNode;
-  begin
-    LNode := AParser.CreateNode();
-    AParser.Consume();
-    LNode.AddChild(TASTNode(AParser.ParseExpression(0)));
-    AParser.Expect('keyword.do');
-    LNode.AddChild(TASTNode(AParser.ParseStatement()));
-    Result := LNode;
-  end);
-```
-
-
-#### Semantic Surface
-
-The semantic stage walks the AST after parsing, resolves symbols, checks types, and writes enrichment attributes onto nodes. Register a handler for each node kind that needs semantic processing:
-
-```delphi
-LMeta.Config().RegisterSemanticRule('stmt.var_decl',
-  procedure(ANode: TASTNodeBase; ASem: TSemanticBase)
-  var
-    LName: TValue;
-  begin
-    ANode.GetAttr('decl.name', LName);
-    if not ASem.DeclareSymbol(LName.AsString, ANode) then
-      ASem.AddSemanticError(ANode, 'S100', 'Duplicate: ' + LName.AsString);
-    if ASem.IsInsideRoutine() then
-      TASTNode(ANode).SetAttr(ATTR_STORAGE_CLASS,
-        TValue.From<string>('local'))
-    else
-      TASTNode(ANode).SetAttr(ATTR_STORAGE_CLASS,
-        TValue.From<string>('global'));
-    ASem.VisitChildren(ANode);
-  end);
-```
-
-**Key semantic operations:**
-
-| Method | Description |
-|--------|-------------|
-| `ASem.PushScope(name, openToken)` | Enter a named scope |
-| `ASem.PopScope(closeToken)` | Leave current scope |
-| `ASem.DeclareSymbol(name, node)` | Declare symbol; returns False if duplicate |
-| `ASem.LookupSymbol(name, outNode)` | Search current + parent scopes |
-| `ASem.VisitChildren(node)` | Walk all children of the node |
-
-**Standard attributes written by the semantic pass:**
-
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `ATTR_TYPE_KIND` | `'sem.type'` | Resolved type kind |
-| `ATTR_RESOLVED_SYMBOL` | `'sem.symbol'` | Declared name this identifier resolves to |
-| `ATTR_DECL_NODE` | `'sem.decl_node'` | Pointer to declaring AST node |
-| `ATTR_STORAGE_CLASS` | `'sem.storage'` | `'local'`, `'global'`, `'param'`, `'const'`, `'routine'` |
-| `ATTR_SCOPE_NAME` | `'sem.scope'` | Fully-qualified scope name |
-| `ATTR_CALL_RESOLVED` | `'sem.call_symbol'` | Resolved overload symbol name |
-| `ATTR_COERCE_TO` | `'sem.coerce'` | Target type for implicit coercion |
-
-**Type compatibility:** Register with `RegisterTypeCompat(func)` to control assignment/argument compatibility and implicit coercion.
-
-
-#### Emit Surface (IR Builders)
-
-The emit surface turns AST nodes into C++23 text. Register an emitter for each node kind:
-
-```delphi
-LMeta.Config().RegisterEmitter('stmt.while',
-  procedure(ANode: TASTNodeBase; AGen: TIRBase)
-  var
-    LCondStr: string;
-  begin
-    LCondStr := LMeta.Config().ExprToString(ANode.GetChild(0));
-    AGen.WhileStmt(LCondStr);
-    AGen.EmitNode(ANode.GetChild(1));
-    AGen.EndWhile();
-  end);
-```
-
-`AGen.EmitNode(child)` dispatches the child through the emitter registry. `AGen.EmitChildren(node)` does this for all children.
-
-**IR builder methods (selected):**
-
-| Category | Methods |
-|----------|---------|
-| **Functions** | `Func(name, returnType)`, `Param(name, type)`, `EndFunc()` |
-| **Variables** | `DeclVar(name, type)`, `DeclVar(name, type, init)`, `Assign(lhs, expr)` |
-| **Control** | `IfStmt(cond)`, `ElseStmt()`, `EndIf()`, `WhileStmt(cond)`, `EndWhile()`, `ForStmt(var, init, cond, step)`, `EndFor()` |
-| **Output** | `Stmt(text)`, `Call(func, args)`, `Return(expr)`, `EmitLine(text)` |
-| **Top-level** | `Include(header)`, `Global(name, type, init)`, `DeclConst(name, type, val)`, `Using(alias, original)` |
-| **Expressions** | `Lit(val)`, `Str(val)`, `Bool(val)`, `Get(var)`, `Invoke(func, args)`, `Add(l, r)`, `Eq(l, r)`, `Cast(type, expr)` |
-| **Context** | `SetContext(key, val)`, `GetContext(key, default)` — shared state across emit handlers |
-
-**ExprToString:** `LMeta.Config().ExprToString(node)` recursively converts an expression AST node to a C++ string. It handles built-in kinds (`expr.identifier`, `expr.binary`, `expr.call`, etc.) automatically. Register `RegisterExprOverride(nodeKind, handler)` for custom rendering.
-
-
-#### Type Inference Surface
-
-For dynamically-typed languages where types are inferred from literals and call sites:
-
-```delphi
-LMeta.Config()
-  .AddLiteralType('expr.integer', 'type.integer')
-  .AddLiteralType('expr.real', 'type.double')
-  .AddLiteralType('expr.string', 'type.string')
-  .AddDeclKind('stmt.local_decl')
-  .AddCallKind('expr.call')
-  .SetCallNameAttr('call.name')
-  .AddTypeKeyword('integer', 'type.integer')
-  .AddTypeKeyword('string', 'type.string');
-```
-
-Call `LMeta.Config().ScanAll(root)` in your semantic handler to populate the type maps. Then `GetDeclTypes()` returns variable → type kind, and `GetCallArgTypes()` returns function → argument types.
-
-
-#### Name Mangling and TypeToIR
-
-```delphi
-// Name mangling: source identifiers → safe C++ identifiers
-LMeta.Config().SetNameMangler(
-  function(const AName: string): string
-  begin
-    Result := 'np_' + AName;
-  end);
-
-// Type-to-IR: internal type kind → C++ type
-LMeta.Config().SetTypeToIR(
-  function(const ATypeKind: string): string
-  begin
-    if ATypeKind = 'type.integer' then Result := 'int32_t'
-    else if ATypeKind = 'type.double' then Result := 'double'
-    else if ATypeKind = 'type.string' then Result := 'std::string'
-    else if ATypeKind = 'type.boolean' then Result := 'bool'
-    else if ATypeKind = 'type.void' then Result := 'void'
-    else Result := 'auto';
-  end);
-```
-
-`MangleName(name)` applies the mangler (or returns unchanged if nil). `TypeToIR(typeKind)` maps type kind to C++ type. `TypeTextToKind(text)` maps a source type keyword to its type kind using the `AddTypeKeyword` table.
-
-
-#### Running the Pipeline
-
-```delphi
-uses
-  Metamorf.API;
-
-var
-  LMeta: TMetamorf;
-begin
-  LMeta := TMetamorf.Create();
-  try
-    // Configure your language on LMeta.Config() ...
-
-    LMeta.SetSourceFile('myprogram.src');
-    LMeta.SetOutputPath('output');
-    LMeta.SetTargetPlatform(tpWin64);
-    LMeta.SetBuildMode(bmExe);
-    LMeta.SetOptimizeLevel(olDebug);
-
-    LMeta.SetStatusCallback(
-      procedure(const ALine: string; const AUserData: Pointer)
-      begin
-        WriteLn(ALine);
-      end);
-
-    if LMeta.Compile(True, True) then  // build + auto-run
-      WriteLn('Success')
-    else
-      LMeta.ShowErrors();
-  finally
-    LMeta.Free();
-  end;
-end;
-```
-
-`Compile()` runs: Tokenize → Parse → Semantics → CodeGen → Zig/Clang → (optional) execute.
-
-
-#### A Complete Minimal Language
-
-The smallest language that can print a string. Source: `print("hello")`.
-
-```delphi
-var
-  LMeta: TMetamorf;
-begin
-  LMeta := TMetamorf.Create();
-  try
-    LMeta.Config()
-      .CaseSensitiveKeywords(True)
-      .AddKeyword('print', 'keyword.print')
-      .AddOperator('(', 'delimiter.lparen')
-      .AddOperator(')', 'delimiter.rparen')
-      .AddStringStyle('"', '"', KIND_STRING, True)
-      .SetStatementTerminator('');
-
-    LMeta.Config().RegisterLiteralPrefixes();
-
-    LMeta.Config().RegisterStatement('keyword.print', 'stmt.print',
-      function(AParser: TParserBase): TASTNodeBase
-      var
-        LNode: TASTNode;
-      begin
-        LNode := AParser.CreateNode();
-        AParser.Consume();
-        AParser.Expect('delimiter.lparen');
-        LNode.AddChild(TASTNode(AParser.ParseExpression(0)));
-        AParser.Expect('delimiter.rparen');
-        Result := LNode;
-      end);
-
-    LMeta.Config().RegisterEmitter('stmt.print',
-      procedure(ANode: TASTNodeBase; AGen: TIRBase)
-      begin
-        AGen.Include('iostream');
-        AGen.Stmt('std::cout << ' +
-          LMeta.Config().ExprToString(ANode.GetChild(0)) +
-          ' << std::endl;');
-      end);
-
-    LMeta.SetSourceFile('hello.mylang');
-    LMeta.SetOutputPath('output');
-    LMeta.SetTargetPlatform(tpWin64);
-    LMeta.SetBuildMode(bmExe);
-    LMeta.SetOptimizeLevel(olDebug);
-
-    LMeta.SetStatusCallback(
-      procedure(const ALine: string; const AUserData: Pointer)
-      begin
-        WriteLn(ALine);
-      end);
-
-    if LMeta.Compile(True) then
-      WriteLn('Done.')
-    else
-      WriteLn('Failed.');
-  finally
-    LMeta.Free();
-  end;
-end;
-```
-
-The emitter turns `print("hello")` into:
-
-```cpp
-#include <iostream>
-int main() {
-    std::cout << "hello" << std::endl;
+// CORRECT: use the cpp.op.* kind that ConfigCpp provides
+grammar {
+  rule expr.mul precedence left 30 {
+    consume [op.star, op.slash, cpp.op.modulo] -> @operator;
+    parse expr -> @right;
+  }
 }
 ```
 
-Every language in the toolkit — including the `.mor` meta-language — is this pattern scaled up. The same four surfaces, the same handler types, the same AST building blocks.
+This applies to all C++ operators: `==` is `cpp.op.eq`, `!=` is `cpp.op.neq`, `%` is `cpp.op.modulo`, `->` is `cpp.op.arrow`, and so on. See the full list in the "What gets registered" section above.
+
+### Do Not Use C++ Keywords as Type Names
+
+C++ keywords like `int`, `bool`, `float`, `void`, `double`, `char`, `long`, `short`, `signed`, `unsigned` are registered by ConfigCpp as `cpp.keyword.*` token kinds. If your language uses these words as type names (e.g., `fn add(x: int) -> int`), the lexer will tokenize `int` as `cpp.keyword.int` instead of `identifier`, and grammar rules that expect an identifier will fail with errors like `expected identifier, got cpp.keyword.int`.
+
+**The fix:** Use non-conflicting type names. For example, MyLang uses `i64` instead of `int`, `boolean` instead of `bool`, and `f64` instead of `float`:
+
+```mor
+// WRONG: int is a C++ keyword, will be tokenized as cpp.keyword.int
+fn add(x: int) -> int { ... }
+
+// CORRECT: i64 is not a C++ keyword, tokenizes as identifier
+fn add(x: i64) -> i64 { ... }
+```
+
+Your `resolveType()` routine maps these custom names to C++ types in the emitter:
+
+```mor
+routine resolveType(typeText: string) -> string {
+  if typeText == "i64"     { return "int64_t"; }
+  if typeText == "boolean" { return "bool"; }
+  if typeText == "f64"     { return "double"; }
+  if typeText == "string"  { return "std::string"; }
+  return typeText;
+}
+```
+
+Note: If your language explicitly registers a C++ keyword as its own keyword (e.g., `token keyword.int = "int"`), ConfigCpp will not override it. The conflict only occurs when the word is used as an identifier without being registered as a keyword.
+
+### Block Comments and Brace Conflicts
+
+The generic lexer processes comments before operators. If your language uses `{ }` as block comment delimiters (as traditional Pascal does), the lexer will consume every `{` as a comment opener before the operator table ever sees it. This means C++ brace-delimited constructs (function bodies, struct definitions, initializer lists) will not parse in passthrough mode.
+
+**The fix:** Use `//` for line comments and `/* */` for block comments:
+
+```mor
+tokens {
+  token comment.line        = "//";
+  token comment.block_open  = "/*";     // NOT "{"
+  token comment.block_close = "*/";     // NOT "}"
+}
+```
+
+This is why `pascal.mor` uses `/* */` instead of `{ }` for block comments, even though standard Pascal supports both.
+
+### Brace-Delimited Languages
+
+Languages that use `{ }` for code blocks (like C-family languages) do not need to register braces as tokens. ConfigCpp provides them automatically as `delimiter.lbrace` and `delimiter.rbrace`. Reference these kinds directly in your grammar rules:
+
+```mor
+grammar {
+  rule stmt.if {
+    expect keyword.if;
+    parse expr -> @condition;
+    expect delimiter.lbrace;             // from ConfigCpp
+    parse many stmt until delimiter.rbrace -> @body;
+    expect delimiter.rbrace;             // from ConfigCpp
+  }
+}
+```
+
+See `mylang.mor` for a complete example of a brace-delimited language using ConfigCpp's delimiter kinds.
+
+### Comment Delimiters That Overlap C++ Operators
+
+Some languages use tokens that are also C++ operators as comment delimiters. For example, Lua uses `--` for line comments, but `--` is also the C++ decrement operator. This is acceptable: the lexer processes comments before operators, so `--` at the start of a line will always be consumed as a comment. The tradeoff is that C++ `x--` decrement will not work in Lua passthrough mode. This is usually acceptable because the custom language does not use `--` as an operator.
+
+### S-Expression Languages
+
+For languages with fundamentally different syntax (like Scheme), where `(` starts both language forms and C++ constructs, the standard grouped-expression pattern does not work for passthrough. These languages use `collectRaw()` with depth tracking instead. See `scheme.mor` for this approach.
+
+### Quick Reference: Common Pitfalls
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `Unexpected character: '{'` | `{ }` not registered as tokens | ConfigCpp provides them; do not use `{ }` as block comments |
+| `Unexpected character: '%'` | `%` not registered as a token | Use `cpp.op.modulo` in grammar rules, do not re-register |
+| `Expected identifier, got cpp.keyword.int` | C++ keyword used as type name | Use non-conflicting names (`i64`, `boolean`, `f64`) |
+| `Expected op.percent but found '%'` | `%` registered with conflicting kind | Remove your token declaration, use `cpp.op.modulo` |
+| `Expected delimiter.rparen but found '%'` | Parser sees `cpp.op.modulo`, no infix rule for it | Add infix rule for `cpp.op.modulo` |
 
 
-### Constants
-
-| Category | Values |
-|----------|--------|
-| **Platform** | `tpWin64`, `tpLinux64` |
-| **Build mode** | `bmExe`, `bmLib`, `bmDll` |
-| **Optimize level** | `olDebug`, `olReleaseSafe`, `olReleaseFast`, `olReleaseSmall` |
-| **Subsystem** | `stConsole`, `stGUI` |
-| **Associativity** | `aoLeft`, `aoRight` |
-| **Source file** | `sfHeader`, `sfSource` |
-| **Error severity** | `esHint`, `esWarning`, `esError`, `esFatal` |
-
-
-### Type Aliases (from Metamorf.API)
-
-All types a consumer needs are aliased in `Metamorf.API`. Nobody touches internal units directly:
-
-| Alias | Source | Description |
-|-------|--------|-------------|
-| `TMetamorf` | `Metamorf.API` | Core compiler object |
-| `TLangConfig` | `Metamorf.LangConfig` | Language configuration (returned by `Config()`) |
-| `TASTNodeBase` | `Metamorf.Common` | Abstract AST node base |
-| `TASTNode` | `Metamorf.Common` | Concrete AST node |
-| `TParserBase` | `Metamorf.Common` | Parser base (received by grammar handlers) |
-| `TIRBase` | `Metamorf.Common` | IR builder base (received by emit handlers) |
-| `TSemanticBase` | `Metamorf.Common` | Semantic engine base (received by semantic handlers) |
-| `TToken` | `Metamorf.Common` | Token record (kind, text, file, line, column) |
-| `TStatementHandler` | `Metamorf.Common` | `function(AParser: TParserBase): TASTNodeBase` |
-| `TPrefixHandler` | `Metamorf.Common` | `function(AParser: TParserBase): TASTNodeBase` |
-| `TInfixHandler` | `Metamorf.Common` | `function(AParser: TParserBase; ALeft: TASTNodeBase): TASTNodeBase` |
-| `TEmitHandler` | `Metamorf.Common` | `procedure(ANode: TASTNodeBase; AGen: TIRBase)` |
-| `TSemanticHandler` | `Metamorf.Common` | `procedure(ANode: TASTNodeBase; ASem: TSemanticBase)` |
-
-
-
-
-## 📜 Formal Grammar (EBNF)
+## Formal Grammar (EBNF)
 
 This section provides the complete EBNF grammar for the Metamorf meta-language. EBNF notation is used: brackets `[` and `]` denote optionality, braces `{` and `}` denote repetition (zero or more), parentheses `(` and `)` group alternatives, and the vertical bar `|` separates alternatives.
 
@@ -3027,47 +2810,6 @@ GuardBlock     = "guard" Expression "{" { TopLevelBlock | TokenDecl | TypeDecl }
 ```
 
 
-### Complete TLangConfig API Coverage
-
-Every public `TLangConfig` method mapped to its Metamorf construct:
-
-| TLangConfig Method | Metamorf Construct |
-|-------------------|-------------------|
-| `CaseSensitiveKeywords(bool)` | `tokens { casesensitive = true; }` |
-| `IdentifierStart(chars)` | `tokens { identifier_start = "chars"; }` |
-| `IdentifierPart(chars)` | `tokens { identifier_part = "chars"; }` |
-| `AddKeyword(text, kind)` | `token keyword.name = "text";` |
-| `AddOperator(text, kind)` | `token op.name = "text";` or `token delimiter.name = "text";` |
-| `AddLineComment(prefix)` | `token comment.line = "prefix";` |
-| `AddBlockComment(open, close)` | `token comment.block_open` + `token comment.block_close` pair |
-| `AddStringStyle(open, close, kind, esc)` | `token string.kind = "open" [noescape, close "close"];` |
-| `SetHexPrefix(prefix, kind)` | `tokens { hex_prefix = "prefix"; }` |
-| `SetBinaryPrefix(prefix, kind)` | `tokens { binary_prefix = "prefix"; }` |
-| `SetDirectivePrefix(prefix, kind)` | `tokens { directive_prefix = "prefix"; }` |
-| `AddDirective(name, kind, role)` | `token directive.kind = "name" [role];` |
-| `SetStatementTerminator(kind)` | `tokens { terminator = kind; }` |
-| `SetBlockOpen(kind)` | `tokens { block_open = kind; }` |
-| `SetBlockClose(kind)` | `tokens { block_close = kind; }` |
-| `RegisterLiteralPrefixes()` | Automatic after token block |
-| `RegisterStatement(kind, node, handler)` | `grammar { rule stmt.name { ... } }` |
-| `RegisterPrefix(kind, node, handler)` | `grammar { rule expr.name { ... } }` |
-| `RegisterInfixLeft(kind, power, node, handler)` | `grammar { rule expr.name precedence left N { ... } }` |
-| `RegisterInfixRight(kind, power, node, handler)` | `grammar { rule expr.name precedence right N { ... } }` |
-| `RegisterBinaryOp(kind, power, op)` | Infix rule + `consume -> @operator` pattern |
-| `RegisterSemanticRule(nodeKind, handler)` | `semantics { on nodeKind { ... } }` |
-| `RegisterEmitter(nodeKind, handler)` | `emitters { on nodeKind { ... } }` |
-| `RegisterTypeCompat(func)` | `types { compatible "from", "to" -> "coerce"; }` |
-| `AddTypeKeyword(text, typeKind)` | `types { type text = "typeKind"; }` |
-| `AddTypeMapping(source, target)` | `types { map "source" -> "target"; }` |
-| `AddLiteralType(nodeKind, typeKind)` | `types { literal "nodeKind" = "typeKind"; }` |
-| `AddDeclKind(nodeKind)` | `types { decl_kind "nodeKind"; }` |
-| `AddCallKind(nodeKind)` | `types { call_kind "nodeKind"; }` |
-| `SetCallNameAttr(attr)` | `types { call_name_attr = "attr"; }` |
-| `SetNameMangler(func)` | `types { name_mangler = funcRef; }` |
-| `RegisterExprOverride(nodeKind, handler)` | Expression emitter `on nodeKind { emit ...; }` |
-| `SetTypeToIR(func)` | Automatic from `types { map ... }` entries |
-| `SetModuleExtension(ext)` | `setModuleExtension("ext")` builtin |
-
 ### Token Kind Naming Conventions
 
 | Category | Examples |
@@ -3095,32 +2837,32 @@ Every public `TLangConfig` method mapped to its Metamorf construct:
 The engine uses `program.root` as the root node kind. All other node kinds are yours to define.
 
 
-## 🧭 Design Principles
+## Design Principles
 
 These principles guide Metamorf's architecture and explain the reasoning behind its design decisions.
 
-1. **Every construct maps to a `TLangConfig` API call.** The meta-language is a thin, readable surface over the engine's configuration API. There is no magic - everything Metamorf does is expressible as Delphi code. The `.mor` syntax exists for readability and productivity, not because it can do things the API cannot.
+1. **The .mor file is the program.** A `.mor` file is not a configuration script or a settings file. It is a complete, self-contained program that defines a compiler. The interpreter executes it, populating dispatch tables that drive the compilation of user source files.
 
 2. **Node-centric handlers.** Handlers always have an implicit current node in scope. Attribute access (`@name`) is the most common operation and gets the shortest syntax. This keeps handler bodies focused on logic rather than boilerplate.
 
-3. **Two-phase architecture.** Phase 1: the bootstrap `TMetamorf` instance parses the `.mor` file. Phase 2: the configured `TMetamorf` instance compiles user source. Closures bridge the two phases. This separation is what makes `.mor` files self-contained - the meta-language and the target language never share a parser.
+3. **Table-driven compilation.** The `.mor` interpreter populates dispatch tables during setup. The generic lexer, parser, semantic engine, and emitter all read from these tables. This separation means the `.mor` language and the target language never share a parser.
 
-4. **C++ passthrough is automatic.** `ConfigCpp` handles all C++ tokens, grammar, and codegen. The `.mor` file never touches C++. This is why every Metamorf language gets C++ interop for free.
+4. **C++ passthrough is automatic.** `ConfigCpp` handles all C++ tokens, grammar, and codegen after `.mor` setup. The `.mor` file never touches C++. This is why every Metamorf language gets C++ interop for free.
 
-5. **Declarative and imperative in one language.** Grammar rule bodies combine declarative constructs (`expect`, `consume`, `parse`) with imperative constructs (`checkToken`, `advance`, `createNode`, loops, conditionals). Both are part of the same language — use whichever fits the structure you are parsing.
+5. **Declarative and imperative in one language.** Grammar rule bodies combine declarative constructs (`expect`, `consume`, `parse`) with imperative constructs (`checkToken`, `advance`, `createNode`, loops, conditionals). Both are part of the same language. Use whichever fits the structure you are parsing.
 
 6. **IR builders for structured emission.** Emitter handlers use `func()`, `declVar()`, `ifStmt()`, etc. for type-safe C++ generation, not raw string concatenation. This produces consistently formatted output and eliminates an entire class of bracket-matching and indentation bugs.
 
 7. **Routines for shared logic.** User-defined `routine` declarations avoid duplication across handlers. A type resolution routine written once can be called from every emitter that needs it.
 
-8. **The meta-language is the blank canvas.** Metamorf has no built-in concept of "function", "variable", "class", or "module". It knows about tokens, grammar rules, scopes, symbols, and IR builders. Every language concept - from Pascal's `program/begin/end` to a hypothetical language with actors and channels - is defined entirely by the `.mor` file author. The engine provides the mechanics; you provide the meaning.
+8. **The meta-language is the blank canvas.** Metamorf has no built-in concept of "function", "variable", "class", or "module". It knows about tokens, grammar rules, scopes, symbols, and IR builders. Every language concept is defined entirely by the `.mor` file author. The engine provides the mechanics; you provide the meaning.
 
-9. **Metamorf is CASE-SENSITIVE.** All keywords, identifiers, and attribute names are case-sensitive. This matches C/C++ and avoids ambiguity. `keyword.Begin` and `keyword.begin` are different token kinds.
+9. **Metamorf is CASE-SENSITIVE.** All keywords, identifiers, and attribute names in the `.mor` language are case-sensitive. This matches C/C++ and avoids ambiguity. `keyword.Begin` and `keyword.begin` are different token kinds.
 
-10. **Turing complete by design.** Most language definition tools are deliberately not Turing complete — they give you a declarative grammar and then punt to a host language for anything complex. The `.mor` language has variables, unbounded loops, conditionals, recursion, and string/arithmetic operations as first-class constructs alongside declarative grammar rules. Every handler body uses the same unified language. No escape hatch to a host language, no build system integration, no glue code. A `.mor` file is self-contained.
+10. **Turing complete by design.** The `.mor` language has variables, unbounded loops, conditionals, recursion, and string/arithmetic operations as first-class constructs alongside declarative grammar rules. Every handler body uses the same unified language. No escape hatch to a host language, no build system integration, no glue code. A `.mor` file is self-contained.
 
 
-## 💻 System Requirements
+## System Requirements
 
 | | Requirement |
 |---|---|
@@ -3129,19 +2871,19 @@ These principles guide Metamorf's architecture and explain the reasoning behind 
 | **Building from source** | Delphi 12 Athens or later |
 
 
-## 🛠️ Building from Source
+## Building from Source
 
 1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases) and extract it
-2. Get the source - either clone or [download](https://github.com/tinyBigGAMES/Metamorf/archive/refs/heads/main.zip) the ZIP from the repo page:
+2. Get the source, either clone or [download](https://github.com/tinyBigGAMES/Metamorf/archive/refs/heads/main.zip) the ZIP from the repo page:
    ```bash
    git clone https://github.com/tinyBigGAMES/Metamorf.git
    ```
-3. Extract the source into the root of the release directory - this places the Delphi source alongside the build tools at their expected relative paths
-4. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 Athens - this loads Metamorf and all sub-projects together
-5. Build all projects in the group
+3. Extract the source into the root of the release directory. This places the Delphi source alongside the build tools at their expected relative paths.
+4. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 Athens
+5. Build the project
 
 
-## 🤝 Contributing, Support, and License
+## Contributing, Support, and License
 
 ### Contributing
 
@@ -3160,7 +2902,7 @@ Metamorf is built in the open. If it saves you time or sparks something useful:
 - ⭐ **Star the repo**: it costs nothing and helps others find the project
 - 🗣️ **Spread the word**: write a post, mention it in a community you are part of
 - 💬 **[Join us on Discord](https://discord.gg/Wb6z8Wam7p)**: share what you are building and help shape what comes next
-- 💖 **[Become a sponsor](https://github.com/sponsors/tinyBigGAMES)**: sponsorship directly funds time spent on Metamorf, documentation, and sub-projects
+- 💖 **[Become a sponsor](https://github.com/sponsors/tinyBigGAMES)**: sponsorship directly funds time spent on Metamorf and its documentation
 - 🦋 **[Follow on Bluesky](https://bsky.app/profile/tinybiggames.com)**: stay in the loop on releases and development
 
 ### License

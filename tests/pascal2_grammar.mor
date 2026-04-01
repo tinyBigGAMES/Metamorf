@@ -1,5 +1,57 @@
 // ===========================================================================
 //  pascal2_grammar.mor -- Grammar rules for Pascal2
+//
+//  Defines all prefix, infix, and statement grammar rules for the Pascal2
+//  language. The generic parser is a Pratt parser: prefix rules handle
+//  tokens that start an expression, infix rules handle binary operators
+//  with precedence and associativity, and statement rules handle language
+//  constructs triggered by a leading keyword or token.
+//
+//  Prefix expression rules:
+//    expr.ident         Identifier reference (variable, function name)
+//    expr.cstring       Double-quoted string literal
+//    expr.sstring       Single-quoted string literal
+//    expr.bool_true     Boolean true literal
+//    expr.bool_false    Boolean false literal
+//    expr.nil           Nil literal
+//    expr.integer       Integer numeric literal (REQUIRED -- see docs)
+//    expr.float         Float numeric literal (REQUIRED -- see docs)
+//    expr.grouped       Parenthesized expression
+//    expr.negate        Unary minus
+//    expr.not           Logical not
+//
+//  Infix expression rules (with precedence):
+//    expr.add           + - (precedence 20, left)
+//    expr.mul           * / (precedence 30, left)
+//    expr.compare       = <> < > <= >= (precedence 10, left)
+//    expr.div_mod       div mod (precedence 30, left)
+//    expr.and           and (precedence 5, left)
+//    expr.or            or (precedence 3, left)
+//    expr.call          ( triggers function call (precedence 80, left)
+//
+//  Statement rules:
+//    stmt.program       program Name;
+//    stmt.unit          unit Name;
+//    stmt.uses          uses unit1, unit2;  (triggers module compilation)
+//    stmt.main_block    begin ... end.
+//    stmt.var_decl      var declarations (loops until next keyword)
+//    stmt.ident_stmt    Assignment (x := expr) or expression statement
+//    stmt.writeln       WriteLn(args)
+//    stmt.write         Write(args)
+//    stmt.if            if/then/else/end
+//    stmt.while         while/do/end
+//    stmt.for           for/to|downto/do/end
+//    stmt.repeat        repeat/until
+//    stmt.func_decl     function with params, return type, decls, body
+//    stmt.proc_decl     procedure with params, decls, body
+//    stmt.directive_*   12 directive rules for build configuration
+//
+//  Imperative parsing:
+//    Several rules use imperative constructs (checkToken, advance,
+//    createNode, addChild, setAttr, matchToken, requireToken) for
+//    parsing logic that cannot be expressed purely declaratively.
+//    For example, stmt.var_decl loops consuming variable declarations
+//    until it sees a keyword that ends the var block.
 // ===========================================================================
 
 grammar {

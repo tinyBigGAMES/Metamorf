@@ -37,6 +37,17 @@
 //  constructs parse naturally. S-expression languages like Scheme
 //  cannot use this pattern -- see scheme.mor.
 //
+//  C++ TOKEN AVOIDANCE
+//
+//  ConfigCpp registers all C++ operators and delimiters unconditionally.
+//  This file does NOT declare tokens for symbols that ConfigCpp provides:
+//    ==   Use cpp.op.eq in grammar rules (not a custom op.eq)
+//    %    Use cpp.op.modulo in grammar rules (not a custom op.percent)
+//    [ ]  Provided as delimiter.lbracket/rbracket by ConfigCpp
+//  The -- comment delimiter overlaps with cpp.op.decrement, but the
+//  lexer processes comments before operators, so -- always starts a
+//  comment. C++ x-- decrement will not work in Lua passthrough.
+//
 //  Test source: hello.lua
 // ===========================================================================
 
@@ -68,7 +79,8 @@ tokens {
   token keyword.write     = "write";
   token keyword.require   = "require";
   token keyword.module    = "module";
-  token op.eq             = "==";
+  // ==, % are provided by ConfigCpp as cpp.op.eq, cpp.op.modulo.
+  // Grammar rules reference the cpp.op.* kinds directly.
   token op.neq            = "~=";
   token op.lte            = "<=";
   token op.gte            = ">=";
@@ -77,13 +89,11 @@ tokens {
   token op.minus          = "-";
   token op.star           = "*";
   token op.slash          = "/";
-  token op.percent        = "%";
   token op.lt             = "<";
   token op.gt             = ">";
   token delimiter.lparen    = "(";
   token delimiter.rparen    = ")";
-  token delimiter.lbracket  = "[";
-  token delimiter.rbracket  = "]";
+  // [ ] are provided by ConfigCpp as delimiter.lbracket/rbracket.
   token delimiter.comma     = ",";
   token delimiter.colon     = ":";
   token delimiter.semicolon = ";";
@@ -143,11 +153,11 @@ grammar {
     parse expr -> @right;
   }
   rule expr.mul precedence left 30 {
-    consume [op.star, op.slash, op.percent] -> @operator;
+    consume [op.star, op.slash, cpp.op.modulo] -> @operator;
     parse expr -> @right;
   }
   rule expr.compare precedence left 10 {
-    consume [op.eq, op.neq, op.lt, op.gt, op.lte, op.gte] -> @operator;
+    consume [cpp.op.eq, op.neq, op.lt, op.gt, op.lte, op.gte] -> @operator;
     parse expr -> @right;
   }
   rule expr.and precedence left 5 {

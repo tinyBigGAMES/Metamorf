@@ -1,7 +1,44 @@
 // ===========================================================================
 //  pascal2_semantics.mor -- Semantic analysis for Pascal2
 //
-//  Demonstrates: overload detection (GROUP 10), top-level guards (GROUP 6)
+//  Defines semantic handlers that run after parsing to build the symbol
+//  table, resolve references, and trigger module compilation. Pascal2
+//  uses single-pass semantics (no "pass N" blocks), relying on source
+//  order for symbol visibility.
+//
+//  Scope management:
+//    program.root       Opens "global" scope, visits all children
+//    stmt.main_block    Opens "main" scope for the begin..end body
+//    stmt.func_decl     Opens a scope named after the function
+//    stmt.proc_decl     Opens a scope named after the procedure
+//
+//  Symbol declaration:
+//    stmt.func_decl     Declares the function's signature (not just
+//                       the name) using declare @sig as routine. The
+//                       signature includes parameter types, enabling
+//                       overload detection.
+//    stmt.proc_decl     Same signature-based declaration pattern.
+//    stmt.single_var    Declares variable name as variable.
+//
+//  Overload detection (guarded by ENABLE_OVERLOADS const):
+//    When a function/procedure is declared, if another symbol with
+//    the same name prefix already exists (checked via
+//    symbolExistsWithPrefix), the existing symbol's C linkage is
+//    demoted via demoteCLinkageForPrefix(). This allows multiple
+//    functions with the same name but different parameter types to
+//    coexist. The guard block ensures this logic only runs when the
+//    ENABLE_OVERLOADS constant is true.
+//
+//  Module compilation:
+//    stmt.uses calls setModuleExtension("pas") and then visits its
+//    children. Each stmt.uses_item calls compileModule(unit_name),
+//    which triggers the engine to lex, parse, and semantically analyze
+//    the referenced unit file (e.g., mathlib.pas).
+//
+//  Directive handlers:
+//    All stmt.directive_* handlers are empty (no semantic action needed).
+//    They exist so the semantic engine does not report "unhandled node"
+//    warnings. Their actual work happens in the emitter phase.
 // ===========================================================================
 
 semantics {

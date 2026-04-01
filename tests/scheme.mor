@@ -51,6 +51,16 @@
 //  Type annotations use colon syntax: (define (add (a : number)
 //  (b : number)) : number (+ a b))
 //
+//  C++ TOKEN AVOIDANCE
+//
+//  ConfigCpp registers all C++ operators unconditionally. This file
+//  does NOT declare tokens for symbols that ConfigCpp provides:
+//    !=   Use cpp.op.neq in grammar headKind checks (not a custom op.neq)
+//    %    Use cpp.op.modulo in grammar headKind checks (not a custom op.percent)
+//  The ; comment delimiter overlaps with a common C++ token, but the
+//  lexer processes comments before operators, so ; always starts a
+//  comment in Scheme source.
+//
 //  Test source: hello.scm
 // ===========================================================================
 
@@ -79,14 +89,14 @@ tokens {
   token keyword.module    = "module";
   token keyword.require   = "require";
   token op.eq             = "=";
-  token op.neq            = "!=";
+  // != and % are provided by ConfigCpp as cpp.op.neq, cpp.op.modulo.
+  // Grammar rules reference the cpp.op.* kinds directly.
   token op.lte            = "<=";
   token op.gte            = ">=";
   token op.plus           = "+";
   token op.minus          = "-";
   token op.star           = "*";
   token op.slash          = "/";
-  token op.percent        = "%";
   token op.lt             = "<";
   token op.gt             = ">";
   token delimiter.lparen    = "(";
@@ -156,7 +166,7 @@ grammar {
     let handled = false;
 
     // Arithmetic and comparison operators (all binary)
-    if headKind == "op.plus" or headKind == "op.minus" or headKind == "op.star" or headKind == "op.slash" or headKind == "op.percent" or headKind == "op.eq" or headKind == "op.neq" or headKind == "op.lt" or headKind == "op.gt" or headKind == "op.lte" or headKind == "op.gte" {
+    if headKind == "op.plus" or headKind == "op.minus" or headKind == "op.star" or headKind == "op.slash" or headKind == "cpp.op.modulo" or headKind == "op.eq" or headKind == "cpp.op.neq" or headKind == "op.lt" or headKind == "op.gt" or headKind == "op.lte" or headKind == "op.gte" {
       handled = true;
       setAttr(nd, "form", "binop");
       setAttr(nd, "op_text", head);

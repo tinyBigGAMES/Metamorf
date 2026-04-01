@@ -1,5 +1,43 @@
 // ===========================================================================
 //  pascal2_tokens.mor -- Token declarations and type system for Pascal2
+//
+//  This file defines everything the lexer needs to tokenize Pascal2
+//  source files, plus the type system mappings used by semantic analysis
+//  and code generation.
+//
+//  Tokens declared:
+//    Keywords       program, begin, end, var, const, function, procedure,
+//                   if/then/else, while/do, for/to/downto, repeat/until,
+//                   writeln, write, not/and/or, div/mod, true/false/nil,
+//                   unit, uses
+//    Operators      :=, <>, <=, >=, +, -, *, /, =, <, >
+//    Delimiters     ( ) , : ; .
+//                   [ ] are provided by ConfigCpp (delimiter.lbracket/rbracket)
+//    Comments       // (line), /* */ (block)
+//    Strings        " (C-style), ' (Pascal-style)
+//    Directives     @ prefix with platform, optimize, subsystem, exeicon,
+//                   vermajor, verminor, verpatch, product, description,
+//                   filename, company, copyright
+//
+//  Type system:
+//    type keywords  integer, string, boolean, single, double, char,
+//                   longint, byte -- each mapped to a type kind
+//    IR mappings    type.integer -> int64_t, type.string -> std::string,
+//                   type.boolean -> bool, etc.
+//    Literal types  expr.integer -> type.integer, expr.float -> type.single,
+//                   expr.cstring/sstring -> type.string, etc.
+//
+//  Note: casesensitive = false makes all keyword matching case-insensitive,
+//  matching standard Pascal behavior.
+//
+//  C++ TOKEN AVOIDANCE
+//
+//  Block comments use /* */ instead of traditional Pascal { } because
+//  ConfigCpp registers { and } as delimiter.lbrace/rbrace. If { were a
+//  comment opener, the lexer would consume it before the operator table
+//  could see it, breaking C++ brace passthrough. [ ] are provided by
+//  ConfigCpp and not declared here. Pascal type names (integer, string,
+//  boolean) do not conflict with C++ keywords (int, bool, float).
 // ===========================================================================
 
 tokens {
@@ -47,15 +85,14 @@ tokens {
   token op.gt             = ">";
   token delimiter.lparen    = "(";
   token delimiter.rparen    = ")";
-  token delimiter.lbracket  = "[";
-  token delimiter.rbracket  = "]";
+  // [ ] are provided by ConfigCpp as delimiter.lbracket/rbracket.
   token delimiter.comma     = ",";
   token delimiter.colon     = ":";
   token delimiter.semicolon = ";";
   token delimiter.dot       = ".";
   token comment.line        = "//";
-  token comment.block_open  = "{";
-  token comment.block_close = "}";
+  token comment.block_open  = "/*";
+  token comment.block_close = "*/";
   token string.cstring      = "\"";
   token string.sstring      = "'";
   directive_prefix = "@";

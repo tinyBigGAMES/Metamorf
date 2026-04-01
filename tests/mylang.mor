@@ -24,11 +24,26 @@
 //  cannot use this pattern -- see scheme.mor.
 //
 //  BRACE-DELIMITED LANGUAGES: ConfigCpp registers { and } as
-//  cpp.delimiter.lbrace/rbrace for depth-aware passthrough collection.
-//  Languages that use braces for blocks (like MyLang) must reference
-//  the cpp.delimiter.* kinds in their grammar rules instead of defining
-//  their own delimiter.lbrace/rbrace tokens, since ConfigCpp runs
-//  after the .mor interpreter and would override them.
+//  delimiter.lbrace/delimiter.rbrace for depth-aware passthrough
+//  collection. Languages that use braces for blocks (like MyLang)
+//  reference the delimiter.* kinds in their grammar rules. These
+//  tokens come from ConfigCpp automatically -- do not redefine them
+//  in your tokens block.
+//
+//  C++ TOKEN AVOIDANCE
+//
+//  ConfigCpp registers all C++ operators and keywords unconditionally.
+//  This file does NOT declare tokens for C++ symbols:
+//    ->   Use cpp.op.arrow in grammar rules (return type annotation)
+//    ==   Use cpp.op.eq in grammar rules (equality comparison)
+//    !=   Use cpp.op.neq in grammar rules (inequality comparison)
+//    %    Use cpp.op.modulo in grammar rules (modulo operator)
+//    { }  Use delimiter.lbrace/rbrace (brace-delimited blocks)
+//  Type names avoid C++ keywords: i64 (not int), boolean (not bool),
+//  f64 (not float). If you use a C++ keyword as a type name without
+//  registering it as your own keyword, the lexer tokenizes it as
+//  cpp.keyword.* instead of identifier, causing "expected identifier"
+//  errors. See resolveType() at the bottom of this file.
 //
 //  Test source: hello.ml
 // ===========================================================================
@@ -72,8 +87,8 @@ tokens {
   token op.gt             = ">";
   token delimiter.lparen    = "(";
   token delimiter.rparen    = ")";
-  // { and } are registered by ConfigCpp as cpp.delimiter.lbrace/rbrace.
-  // Grammar rules must use the cpp.delimiter.* kinds accordingly.
+  // { and } are registered by ConfigCpp as delimiter.lbrace/rbrace.
+  // Do not redefine them in this tokens block.
   token delimiter.comma     = ",";
   token delimiter.colon     = ":";
   token delimiter.semicolon = ";";
@@ -222,21 +237,21 @@ grammar {
     if matchToken("cpp.op.arrow") {
       consume identifier -> @return_type;
     }
-    expect cpp.delimiter.lbrace;
-    parse many stmt until cpp.delimiter.rbrace -> @func_body;
-    expect cpp.delimiter.rbrace;
+    expect delimiter.lbrace;
+    parse many stmt until delimiter.rbrace -> @func_body;
+    expect delimiter.rbrace;
   }
   // if expr { body } else if expr { body } else { body }
   rule stmt.if {
     expect keyword.if;
     let nd = getResultNode();
     addChild(nd, parseExpr(0));
-    requireToken("cpp.delimiter.lbrace");
+    requireToken("delimiter.lbrace");
     let body = createNode("stmt.block");
-    while not checkToken("cpp.delimiter.rbrace") {
+    while not checkToken("delimiter.rbrace") {
       addChild(body, parseStmt());
     }
-    requireToken("cpp.delimiter.rbrace");
+    requireToken("delimiter.rbrace");
     addChild(nd, body);
     // else if / else chains
     while checkToken("keyword.else") {
@@ -245,21 +260,21 @@ grammar {
         advance();
         let branch = createNode("stmt.elseif_branch");
         addChild(branch, parseExpr(0));
-        requireToken("cpp.delimiter.lbrace");
+        requireToken("delimiter.lbrace");
         let branchBody = createNode("stmt.block");
-        while not checkToken("cpp.delimiter.rbrace") {
+        while not checkToken("delimiter.rbrace") {
           addChild(branchBody, parseStmt());
         }
-        requireToken("cpp.delimiter.rbrace");
+        requireToken("delimiter.rbrace");
         addChild(branch, branchBody);
         addChild(nd, branch);
       } else {
-        requireToken("cpp.delimiter.lbrace");
+        requireToken("delimiter.lbrace");
         let elseBody = createNode("stmt.block");
-        while not checkToken("cpp.delimiter.rbrace") {
+        while not checkToken("delimiter.rbrace") {
           addChild(elseBody, parseStmt());
         }
-        requireToken("cpp.delimiter.rbrace");
+        requireToken("delimiter.rbrace");
         addChild(nd, elseBody);
       }
     }
@@ -268,9 +283,9 @@ grammar {
   rule stmt.while {
     expect keyword.while;
     parse expr -> @condition;
-    expect cpp.delimiter.lbrace;
-    parse many stmt until cpp.delimiter.rbrace -> @body;
-    expect cpp.delimiter.rbrace;
+    expect delimiter.lbrace;
+    parse many stmt until delimiter.rbrace -> @body;
+    expect delimiter.rbrace;
   }
   // for ident = expr to expr { body }
   rule stmt.for {
@@ -280,16 +295,16 @@ grammar {
     parse expr -> @start;
     expect keyword.to;
     parse expr -> @finish;
-    expect cpp.delimiter.lbrace;
-    parse many stmt until cpp.delimiter.rbrace -> @body;
-    expect cpp.delimiter.rbrace;
+    expect delimiter.lbrace;
+    parse many stmt until delimiter.rbrace -> @body;
+    expect delimiter.rbrace;
   }
   // loop { body } until expr;
   rule stmt.loop {
     expect keyword.loop;
-    expect cpp.delimiter.lbrace;
-    parse many stmt until cpp.delimiter.rbrace -> @body;
-    expect cpp.delimiter.rbrace;
+    expect delimiter.lbrace;
+    parse many stmt until delimiter.rbrace -> @body;
+    expect delimiter.rbrace;
     expect keyword.until;
     parse expr -> @condition;
     expect delimiter.semicolon;
@@ -324,7 +339,7 @@ grammar {
     expect keyword.return;
     let nd = getResultNode();
     let atEnd = false;
-    if checkToken("cpp.delimiter.rbrace") { atEnd = true; }
+    if checkToken("delimiter.rbrace") { atEnd = true; }
     if checkToken("delimiter.semicolon") { atEnd = true; }
     if not atEnd {
       addChild(nd, parseExpr(0));
@@ -676,7 +691,7 @@ emitters {
 // ===========================================================================
 
 routine resolveType(typeText: string) -> string {
-  if typeText == "int" {
+  if typeText == "i64" {
     return "int64_t";
   }
   if typeText == "number" {
@@ -685,10 +700,10 @@ routine resolveType(typeText: string) -> string {
   if typeText == "string" {
     return "std::string";
   }
-  if typeText == "bool" {
+  if typeText == "boolean" {
     return "bool";
   }
-  if typeText == "float" {
+  if typeText == "f64" {
     return "double";
   }
   if typeText == "void" {
