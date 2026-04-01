@@ -191,6 +191,7 @@ begin
 
   // Register C++ passthrough (AFTER custom lang setup)
   ConfigCpp(FInterp);
+  Status(RSEngineCppPassthrough);
 
   // --- Phase 3: Read and process user source ---
   if not TFile.Exists(ASourceFile) then
@@ -313,6 +314,32 @@ begin
     end;
 
     // --- Phase 7: Build via Zig/Clang ---
+    if FBuild.GetTarget() = tpWin64 then
+    begin
+      if FBuild.GetSubsystem() = stGUI then
+        Status(RSEngineTargetPlatform, [COLOR_CYAN + 'Win64 (GUI)'])
+      else
+        Status(RSEngineTargetPlatform, [COLOR_CYAN + 'Win64 (Console)']);
+    end
+    else
+      Status(RSEngineTargetPlatform, [COLOR_CYAN + 'Linux64']);
+
+    if FBuild.GetBuildMode() = bmExe then
+      Status(RSEngineBuildMode, [COLOR_CYAN + 'Executable'])
+    else if FBuild.GetBuildMode() = bmDll then
+      Status(RSEngineBuildMode, [COLOR_CYAN + 'DLL'])
+    else
+      Status(RSEngineBuildMode, [COLOR_CYAN + 'Library']);
+
+    if FBuild.GetOptimizeLevel() = olDebug then
+      Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'Debug'])
+    else if FBuild.GetOptimizeLevel() = olReleaseSafe then
+      Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'ReleaseSafe'])
+    else if FBuild.GetOptimizeLevel() = olReleaseFast then
+      Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'ReleaseFast'])
+    else
+      Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'ReleaseSmall']);
+
     FBuild.Process(AAutoRun);
   finally
     FInterp.SetCompileModuleFunc(nil);

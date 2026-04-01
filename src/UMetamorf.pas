@@ -22,7 +22,8 @@ uses
   System.IOUtils,
   Metamorf.Utils,
   Metamorf.Engine,
-  Metamorf.Build;
+  Metamorf.Build,
+  Metamorf.CLI;
 
 // =========================================================================
 // CLI MODE (Release)
@@ -30,61 +31,14 @@ uses
 
 procedure RunCLI();
 var
-  LEngine: TMorEngine;
-  LMorFile: string;
-  LSrcFile: string;
-  LOutputPath: string;
+  LCLI: TMorCLI;
 begin
   ExitCode := 0;
-
-  if ParamCount() < 2 then
-  begin
-    TUtils.PrintLn('Usage: metamorf <lang.mor> <source> [output_path]');
-    ExitCode := 1;
-    Exit;
-  end;
-
-  LMorFile := ParamStr(1);
-  LSrcFile := ParamStr(2);
-  if ParamCount() >= 3 then
-    LOutputPath := ParamStr(3)
-  else
-    LOutputPath := 'output';
-
-  LEngine := TMorEngine.Create();
+  LCLI := TMorCLI.Create();
   try
-    try
-      LEngine.SetStatusCallback(
-        procedure(const AMsg: string; const AUserData: Pointer)
-        begin
-          TUtils.PrintLn(AMsg);
-        end);
-
-      LEngine.GetBuild().SetOutputCallback(
-        procedure(const ALine: string; const AUserData: Pointer)
-        begin
-          TUtils.Print(ALine);
-        end);
-
-      LEngine.Compile(LMorFile, LSrcFile, LOutputPath, True);
-
-      if LEngine.GetErrors().HasErrors() then
-      begin
-        TUtils.PrintLn(LEngine.GetErrors().Dump());
-        ExitCode := 1;
-      end;
-    finally
-      FreeAndNil(LEngine);
-    end;
-  except
-    on E: Exception do
-    begin
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + COLOR_BOLD + 'Fatal Error: ' +
-        E.Message + COLOR_RESET);
-      TUtils.PrintLn('');
-      ExitCode := 1;
-    end;
+    LCLI.Execute();
+  finally
+    FreeAndNil(LCLI);
   end;
 end;
 
@@ -140,7 +94,7 @@ var
   LNum: Integer;
 begin
   try
-    LNum := 8;
+    LNum := 4;
 
     case LNum of
       01: TestLang('..\tests\pascal', '..\tests\hello.pas');
@@ -148,9 +102,8 @@ begin
       03: TestLang('..\tests\basic',  '..\tests\hello.bas');
       04: TestLang('..\tests\scheme', '..\tests\hello.scm');
       05: TestLang('..\tests\mylang', '..\tests\hello.ml');
-      06: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_hello.myra');
-      07: TestLang('..\tests\myra', '..\projects\myra\tests\test_exe_mixedmode.myra');
-      08: TestLang('..\tests\pascal2', '..\tests\hello2.pas');
+      06: TestLang('..\tests\pascal2', '..\tests\hello2.pas');
+      07: TestLang('..\tests\testbed', '..\tests\testbed.pas');
 
     end;
 

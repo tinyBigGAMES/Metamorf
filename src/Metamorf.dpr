@@ -34,7 +34,8 @@ uses
   Metamorf.CodeGen in 'Metamorf.CodeGen.pas',
   Metamorf.Parser in 'Metamorf.Parser.pas',
   Metamorf.Scopes in 'Metamorf.Scopes.pas',
-  UMetamorf in 'UMetamorf.pas';
+  UMetamorf in 'UMetamorf.pas',
+  Metamorf.CLI in 'Metamorf.CLI.pas';
 
 begin
   RunMetamorf();

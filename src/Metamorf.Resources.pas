@@ -318,6 +318,10 @@ resourcestring
   RSUserParserParsing            = 'Parsing %s...';
   RSUserSemanticAnalyzing        = 'Analyzing %s...';
   RSUserCodeGenEmitting          = 'Emitting %s...';
+  RSEngineTargetPlatform          = 'Target: %s';
+  RSEngineBuildMode               = 'Build mode: %s';
+  RSEngineOptimizeLevel           = 'Optimization: %s';
+  RSEngineCppPassthrough          = 'Registering C++ passthrough...';
 
 implementation
 
