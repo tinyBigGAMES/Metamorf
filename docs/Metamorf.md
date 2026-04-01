@@ -133,37 +133,58 @@ Metamorf/repo/
 Metamorf compiles your language in a single pass through a table-driven pipeline. The `.mor` file is parsed first, and its contents populate a set of dispatch tables (token registrations, grammar rules, semantic handlers, emitters). These tables then drive the compilation of your user source files.
 
 ```
-                        SETUP
-                        =====
-mylang.mor  -->  .mor Lexer  -->  .mor Parser  -->  .mor AST
-                                                       |
-                                             Interpreter walks AST,
-                                             populates dispatch tables:
-                                               - Token registrations
-                                               - Grammar rules (prefix/infix/stmt)
-                                               - Semantic handlers
-                                               - Emitter handlers
-                                               - Routines, constants, fragments
-                                                       |
-                                             C++ passthrough registered
-                                             (after .mor setup)
-                                                       |
-                        COMPILATION                    |
-                        ===========                    v
-myprogram.src  -->  Generic Lexer  -->  Generic Parser  -->  Semantic Analysis
-                    (table-driven)      (Pratt, dispatches    (multi-pass, scope
-                                        to grammar rules)     management, symbols)
-                                                                    |
-                                                              Code Generation
-                                                              (emitter handlers
-                                                               produce C++23)
-                                                                    |
-                                                              .h + .cpp files
-                                                                    |
-                                                              Zig/Clang build
-                                                                    |
-                                                              Native binary
-                                                              (Win64/Linux64)
+  SETUP
+  ┌─────────────┐    ┌────────────┐    ┌────────────┐    ┌─────────┐
+  │ mylang.mor  │───►│ .mor Lexer │───►│.mor Parser │───►│.mor AST │
+  └─────────────┘    └────────────┘    └────────────┘    └────┬────┘
+                                                              │
+                                               ┌──────────────┴───────────┐
+                                               │  Interpreter walks       │
+                                               │  AST and populates:      │
+                                               │                          │
+                                               │  · Token registers       │
+                                               │  · Grammar rules         │
+                                               │  · Semantic handlers     │
+                                               │  · Emitter handlers      │
+                                               │  · Routines/consts       │
+                                               └──────────────┬───────────┘
+                                                              │
+                                               ┌──────────────┴───────────┐
+                                               │  C++ passthrough         │
+                                               │  registered              │
+                                               └──────────────┬───────────┘
+                                                              │
+  COMPILATION                                                 │
+                                                              │
+                                                              ▼
+  ┌─────────────────┐    ┌───────────────┐    ┌───────────────────┐
+  │ myprogram.src   │───►│ Generic Lexer │───►│  Generic Parser   │
+  └─────────────────┘    │ (table-driven)│    │ (Pratt dispatch)  │
+                         └───────────────┘    └─────────┬─────────┘
+                                                        │
+                                              ┌─────────┴─────────┐
+                                              │ Semantic Analysis │
+                                              │ (multi-pass,      │
+                                              │  scopes, symbols) │
+                                              └─────────┬─────────┘
+                                                        │
+                                              ┌─────────┴─────────┐
+                                              │ Code Generation   │
+                                              │ (emitters ► C++23)│
+                                              └─────────┬─────────┘
+                                                        │
+                                              ┌─────────┴─────────┐
+                                              │  .h + .cpp files  │
+                                              └─────────┬─────────┘
+                                                        │
+                                              ┌─────────┴─────────┐
+                                              │ Zig/Clang build   │
+                                              └─────────┬─────────┘
+                                                        │
+                                              ┌─────────┴─────────┐
+                                              │  Native binary    │
+                                              │ (Win64/Linux64)   │
+                                              └───────────────────┘
 ```
 
 ### Setup Phase
@@ -2868,19 +2889,16 @@ These principles guide Metamorf's architecture and explain the reasoning behind 
 |---|---|
 | **Host OS** | Windows 10/11 x64 |
 | **Linux target** | WSL2 + Ubuntu (`wsl --install -d Ubuntu`) |
-| **Building from source** | Delphi 12 Athens or later |
+| **Building from source** | Delphi 12 or higher |
 
 
 ## Building from Source
 
+Each release includes the full source alongside the binaries. No separate download required.
+
 1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases) and extract it
-2. Get the source, either clone or [download](https://github.com/tinyBigGAMES/Metamorf/archive/refs/heads/main.zip) the ZIP from the repo page:
-   ```bash
-   git clone https://github.com/tinyBigGAMES/Metamorf.git
-   ```
-3. Extract the source into the root of the release directory. This places the Delphi source alongside the build tools at their expected relative paths.
-4. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 Athens
-5. Build the project
+2. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
+3. Build the project
 
 
 ## Contributing, Support, and License

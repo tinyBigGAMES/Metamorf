@@ -39,9 +39,25 @@ No host language glue code. No build system integration. No escape hatch to C, J
 Metamorf reads your `.mor` file, populates its internal dispatch tables (token definitions, grammar rules, semantic handlers, emitter handlers), then uses those tables to lex, parse, analyze, and generate C++23 from your source file. The generated C++ is compiled to a native binary via Zig/Clang.
 
 ```
-mylang.mor  ──►  .mor parser  ──►  dispatch tables  ──►  lex ► parse ► semantics ► C++23 ► Zig/Clang
-                                                                                          │
-myprogram.src  ────────────────────────────────────────────────────────────────────►      native binary
+  ┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
+  │ mylang.mor  │────►│ .mor parser  │────►│ dispatch tables  │
+  └─────────────┘     └──────────────┘     └────────┬─────────┘
+                                                    │
+  ┌─────────────────┐                               │
+  │ myprogram.src   │───┐                           │
+  └─────────────────┘   │                           │
+                        ▼                           ▼
+                  ┌─────────────────────────────────────┐
+                  │ lex ──► parse ──► analyze ──► C++23 │
+                  └──────────────────┬──────────────────┘
+                                     │
+                               ┌─────┴─────┐
+                               │ Zig/Clang │
+                               └─────┬─────┘
+                                     │
+                             ┌───────┴───────┐
+                             │ native binary │
+                             └───────────────┘
 ```
 
 See the [Metamorf Manual](docs/Metamorf.md) for the complete guide: architecture, grammar rules, semantic analysis, code emission, type inference, worked examples, and a checklist for building a new language.
@@ -90,18 +106,15 @@ Metamorf/repo/
 |---|---|
 | **Host OS** | Windows 10/11 x64 |
 | **Linux target** | WSL2 + Ubuntu (`wsl --install -d Ubuntu`) |
-| **Building from source** | Delphi 12 Athens or later |
+| **Building from source** | Delphi 12 or higher |
 
 ## Building from Source
 
+Each release includes the full source alongside the binaries. No separate download required.
+
 1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases) and extract it
-2. Get the source, either clone or [download](https://github.com/tinyBigGAMES/Metamorf/archive/refs/heads/main.zip) the ZIP from the repo page:
-   ```bash
-   git clone https://github.com/tinyBigGAMES/Metamorf.git
-   ```
-3. Extract the source into the root of the release directory; this places the Delphi source alongside the build tools at their expected relative paths
-4. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 Athens
-5. Build the project
+2. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
+3. Build the project
 
 > [!IMPORTANT]
 > This repository is under active development. Language surfaces may change without notice. Each release aims to be stable and usable as we work toward v1.0. Follow the repo or join the [Discord](https://discord.gg/Wb6z8Wam7p) to track progress.
