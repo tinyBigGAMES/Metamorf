@@ -1,8 +1,4 @@
-<div align="center">
-
 ![Metamorf](../media/logo.png)
-
-</div>
 
 ## Table of Contents
 
