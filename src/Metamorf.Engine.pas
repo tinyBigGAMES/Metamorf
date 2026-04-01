@@ -105,6 +105,7 @@ end;
 
 destructor TMorEngine.Destroy();
 begin
+  FreeAndNil(FMorMasterRoot);
   FreeAndNil(FImportedMorFiles);
   FreeAndNil(FProcessedFiles);
   FreeAndNil(FInterp);
