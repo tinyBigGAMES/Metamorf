@@ -59,42 +59,57 @@ begin
 
   // C++ keywords -- registered as cpp.keyword.* so they don't collide
   // with custom language keywords. Only add if not already registered.
-
   for LI := 0 to High(CppKW) do
   begin
-    // Only add if the custom language hasn't claimed this word
     if not LKeywords.ContainsKey(CppKW[LI]) then
       LKeywords.AddOrSetValue(CppKW[LI], 'cpp.keyword.' + CppKW[LI]);
   end;
 
-  // C++ operators -- only add those not already registered
-  // Scope resolution
+  // C++ operators and delimiters -- always registered unconditionally.
+  // Custom languages MUST NOT redefine these tokens. If a custom
+  // language needs the same symbol (e.g. % for modulo), it should
+  // reference the cpp.op.* kind in its grammar rules instead.
   LEntry.Text := '::'; LEntry.Kind := 'cpp.op.scope';
   LOperators.Add(LEntry);
-  // Arrow
   LEntry.Text := '->'; LEntry.Kind := 'cpp.op.arrow';
   LOperators.Add(LEntry);
-  // Increment/decrement
   LEntry.Text := '++'; LEntry.Kind := 'cpp.op.increment';
   LOperators.Add(LEntry);
   LEntry.Text := '--'; LEntry.Kind := 'cpp.op.decrement';
   LOperators.Add(LEntry);
-  // Shift
   LEntry.Text := '<<'; LEntry.Kind := 'cpp.op.shl';
   LOperators.Add(LEntry);
   LEntry.Text := '>>'; LEntry.Kind := 'cpp.op.shr';
   LOperators.Add(LEntry);
-  // Logical
   LEntry.Text := '&&'; LEntry.Kind := 'cpp.op.logand';
   LOperators.Add(LEntry);
   LEntry.Text := '||'; LEntry.Kind := 'cpp.op.logor';
   LOperators.Add(LEntry);
-  // Comparison (==, != already registered by custom lang)
-  // Bitwise
+  LEntry.Text := '=='; LEntry.Kind := 'cpp.op.eq';
+  LOperators.Add(LEntry);
+  LEntry.Text := '!='; LEntry.Kind := 'cpp.op.neq';
+  LOperators.Add(LEntry);
+  LEntry.Text := '%'; LEntry.Kind := 'cpp.op.modulo';
+  LOperators.Add(LEntry);
   LEntry.Text := '~'; LEntry.Kind := 'cpp.op.bitnot';
   LOperators.Add(LEntry);
-  // Hash for preprocessor
+  LEntry.Text := '&'; LEntry.Kind := 'cpp.op.bitand';
+  LOperators.Add(LEntry);
+  LEntry.Text := '|'; LEntry.Kind := 'cpp.op.bitor';
+  LOperators.Add(LEntry);
+  LEntry.Text := '^'; LEntry.Kind := 'cpp.op.bitxor';
+  LOperators.Add(LEntry);
+  LEntry.Text := '!'; LEntry.Kind := 'cpp.op.lognot';
+  LOperators.Add(LEntry);
   LEntry.Text := '#'; LEntry.Kind := 'cpp.op.hash';
+  LOperators.Add(LEntry);
+  LEntry.Text := '{'; LEntry.Kind := 'delimiter.lbrace';
+  LOperators.Add(LEntry);
+  LEntry.Text := '}'; LEntry.Kind := 'delimiter.rbrace';
+  LOperators.Add(LEntry);
+  LEntry.Text := '['; LEntry.Kind := 'delimiter.lbracket';
+  LOperators.Add(LEntry);
+  LEntry.Text := ']'; LEntry.Kind := 'delimiter.rbracket';
   LOperators.Add(LEntry);
 
   // Re-sort operators longest-first after adding C++ ones
