@@ -129,6 +129,12 @@ grammar {
     expect keyword.not;
     parse expr -> @operand;
   }
+  rule expr.integer {
+    consume literal.integer -> @value;
+  }
+  rule expr.float {
+    consume literal.float -> @value;
+  }
 
   // --- Infix expression rules ---
   rule expr.add precedence left 20 {
@@ -687,13 +693,19 @@ emitters {
 
   // --- Expression emitters ---
   on expr.string {
-    emit @value;
+    emit "\"" + @value + "\"";
   }
   on expr.bool_true {
     emit "true";
   }
   on expr.bool_false {
     emit "false";
+  }
+  on expr.integer {
+    emit @value;
+  }
+  on expr.float {
+    emit @value;
   }
   on expr.ident {
     emit @name;

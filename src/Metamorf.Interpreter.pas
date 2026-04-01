@@ -2285,6 +2285,67 @@ begin
       Result := TValue.From<string>('');
   end
 
+  // collectRaw() -> string : collect raw tokens until ; or balanced close at depth 0
+  else if AName = 'collectRaw' then
+  begin
+    if Assigned(FActiveParser) then
+    begin
+      LGenParser := TGenericParser(FActiveParser);
+      LRawAccum := '';
+      LDepth := 0;
+      while not LGenParser.AtEnd() do
+      begin
+        LTokenKind := LGenParser.Current().Kind;
+        LS := LGenParser.Current().Text;
+
+        if LTokenKind = 'eof' then
+          Break;
+
+        // Track depth
+        if (LTokenKind = 'delimiter.lparen') or
+           (LTokenKind = 'delimiter.lbrace') or
+           (LTokenKind = 'delimiter.lbracket') then
+          Inc(LDepth)
+        else if (LTokenKind = 'delimiter.rparen') or
+                (LTokenKind = 'delimiter.rbrace') or
+                (LTokenKind = 'delimiter.rbracket') then
+        begin
+          Dec(LDepth);
+          if LDepth < 0 then
+            Break;
+          // Balanced close: include token and stop
+          if LDepth <= 0 then
+          begin
+            if LRawAccum <> '' then LRawAccum := LRawAccum + ' ';
+            LRawAccum := LRawAccum + LS;
+            LGenParser.DoAdvance();
+            Break;
+          end;
+        end;
+
+        // Stop at ; when depth <= 0
+        if (LTokenKind = 'delimiter.semicolon') and (LDepth <= 0) then
+        begin
+          if LRawAccum <> '' then LRawAccum := LRawAccum + ' ';
+          LRawAccum := LRawAccum + LS;
+          LGenParser.DoAdvance();
+          Break;
+        end;
+
+        // Accumulate token text
+        if LRawAccum <> '' then LRawAccum := LRawAccum + ' ';
+        if LTokenKind.StartsWith('string.') then
+          LRawAccum := LRawAccum + '"' + LS + '"'
+        else
+          LRawAccum := LRawAccum + LS;
+        LGenParser.DoAdvance();
+      end;
+      Result := TValue.From<string>(LRawAccum);
+    end
+    else
+      Result := TValue.From<string>('');
+  end
+
   // Emit context (emitter handler bodies)
   // emitLine(text) / emitLine(text, target)
   else if AName = 'emitLine' then

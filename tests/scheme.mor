@@ -119,6 +119,12 @@ grammar {
   rule expr.nil {
     expect keyword.nil;
   }
+  rule expr.integer {
+    consume literal.integer -> @value;
+  }
+  rule expr.float {
+    consume literal.float -> @value;
+  }
   // Scheme has no expr.grouped rule. Every ( in expression position
   // triggers expr.sexp (the S-expression dispatcher). This rule,
   // expr.call, exists as an INFIX handler at precedence 80 so that
@@ -817,7 +823,7 @@ emitters {
 
   // --- Expression emitters ---
   on expr.string {
-    emit @value;
+    emit "\"" + @value + "\"";
   }
   on expr.bool_true {
     emit "true";
@@ -827,6 +833,12 @@ emitters {
   }
   on expr.nil {
     emit "nullptr";
+  }
+  on expr.integer {
+    emit @value;
+  }
+  on expr.float {
+    emit @value;
   }
   on expr.ident {
     emit @name;
