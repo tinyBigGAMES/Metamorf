@@ -1191,6 +1191,15 @@ begin
           FResultNode.SetNamedChild(LAttrName, LExprNode);
         end;;
       end
+      else if LMode = 'stmt' then
+      begin
+        LExprNode := LGenParser.ParseStatement();
+        if Assigned(LExprNode) and Assigned(FResultNode) then
+        begin
+          FResultNode.AddChild(LExprNode);
+          FResultNode.SetNamedChild(LAttrName, LExprNode);
+        end;
+      end
       else if LMode = 'many' then
       begin
         LBlock := TASTNode.Create();

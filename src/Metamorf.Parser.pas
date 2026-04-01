@@ -1336,9 +1336,9 @@ begin
     else
       LNode.SetAttr('until_kind', ConsumeDottedIdent());
   end
-  else
+  else if Check('kw.expr') then
   begin
-    Expect('kw.expr');
+    DoAdvance();
     LNode.SetAttr('mode', 'expr');
     // Optional binding power: parse expr 35 -> @operand;
     if Check('literal.integer') then
@@ -1346,6 +1346,11 @@ begin
       LNode.SetAttr('bind_power', Current().Text);
       DoAdvance();
     end;
+  end
+  else
+  begin
+    Expect('kw.stmt');
+    LNode.SetAttr('mode', 'stmt');
   end;
 
   // -> @target
