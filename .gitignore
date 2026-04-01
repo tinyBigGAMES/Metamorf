@@ -103,3 +103,6 @@ bin/res/libs/raylib/imports/raylib_pp.c
 _checkpoint_base.cmd
 docs/Metamorf.pdf
 /bin/res/libs
+/bin/temp
+docs/Infographic.jpg
+docs/Overview.mp4
