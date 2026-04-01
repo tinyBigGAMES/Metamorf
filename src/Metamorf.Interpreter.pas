@@ -145,7 +145,7 @@ type
     // From grammar {} block
     FPrefixRules: TDictionary<string, TASTNode>;
     FInfixRules: TDictionary<string, TInfixEntry>;
-    FStmtRules: TDictionary<string, TASTNode>;
+    FStmtRules: TDictionary<string, TList<TASTNode>>;
 
     // From semantics {} block
     FSemanticHandlers: TDictionary<string, TASTNode>;
@@ -232,7 +232,7 @@ type
     function GetDirectives(): TDictionary<string, string>;
     function GetPrefixRules(): TDictionary<string, TASTNode>;
     function GetInfixRules(): TDictionary<string, TInfixEntry>;
-    function GetStmtRules(): TDictionary<string, TASTNode>;
+    function GetStmtRules(): TDictionary<string, TList<TASTNode>>;
     function GetSemanticHandlers(): TDictionary<string, TASTNode>;
     function GetEmitHandlers(): TDictionary<string, TASTNode>;
     function GetRoutines(): TDictionary<string, TASTNode>;
@@ -331,7 +331,7 @@ begin
   // Grammar block
   FPrefixRules := TDictionary<string, TASTNode>.Create();
   FInfixRules := TDictionary<string, TInfixEntry>.Create();
-  FStmtRules := TDictionary<string, TASTNode>.Create();
+  FStmtRules := TDictionary<string, TList<TASTNode>>.Create();
 
   // Semantics block
   FSemanticHandlers := TDictionary<string, TASTNode>.Create();
@@ -370,6 +370,7 @@ end;
 destructor TMorInterpreter.Destroy();
 var
   LI: Integer;
+  LStmtList: TList<TASTNode>;
 begin
   FreeAndNil(FNativeEmitHandlers);
   FreeAndNil(FNativeStmtRules);
@@ -389,6 +390,9 @@ begin
   end;
   FreeAndNil(FSemanticPasses);
   FreeAndNil(FSemanticHandlers);
+  if Assigned(FStmtRules) then
+    for LStmtList in FStmtRules.Values do
+      LStmtList.Free();
   FreeAndNil(FStmtRules);
   FreeAndNil(FInfixRules);
   FreeAndNil(FPrefixRules);
@@ -622,6 +626,7 @@ var
   LTriggers: TArray<string>;
   LTriggerItem: string;
   LInfix: TInfixEntry;
+  LRuleList: TList<TASTNode>;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
@@ -662,7 +667,14 @@ begin
         FInfixRules.AddOrSetValue(LTriggerItem, LInfix);
     end
     else if LNodeKind.StartsWith('stmt.') then
-      FStmtRules.AddOrSetValue(LTrigger, LChild)
+    begin
+      if not FStmtRules.TryGetValue(LTrigger, LRuleList) then
+      begin
+        LRuleList := TList<TASTNode>.Create();
+        FStmtRules.Add(LTrigger, LRuleList);
+      end;
+      LRuleList.Add(LChild);
+    end
     else
       FPrefixRules.AddOrSetValue(LTrigger, LChild);
   end;
@@ -2896,7 +2908,7 @@ begin
   Result := FInfixRules;
 end;
 
-function TMorInterpreter.GetStmtRules(): TDictionary<string, TASTNode>;
+function TMorInterpreter.GetStmtRules(): TDictionary<string, TList<TASTNode>>;
 begin
   Result := FStmtRules;
 end;

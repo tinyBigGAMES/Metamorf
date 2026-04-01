@@ -286,6 +286,7 @@ type
     function WarningCount(): Integer;
     function ReachedMaxErrors(): Boolean;
     procedure Clear();
+    procedure TruncateTo(const ACount: Integer);
 
     function GetItems(): TList<TError>;
     function GetMaxErrors(): Integer;
@@ -2321,6 +2322,12 @@ end;
 procedure TErrors.Clear();
 begin
   FItems.Clear();
+end;
+
+procedure TErrors.TruncateTo(const ACount: Integer);
+begin
+  while FItems.Count > ACount do
+    FItems.Delete(FItems.Count - 1);
 end;
 
 function TErrors.GetItems(): TList<TError>;

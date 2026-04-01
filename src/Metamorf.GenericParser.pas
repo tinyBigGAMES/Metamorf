@@ -256,12 +256,16 @@ end;
 
 function TGenericParser.ParseStatement(): TASTNode;
 var
-  LStmtRules: TDictionary<string, TASTNode>;
+  LStmtRules: TDictionary<string, TList<TASTNode>>;
   LNativeStmtRules: TDictionary<string, TNativeStmtHandler>;
-  LStmtRule: TASTNode;
+  LStmtRuleList: TList<TASTNode>;
   LNativeStmtHandler: TNativeStmtHandler;
   LCurrentKind: string;
   LSavedParser: TObject;
+  LI: Integer;
+  LSavedPos: Integer;
+  LSavedItemCount: Integer;
+  LSavedErrorCount: Integer;
 begin
   LStmtRules := FInterp.GetStmtRules();
   LNativeStmtRules := FInterp.GetNativeStmtRules();
@@ -275,8 +279,35 @@ begin
     if LNativeStmtRules.TryGetValue(LCurrentKind, LNativeStmtHandler) then
       Result := LNativeStmtHandler()
     // Then check interpreted statement rules
-    else if LStmtRules.TryGetValue(LCurrentKind, LStmtRule) then
-      Result := FInterp.ExecuteGrammarRule(LStmtRule)
+    else if LStmtRules.TryGetValue(LCurrentKind, LStmtRuleList) then
+    begin
+      if LStmtRuleList.Count = 1 then
+        // Fast path: single rule, same as before
+        Result := FInterp.ExecuteGrammarRule(LStmtRuleList[0])
+      else
+      begin
+        // Try each rule in registration order, restore on failure
+        Result := nil;
+        for LI := 0 to LStmtRuleList.Count - 1 do
+        begin
+          LSavedPos := GetPos();
+          LSavedItemCount := FErrors.Count();
+          LSavedErrorCount := FErrors.ErrorCount();
+          Result := FInterp.ExecuteGrammarRule(LStmtRuleList[LI]);
+          if FErrors.ErrorCount() = LSavedErrorCount then
+            Break;  // success — no new errors or fatals
+          // Failed: restore position, remove all items from failed attempt
+          SetPos(LSavedPos);
+          FErrors.TruncateTo(LSavedItemCount);
+          Result.Free();
+          Result := nil;
+        end;
+        // All failed: re-run last to produce the error naturally
+        if Result = nil then
+          Result := FInterp.ExecuteGrammarRule(
+            LStmtRuleList[LStmtRuleList.Count - 1]);
+      end;
+    end
     else
     begin
       // Fall through to expression statement

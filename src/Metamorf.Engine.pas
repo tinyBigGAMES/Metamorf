@@ -230,7 +230,11 @@ begin
     LGenParser.Free();
   end;
   LUserTokens.Free();
-  if FErrors.HasErrors() then Exit;
+  if FErrors.HasErrors() then
+  begin
+    LUserBranch.Free();
+    Exit;
+  end;
 
   // Assemble master AST: single root, one branch per file
   LMasterRoot := TASTNode.Create();
