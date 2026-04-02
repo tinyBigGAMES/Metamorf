@@ -9,11 +9,13 @@
   See LICENSE for license information
 ===============================================================================}
 
-unit UMetamorf;
+unit UMorTestbed;
+
+{$I Metamorf.Defines.inc}
 
 interface
 
-procedure RunMetamorf();
+procedure RunMorTestbed();
 
 implementation
 
@@ -23,28 +25,9 @@ uses
   Metamorf.Utils,
   Metamorf.Engine,
   Metamorf.Build,
-  Metamorf.CLI;
-
-// =========================================================================
-// CLI MODE (Release)
-// =========================================================================
-
-procedure RunCLI();
-var
-  LCLI: TMorCLI;
-begin
-  ExitCode := 0;
-  LCLI := TMorCLI.Create();
-  try
-    LCLI.Execute();
-  finally
-    FreeAndNil(LCLI);
-  end;
-end;
-
-// =========================================================================
-// TESTBED MODE (Debug / IDE)
-// =========================================================================
+  Metamorf.CLI,
+  UTest.API,
+  UTest.LSP;
 
 function TestLang(const ALangFile: string; const ASrcFile: string): Boolean;
 var
@@ -88,14 +71,16 @@ begin
   end;
 end;
 
-procedure RunTestbed();
+procedure RunMorTestbed();
 var
   LNum: Integer;
 begin
   try
-    LNum := 7;
+
+    LNum := 1;
 
     case LNum of
+      // Languages
       01: TestLang('..\tests\pascal', '..\tests\hello.pas');
       02: TestLang('..\tests\lua',    '..\tests\hello.lua');
       03: TestLang('..\tests\basic',  '..\tests\hello.bas');
@@ -104,6 +89,30 @@ begin
       06: TestLang('..\tests\pascal2', '..\tests\hello2.pas');
       07: TestLang('..\tests\testbed', '..\tests\testbed.pas');
 
+      // Test C-API
+      100: UTest.API.Test_CompileBuild();
+      101: UTest.API.Test_CustomCodeGen();
+
+      // Test LSP
+      200: UTest.LSP.Test_LSP_InProcess();
+      201: UTest.LSP.Test_LSP_OutOfProcess();
+
+      // issue-3 (1000-1002) Fixed
+      1000: TestLang('..\bugs\issue-3\root_ok', '..\bugs\issue-3\test.pas');
+      1001: TestLang('..\bugs\issue-3\root_crash', '..\bugs\issue-3\test.pas');
+      1002: TestLang('..\bugs\issue-3\root_broken', '..\bugs\issue-3\test.pas'); // to test for memory leaks
+
+      // issue-4 (1003-1004) Fixed
+      1003: TestLang('..\bugs\issue-4\works', '..\bugs\issue-4\test.pas');
+      1004: TestLang('..\bugs\issue-4\crashes', '..\bugs\issue-4\test.pas');
+
+      // issue-5 (1005-1006) Fixed
+      1005: TestLang('..\bugs\issue-5\works', '..\bugs\issue-5\test.pas');
+      1006: TestLang('..\bugs\issue-5\crashes', '..\bugs\issue-5\test.pas');
+
+      // issue-6 (1007-1008) Fixed
+      1007: TestLang('..\bugs\issue-6\works', '..\bugs\issue-6\test.pas');
+      1008: TestLang('..\bugs\issue-6\crashes', '..\bugs\issue-6\test.pas');
     end;
 
   except
@@ -118,17 +127,5 @@ begin
     TUtils.Pause();
 end;
 
-// =========================================================================
-// ENTRY POINT
-// =========================================================================
-
-procedure RunMetamorf();
-begin
-  {$IFDEF RELEASE}
-  RunCLI();
-  {$ELSE}
-  RunTestbed();
-  {$ENDIF}
-end;
 
 end.

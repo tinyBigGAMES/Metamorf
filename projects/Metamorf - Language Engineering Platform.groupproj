@@ -1,0 +1,72 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{8B0D489D-215E-4B81-BC60-F5A968F59622}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Metamorf\Metamorf.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="MorLSP\MorLSP.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Mor\Mor.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="MorTestbed\MorTestbed.dproj">
+            <Dependencies>MorLSP\MorLSP.dproj;Mor\Mor.dproj;Metamorf\Metamorf.dproj</Dependencies>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="Metamorf">
+        <MSBuild Projects="Metamorf\Metamorf.dproj"/>
+    </Target>
+    <Target Name="Metamorf:Clean">
+        <MSBuild Projects="Metamorf\Metamorf.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Metamorf:Make">
+        <MSBuild Projects="Metamorf\Metamorf.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="MorLSP">
+        <MSBuild Projects="MorLSP\MorLSP.dproj"/>
+    </Target>
+    <Target Name="MorLSP:Clean">
+        <MSBuild Projects="MorLSP\MorLSP.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="MorLSP:Make">
+        <MSBuild Projects="MorLSP\MorLSP.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Mor">
+        <MSBuild Projects="Mor\Mor.dproj"/>
+    </Target>
+    <Target Name="Mor:Clean">
+        <MSBuild Projects="Mor\Mor.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Mor:Make">
+        <MSBuild Projects="Mor\Mor.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="MorTestbed" DependsOnTargets="MorLSP;Mor;Metamorf">
+        <MSBuild Projects="MorTestbed\MorTestbed.dproj"/>
+    </Target>
+    <Target Name="MorTestbed:Clean" DependsOnTargets="MorLSP:Clean;Mor:Clean;Metamorf:Clean">
+        <MSBuild Projects="MorTestbed\MorTestbed.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="MorTestbed:Make" DependsOnTargets="MorLSP:Make;Mor:Make;Metamorf:Make">
+        <MSBuild Projects="MorTestbed\MorTestbed.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="Metamorf;MorLSP;Mor;MorTestbed"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="Metamorf:Clean;MorLSP:Clean;Mor:Clean;MorTestbed:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="Metamorf:Make;MorLSP:Make;Mor:Make;MorTestbed:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
