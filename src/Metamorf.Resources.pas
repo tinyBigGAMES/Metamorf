@@ -323,6 +323,14 @@ resourcestring
   RSEngineOptimizeLevel           = 'Optimization: %s';
   RSEngineCppPassthrough          = 'Registering C++ passthrough...';
 
+  //--------------------------------------------------------------------------
+  // Engine API Messages
+  //--------------------------------------------------------------------------
+  RSEngineAPIMorNotLoaded = 'LoadMor must be called before ParseSource';
+  RSEngineAPISrcNotParsed = 'ParseSource must be called before RunSemantics';
+  RSEngineAPISemNotRun    = 'RunSemantics must be called before RunEmitters';
+  RSEngineAPIEmitNotRun   = 'RunEmitters must be called before Build';
+
 implementation
 
 end.

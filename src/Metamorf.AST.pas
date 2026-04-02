@@ -41,6 +41,7 @@ type
     FAttrs: TDictionary<string, string>;
     FChildren: TObjectList<TASTNode>;
     FNamedChildren: TDictionary<string, TASTNode>;
+    FRange: TSourceRange;
 
   public
     constructor Create(); override;
@@ -69,6 +70,10 @@ type
     function GetNamedChild(const AName: string): TASTNode;
     procedure SetNamedChild(const AName: string; const AChild: TASTNode);
     function HasNamedChild(const AName: string): Boolean;
+
+    // Source range
+    function GetRange(): TSourceRange;
+    procedure SetRange(const ARange: TSourceRange);
   end;
 
 // Helper functions for TValue operations
@@ -172,6 +177,7 @@ begin
   FAttrs := TDictionary<string, string>.Create();
   FChildren := TObjectList<TASTNode>.Create(True);
   FNamedChildren := TDictionary<string, TASTNode>.Create();
+  FRange.Clear();
 end;
 
 destructor TASTNode.Destroy();
@@ -267,6 +273,16 @@ end;
 function TASTNode.HasNamedChild(const AName: string): Boolean;
 begin
   Result := FNamedChildren.ContainsKey(AName);
+end;
+
+function TASTNode.GetRange(): TSourceRange;
+begin
+  Result := FRange;
+end;
+
+procedure TASTNode.SetRange(const ARange: TSourceRange);
+begin
+  FRange := ARange;
 end;
 
 end.

@@ -3068,6 +3068,9 @@ var
   LSavedResultNode: TASTNode;
   LSavedSnapshot: Integer;
   LI: Integer;
+  LStartToken: TToken;
+  LEndToken: TToken;
+  LRange: TSourceRange;
 begin
   LNodeKind := ARuleAST.GetAttr('node_kind');
 
@@ -3075,6 +3078,7 @@ begin
   Result := TASTNode.Create();
   Result.SetKind(LNodeKind);
   Result.SetToken(ParserCurrentToken());
+  LStartToken := ParserCurrentToken();
 
   // Save and set context
   LSavedResultNode := FResultNode;
@@ -3099,6 +3103,16 @@ begin
       if Assigned(FErrors) and FErrors.ReachedMaxErrors() then Break;
       ExecStmt(ARuleAST.GetChild(LI));
     end;
+
+    // Set source range on the result node
+    LEndToken := ParserCurrentToken();
+    LRange.Clear();
+    LRange.Filename := LStartToken.Filename;
+    LRange.StartLine := LStartToken.Line;
+    LRange.StartColumn := LStartToken.Col;
+    LRange.EndLine := LEndToken.Line;
+    LRange.EndColumn := LEndToken.Col;
+    Result.SetRange(LRange);
   finally
     FEnv.Pop();
     FResultNode := LSavedResultNode;

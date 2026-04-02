@@ -69,7 +69,7 @@ var
   LVersion: TVersionInfo;
   LVersionStr: string;
 begin
-  if TUtils.GetVersionInfo(LVersion) then
+  if TUtils.GetVersionInfo(LVersion, 'Metamorf.dll') then
     LVersionStr := LVersion.VersionString
   else
     LVersionStr := '0.0.0';
@@ -85,10 +85,10 @@ end;
 procedure TMorCLI.ShowHelp();
 begin
   TUtils.PrintLn(COLOR_WHITE +
-    'Syntax: Metamorf [options] -l <file> -s <file> [options]');
+    'Syntax: Mor [options] -l <file> -s <file> [options]');
   TUtils.PrintLn('');
   TUtils.PrintLn(COLOR_BOLD + 'USAGE:');
-  TUtils.PrintLn('  Metamorf ' + COLOR_CYAN +
+  TUtils.PrintLn('  Mor ' + COLOR_CYAN +
     '-l <file> -s <file>' + COLOR_RESET + ' [OPTIONS]');
   TUtils.PrintLn('');
   TUtils.PrintLn(COLOR_BOLD + 'REQUIRED:');
@@ -107,11 +107,11 @@ begin
   TUtils.PrintLn('');
   TUtils.PrintLn(COLOR_BOLD + 'EXAMPLES:');
   TUtils.PrintLn('  ' + COLOR_CYAN +
-    'Metamorf -l mylang.mor -s hello.src');
+    'Mor -l mylang.mor -s hello.src');
   TUtils.PrintLn('  ' + COLOR_CYAN +
-    'Metamorf -l mylang.mor -s hello.src -o build');
+    'Mor -l mylang.mor -s hello.src -o build');
   TUtils.PrintLn('  ' + COLOR_CYAN +
-    'Metamorf -l mylang.mor -s hello.src -r');
+    'Mor -l mylang.mor -s hello.src -r');
   TUtils.PrintLn('');
 end;
 

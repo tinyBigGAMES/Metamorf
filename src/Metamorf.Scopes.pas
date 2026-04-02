@@ -67,6 +67,8 @@ type
     function FindChild(const AName: string): TScope;
     procedure DeclareSymbol(const AName: string; const ASymKind: string; const ADeclNode: TObject = nil);
     function LookupLocal(const AName: string): TSymbol;
+    function GetSymbols(): TObjectDictionary<string, TSymbol>;
+    function GetChildren(): TObjectList<TScope>;
   end;
 
   { TScopeManager }
@@ -83,6 +85,7 @@ type
     procedure Reset();
     procedure Declare(const AName: string; const ASymKind: string; const ADeclNode: TObject = nil);
     function Lookup(const AName: string): TSymbol;
+    function LookupGlobal(const AName: string): TSymbol;
     function SymbolExistsWithPrefix(const APrefix: string): Boolean;
     function DemoteCLinkageForPrefix(const APrefix: string): Integer;
     function GetCurrent(): TScope;
@@ -215,6 +218,16 @@ begin
     Result := nil;
 end;
 
+function TScope.GetSymbols(): TObjectDictionary<string, TSymbol>;
+begin
+  Result := FSymbols;
+end;
+
+function TScope.GetChildren(): TObjectList<TScope>;
+begin
+  Result := FChildren;
+end;
+
 { TScopeManager }
 
 constructor TScopeManager.Create();
@@ -281,6 +294,29 @@ begin
     LScope := LScope.GetParent();
   end;
   Result := nil;
+end;
+
+function TScopeManager.LookupGlobal(const AName: string): TSymbol;
+
+  function SearchScope(const AScope: TScope): TSymbol;
+  var
+    LI: Integer;
+  begin
+    Result := AScope.LookupLocal(AName);
+    if Result <> nil then Exit;
+
+    for LI := 0 to AScope.GetChildren().Count - 1 do
+    begin
+      Result := SearchScope(AScope.GetChildren()[LI]);
+      if Result <> nil then Exit;
+    end;
+  end;
+
+begin
+  if FRoot <> nil then
+    Result := SearchScope(FRoot)
+  else
+    Result := nil;
 end;
 
 function TScopeManager.SymbolExistsWithPrefix(const APrefix: string): Boolean;
