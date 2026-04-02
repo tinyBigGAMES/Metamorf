@@ -405,7 +405,7 @@ semantics {
     }
   }
   on stmt.func_decl {
-    declare @func_name as routine;
+    declare @func_name as routine typed @return_type;
     scope @func_name {
       visit children;
     }
@@ -420,7 +420,7 @@ semantics {
     visit children;
   }
   on stmt.single_var {
-    declare @vname as variable;
+    declare @vname as variable typed @vtype;
     visit children;
   }
   on stmt.ident_stmt { visit children; }
