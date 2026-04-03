@@ -10,7 +10,7 @@
 ===============================================================================}
 
 /// <summary>
-///   Delphi and Free Pascal import wrapper for MetamorfAPI.dll. Provides
+///   Delphi and Free Pascal import wrapper for Metamorf.dll. Provides
 ///   complete access to the Metamorf compilation pipeline through opaque
 ///   handles and flat function calls with no dependencies on Metamorf
 ///   internals.
