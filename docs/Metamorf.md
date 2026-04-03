@@ -16,11 +16,13 @@
 12. [Fragments, Imports, and Includes](#fragments-imports-and-includes)
 13. [Built-in Functions Reference](#built-in-functions-reference)
 14. [C++ Passthrough](#c-passthrough)
-15. [Formal Grammar (EBNF)](#formal-grammar-ebnf)
-16. [Design Principles](#design-principles)
-17. [System Requirements](#system-requirements)
-18. [Building from Source](#building-from-source)
-19. [Contributing, Support, and License](#contributing-support-and-license)
+15. [Language Server Protocol (LSP)](#language-server-protocol-lsp)
+16. [C API (Metamorf.dll)](#c-api-metamorfdll)
+17. [Formal Grammar (EBNF)](#formal-grammar-ebnf)
+18. [Design Principles](#design-principles)
+19. [System Requirements](#system-requirements)
+20. [Building from Source](#building-from-source)
+21. [Contributing, Support, and License](#contributing-support-and-license)
 
 
 ## Overview
@@ -28,7 +30,7 @@
 Metamorf is a language engineering platform. You describe a complete programming language in a `.mor` file, then compile source files written in that language to native Win64/Linux64 binaries. One file defines your language. One command compiles your program:
 
 ```bash
-Metamorf -l pascal.mor -s hello.pas -r
+Mor -l pascal.mor -s hello.pas -r
 ```
 
 A `.mor` file covers the full compiler pipeline: lexer tokens, Pratt parser grammar, multi-pass semantic analysis, and C++23 code generation. The result is a native binary built via Zig/Clang.
@@ -54,24 +56,40 @@ No host language glue code. No build system integration. No escape hatch to C, J
 
 ## Getting Started
 
-### Using Metamorf
+### Download the Release
 
-Metamorf ships as a self-contained release with everything included. No separate toolchain download, no configuration.
+Always download the most recent release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases). The release archive is the canonical distribution. It contains compiled binaries, the Zig/Clang toolchain, a source checkpoint that matches the binaries, test files, and documentation. No separate toolchain download or configuration is required.
 
-1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases)
-2. Extract the archive to any directory
+1. Download the latest release archive
+2. Extract it to any directory
 3. Write a `.mor` language definition and a source file, then compile:
 
 ```bash
-Metamorf -l pascal.mor -s hello.pas
+Mor -l pascal.mor -s hello.pas
 ```
 
 The `-l` flag specifies the language definition file. The `-s` flag specifies the source file to compile. The resulting native binary is placed in the output directory.
 
+### Release Contents
+
+Each release ships the following:
+
+| File | Description |
+|------|-------------|
+| `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. |
+| `MorLSP.exe` | Out-of-process LSP server. Provides editor integration (completions, hover, go-to-definition, and more) for any Metamorf-defined language. |
+| `MorTestbed.exe` | Test suite runner. Exercises the full Metamorf library including API and LSP tests. |
+| `Metamorf.dll` | C-callable shared library. Exposes the entire compilation pipeline for use from any programming language. |
+| `Metamorf.pas` | Delphi/Free Pascal import unit for `Metamorf.dll`. No Metamorf source dependencies required. |
+| `src/` | Source checkpoint matching the release binaries. |
+| `tests/` | Test `.mor` language definitions and source files. |
+| `docs/` | Reference documentation including this manual. |
+| `bin/res/zig/` | Bundled Zig/Clang toolchain for native code generation. |
+
 ### CLI Reference
 
 ```
-Metamorf [options] -l <file> -s <file> [options]
+Mor [options] -l <file> -s <file> [options]
 
 REQUIRED:
   -l, --lang    <file>   Language definition file (.mor)
@@ -86,9 +104,9 @@ OPTIONS:
 **Examples:**
 
 ```bash
-Metamorf -l mylang.mor -s hello.src
-Metamorf -l mylang.mor -s hello.src -o build
-Metamorf -l mylang.mor -s hello.src -r
+Mor -l mylang.mor -s hello.src
+Mor -l mylang.mor -s hello.src -o build
+Mor -l mylang.mor -s hello.src -r
 ```
 
 ### Cross-Compilation via WSL2
@@ -105,9 +123,13 @@ Then set the target platform in your source file using a directive (if your lang
 @platform linux64
 ```
 
-### Getting the Source (Developers)
+### Getting Source Between Releases
 
-Clone the repository:
+The [repository](https://github.com/tinyBigGAMES/Metamorf) contains the latest source code, which may include bug fixes and improvements made after the most recent official release. To apply these fixes to your local installation:
+
+1. Clone or pull the latest source
+2. Copy the updated `src/` files into your release directory, overwriting the existing source checkpoint
+3. Rebuild from source (see [Building from Source](#building-from-source))
 
 ```bash
 git clone https://github.com/tinyBigGAMES/Metamorf.git
@@ -116,11 +138,16 @@ git clone https://github.com/tinyBigGAMES/Metamorf.git
 The repository is organized as:
 
 ```
-Metamorf/repo/
-  src/                          <- Metamorf compiler sources
-  tests/                        <- Test .mor files and source files
-  docs/                         <- Reference documentation
-  bin/                          <- Executables run from here
+Metamorf/
+  src/                <- Metamorf core source units (shared by all projects)
+  projects/           <- Delphi project files
+    Metamorf/         <- Metamorf.dll (C-callable shared library)
+    Mor/              <- Mor.exe (CLI compiler)
+    MorLSP/           <- MorLSP.exe (LSP server)
+    MorTestbed/       <- MorTestbed.exe (test suite runner)
+  tests/              <- Test .mor files and source files
+  docs/               <- Reference documentation
+  bin/                <- Runtime directory (binaries run from here)
 ```
 
 
@@ -279,7 +306,9 @@ The Metamorf compiler is built from these Delphi source units:
 | Unit | Purpose |
 |------|---------|
 | `Metamorf.Engine.pas` | `TMorEngine`: single entry point, orchestrates the full compilation pipeline |
+| `Metamorf.EngineAPI.pas` | `TMorEngineAPI`: flat C-callable API implementation exported by `Metamorf.dll` |
 | `Metamorf.CLI.pas` | `TMorCLI`: command-line interface (`-l`, `-s`, `-o`, `-r` flags) |
+| `Metamorf.LSP.pas` | `TMorLSPDocument`, `TMorLSPService`, `TMorLSPServer`: Language Server Protocol implementation |
 | `Metamorf.Lexer.pas` | `TMorLexer`: tokenizes `.mor` source files |
 | `Metamorf.Parser.pas` | `TMorParser`: parses `.mor` source into an AST |
 | `Metamorf.Interpreter.pas` | `TMorInterpreter`: walks `.mor` AST, populates dispatch tables, executes grammar/semantic/emit handlers at compile time |
@@ -296,7 +325,7 @@ The Metamorf compiler is built from these Delphi source units:
 | `Metamorf.Resources.pas` | Resource strings for all user-facing messages |
 | `Metamorf.Config.pas` | Configuration constants |
 | `Metamorf.TOML.pas` | TOML parser for build configuration files |
-| `UMetamorf.pas` | Main testbed/entry point unit |
+| `Metamorf.pas` | Delphi/Free Pascal import unit for `Metamorf.dll` (no Metamorf source dependencies) |
 
 
 ## Tokens Block
@@ -1926,17 +1955,17 @@ Interpolation works in the same way inside `error`, `warning`, and other diagnos
 
 ### Triple-Quoted Strings
 
-Triple-quoted strings use `'''` for multi-line text. Leading whitespace is trimmed to the minimum common indent. They do not process escape sequences - all content is literal.
+Triple-quoted strings use `"""` for multi-line text. Leading whitespace is trimmed to the minimum common indent. They do not process escape sequences - all content is literal.
 
 ```mor
 emitters {
   on program.root {
-    emit to header: '''
+    emit to header: """
       #pragma once
       #include <cstdint>
       #include <string>
       #include <vector>
-    ''';
+    """;
   }
 }
 ```
@@ -2564,6 +2593,300 @@ For languages with fundamentally different syntax (like Scheme), where `(` start
 | `Expected delimiter.rparen but found '%'` | Parser sees `cpp.op.modulo`, no infix rule for it | Add infix rule for `cpp.op.modulo` |
 
 
+## Language Server Protocol (LSP)
+
+Metamorf includes a Language Server Protocol implementation that provides real-time editor integration for any language defined with a `.mor` file. When you define a language with Metamorf, you automatically get IDE features such as completions, hover documentation, go-to-definition, and semantic highlighting without writing any editor-specific code.
+
+### What the LSP Provides
+
+The LSP server analyzes source files written in your Metamorf-defined language and reports results back to the editor using the standard LSP protocol. The server loads your `.mor` file, then uses the same pipeline (lexer, parser, semantic analysis) that the compiler uses. This means the editor sees exactly the same tokens, AST, scopes, and symbols that the compiler produces.
+
+Supported capabilities:
+
+| Capability | Description |
+|------------|-------------|
+| **Completions** | Context-aware suggestions for keywords and symbols in scope. Triggered by `.` and typing. |
+| **Hover** | Shows the kind and name of the symbol under the cursor (e.g., `routine add`). |
+| **Go to Definition** | Jumps to the declaration of a symbol. Works for routines, variables, and parameters. |
+| **Find References** | Lists all locations where a symbol is used. |
+| **Document Symbols** | Outline view of all symbols declared in the current file. |
+| **Workspace Symbols** | Search for symbols across all open files. |
+| **Semantic Tokens** | Full semantic highlighting. The server classifies every token (keywords, types, functions, variables, parameters, operators, literals, comments) so the editor can color them accurately. |
+| **Folding Ranges** | Collapsible regions for blocks, routines, and other multi-line constructs. |
+| **Inlay Hints** | Inline annotations (e.g., parameter names at call sites). |
+| **Rename** | Rename a symbol across all its usages. |
+| **Formatting** | Document formatting support. |
+| **Code Actions** | Context-sensitive quick fixes and refactorings. |
+| **Signature Help** | Parameter information shown while typing function arguments. Triggered by `(` and `,`. |
+| **Diagnostics** | Compiler errors and warnings reported in real time as you type. |
+
+### Architecture
+
+The LSP implementation has three layers:
+
+**TMorLSPDocument** holds the source text for a single open file, runs the Metamorf pipeline (lex, parse, semantic analysis) on every edit, and provides query methods for AST nodes and tokens at specific positions.
+
+**TMorLSPService** contains all the LSP logic without any JSON dependency. It receives structured requests (position, document URI) and returns structured results (completion items, hover content, locations). This layer is usable directly from Delphi code for in-process editor integration.
+
+**TMorLSPServer** handles JSON-RPC framing and the stdio transport loop. It reads LSP messages from stdin, dispatches them to `TMorLSPService`, and writes JSON-RPC responses to stdout. This is the layer that `MorLSP.exe` runs.
+
+### Out-of-Process Usage (MorLSP.exe)
+
+`MorLSP.exe` is a standalone executable that runs as an out-of-process LSP server. It communicates with the editor over stdin/stdout using the JSON-RPC protocol defined by the LSP specification.
+
+```bash
+MorLSP pascal.mor
+```
+
+The single argument is the `.mor` language definition file. The server loads the grammar once at startup, then processes LSP messages for source files written in that language. The grammar remains loaded for the lifetime of the server process.
+
+To configure an editor to use `MorLSP.exe`, you create a language client configuration that launches the server and associates it with source files matching your language's file extension. For example, in VS Code you would create an extension or use a generic LSP client extension, specifying:
+
+- **Command:** `MorLSP` (or the full path to `MorLSP.exe`)
+- **Arguments:** `["pascal.mor"]` (path to your `.mor` file)
+- **File pattern:** `*.pas` (or whatever extension your language uses)
+
+The server handles the full LSP lifecycle: `initialize`, `textDocument/didOpen`, `textDocument/didChange`, `textDocument/completion`, `textDocument/hover`, `textDocument/definition`, and all other supported methods. It shuts down cleanly on `shutdown` + `exit`.
+
+### In-Process Usage (TMorLSPService)
+
+For tools that embed Metamorf directly (such as a custom IDE or a Delphi application), you can use `TMorLSPService` without the JSON-RPC layer. Create an instance, load a `.mor` grammar, open documents, and call query methods directly:
+
+1. Create a `TMorLSPService` instance
+2. Call the service methods with document URIs and positions
+3. Receive typed Delphi records (completions, hover info, locations) rather than JSON
+
+This avoids the overhead of process spawning and JSON serialization, making it suitable for tightly integrated editor experiences.
+
+
+## C API (Metamorf.dll)
+
+`Metamorf.dll` exposes the entire Metamorf compilation pipeline as a flat, C-callable API. Any programming language that can load a shared library and call C functions can drive Metamorf programmatically: C, C++, C#, Python (via ctypes), Rust (via FFI), Go (via cgo), and others.
+
+The API uses opaque 64-bit handles and null-terminated UTF-8 strings. No Metamorf internals are exposed. The Delphi/Free Pascal import unit `Metamorf.pas` provides typed declarations for all functions and can be compiled without any Metamorf source dependencies.
+
+### String Contract
+
+All strings crossing the DLL boundary are null-terminated UTF-8:
+
+- Strings you pass to the API must be PUTF8Char (null-terminated UTF-8).
+- Strings returned by the API point into an internal buffer that is valid only until the next string-returning call on the same handle. Copy immediately if you need the value to persist.
+- Strings passed to callbacks are valid only for the duration of that callback invocation.
+
+### Handles
+
+Two handle types are used:
+
+- `TMorHandle` (UInt64): an opaque handle to a Metamorf engine instance. Returned by `metamorf_create`, accepted by all API functions, freed with `metamorf_destroy`.
+- `TMorNode` (UInt64): an opaque handle to an AST node. Returned by `metamorf_get_master_root` and `metamorf_node_child`. Valid until `metamorf_reset` or `metamorf_destroy`. A value of zero means nil (no node).
+
+### Lifecycle
+
+```pascal
+var
+  LHandle: TMorHandle;
+begin
+  LHandle := metamorf_create();     // create an independent engine instance
+  try
+    // ... use the API ...
+  finally
+    metamorf_destroy(LHandle);      // free all memory
+  end;
+end;
+```
+
+Each handle is fully independent. Multiple handles can be used concurrently from different threads. A single handle must not be accessed from multiple threads simultaneously.
+
+Call `metamorf_reset` to clear the parsed AST, scopes, and output from the most recent compilation while keeping the loaded `.mor` grammar. This allows compiling multiple source files against the same grammar without re-parsing the `.mor` file.
+
+### One-Shot Compilation
+
+The simplest way to compile is `metamorf_compile`, which runs the entire pipeline in one call:
+
+```pascal
+if metamorf_compile(LHandle,
+  PUTF8Char(UTF8Encode('langs\pascal.mor')),
+  PUTF8Char(UTF8Encode('hello.pas')),
+  PUTF8Char(UTF8Encode('output')), True) then
+  WriteLn('Success')
+else
+  WriteLn('Failed: ', metamorf_error_count(LHandle), ' error(s)');
+```
+
+### Stepped Pipeline
+
+For more control, call each pipeline step individually. This is essential when compiling multiple source files against the same grammar, or when you want to stop after parsing to walk the AST yourself.
+
+The pipeline steps must be called in order. Each step requires the previous step to have succeeded:
+
+1. `metamorf_load_mor(handle, morFile)` -- parse the `.mor` grammar, populate dispatch tables, register C++ passthrough. This is the most expensive step and only needs to run once per grammar.
+2. `metamorf_parse_source(handle, sourceFile)` -- lex and parse the user source file into an AST.
+3. `metamorf_run_semantics(handle)` -- run multi-pass semantic analysis (type checking, symbol resolution, scope management, module imports).
+4. `metamorf_run_emitters(handle)` -- generate C++ source files from the AST using `.mor`-defined emitters.
+5. `metamorf_build(handle, outputPath, autoRun)` -- invoke Zig/Clang to produce a native binary.
+
+```pascal
+// Load grammar once
+if metamorf_load_mor(LHandle, PUTF8Char(UTF8Encode('langs\pascal.mor'))) then
+begin
+  // Compile first source file
+  if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('hello.pas'))) then
+    if metamorf_run_semantics(LHandle) then
+      if metamorf_run_emitters(LHandle) then
+        metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), True);
+
+  // Reset pipeline state, keep grammar loaded
+  metamorf_reset(LHandle);
+
+  // Compile second source file against the same grammar
+  if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('world.pas'))) then
+    if metamorf_run_semantics(LHandle) then
+      if metamorf_run_emitters(LHandle) then
+        metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), True);
+end;
+```
+
+### Callbacks
+
+Register callbacks before calling pipeline steps to receive real-time progress and output:
+
+**Status callback** receives pipeline progress messages such as "Tokenizing hello.pas..." and "Building output...":
+
+```pascal
+procedure MyStatus(const AMessage: PUTF8Char; const AUserData: Pointer);
+begin
+  WriteLn(UTF8ToString(AMessage));
+end;
+
+metamorf_set_status_callback(LHandle, @MyStatus, nil);
+```
+
+**Output callback** receives compiler tool output and the stdout of auto-run executables:
+
+```pascal
+procedure MyOutput(const ALine: PUTF8Char; const AUserData: Pointer);
+begin
+  Write(UTF8ToString(ALine));
+end;
+
+metamorf_set_output_callback(LHandle, @MyOutput, nil);
+```
+
+**Custom emit handler** overrides the `.mor`-defined emitter for a specific AST node kind. Register after `metamorf_load_mor` and before `metamorf_run_emitters`:
+
+```pascal
+procedure MyEmitHandler(const ANodeHandle: UInt64; const AUserData: Pointer);
+begin
+  // Walk the node using metamorf_node_kind, metamorf_node_get_attr, etc.
+  // Produce your own output
+end;
+
+metamorf_register_emit_handler(LHandle,
+  PUTF8Char(UTF8Encode('stmt.print')), @MyEmitHandler, nil);
+```
+
+### AST Traversal
+
+After `metamorf_parse_source` (and optionally `metamorf_run_semantics` for a fully typed AST), you can walk the AST directly:
+
+```pascal
+var
+  LRoot, LChild: TMorNode;
+  LI: Integer;
+begin
+  LRoot := metamorf_get_master_root(LHandle);
+
+  // The master root has kind 'master.root' with one child per source file
+  for LI := 0 to metamorf_node_child_count(LRoot) - 1 do
+  begin
+    LChild := metamorf_node_child(LRoot, LI);
+    WriteLn('Branch ', LI, ': kind = ',
+      UTF8ToString(metamorf_node_kind(LHandle, LChild)));
+  end;
+end;
+```
+
+Key AST query functions:
+
+| Function | Description |
+|----------|-------------|
+| `metamorf_get_master_root(handle)` | Returns the master root node (kind `master.root`). Branch 0 is the main program; branches 1+ are imported modules. |
+| `metamorf_node_kind(handle, node)` | Returns the node kind string (e.g., `stmt.var_decl`, `expr.binary`). |
+| `metamorf_node_get_attr(handle, node, name)` | Returns an attribute value (e.g., `identifier`, `value`, `type_name`). Empty string if not found. |
+| `metamorf_node_has_attr(node, name)` | Tests whether an attribute exists on a node. |
+| `metamorf_node_set_attr(node, name, value)` | Sets or creates an attribute on a node. Useful for annotating nodes before custom code generation. |
+| `metamorf_node_child_count(node)` | Returns the number of children. |
+| `metamorf_node_child(node, index)` | Returns the child at the given zero-based index. |
+
+### Custom Code Generation
+
+A powerful use case for the C API is building tools that use Metamorf's parser and semantic analysis but generate output other than C++. For example:
+
+- **Source formatter**: parse with your `.mor` grammar, walk the AST, and emit reformatted source code in the original language.
+- **Linter**: parse and run semantics, then walk the typed AST to check for patterns and report warnings.
+- **Transpiler**: parse one language and emit another (e.g., Pascal to JavaScript).
+- **Documentation generator**: extract routine signatures, comments, and type information from the AST.
+
+The workflow is: call `metamorf_load_mor`, `metamorf_parse_source`, and `metamorf_run_semantics` to get a fully typed AST. Then walk the AST using the node query functions. Skip `metamorf_run_emitters` and `metamorf_build` entirely.
+
+### Error Query
+
+Diagnostics (hints, warnings, errors, fatals) accumulate during pipeline steps:
+
+| Function | Description |
+|----------|-------------|
+| `metamorf_error_count(handle)` | Total number of diagnostics. |
+| `metamorf_has_errors(handle)` | True if any Error or Fatal severity diagnostics exist. |
+| `metamorf_clear_errors(handle)` | Clears all diagnostics. |
+| `metamorf_get_max_errors(handle)` | Returns the maximum error count before the pipeline halts (default: 1). |
+| `metamorf_set_max_errors(handle, n)` | Sets the maximum. Increase for IDE-style workflows where you want multiple errors. |
+| `metamorf_error_get_severity(handle, i)` | Severity ordinal: 0=Hint, 1=Warning, 2=Error, 3=Fatal. |
+| `metamorf_error_get_code(handle, i)` | Error code string (e.g., `E001`, `EA002`). |
+| `metamorf_error_get_message(handle, i)` | Human-readable error message. |
+| `metamorf_error_get_filename(handle, i)` | Source filename (empty if no location). |
+| `metamorf_error_get_line(handle, i)` | One-based line number (zero if no location). |
+| `metamorf_error_get_col(handle, i)` | One-based column number (zero if no location). |
+
+### Complete Function Reference
+
+| Function | Signature | Returns |
+|----------|-----------|---------|
+| `metamorf_create` | `(): TMorHandle` | New engine handle |
+| `metamorf_destroy` | `(handle)` | -- |
+| `metamorf_reset` | `(handle)` | -- |
+| `metamorf_set_status_callback` | `(handle, proc, userData)` | -- |
+| `metamorf_set_output_callback` | `(handle, proc, userData)` | -- |
+| `metamorf_register_emit_handler` | `(handle, nodeKind, proc, userData)` | -- |
+| `metamorf_load_mor` | `(handle, morFile): Boolean` | True on success |
+| `metamorf_parse_source` | `(handle, sourceFile): Boolean` | True on success |
+| `metamorf_run_semantics` | `(handle): Boolean` | True on success |
+| `metamorf_run_emitters` | `(handle): Boolean` | True on success |
+| `metamorf_build` | `(handle, outputPath, autoRun): Boolean` | True on success |
+| `metamorf_compile` | `(handle, morFile, sourceFile, outputPath, autoRun): Boolean` | True on success |
+| `metamorf_get_master_root` | `(handle): TMorNode` | Master root node |
+| `metamorf_node_kind` | `(handle, node): PUTF8Char` | Node kind string |
+| `metamorf_node_get_attr` | `(handle, node, attrName): PUTF8Char` | Attribute value |
+| `metamorf_node_has_attr` | `(node, attrName): Boolean` | True if exists |
+| `metamorf_node_set_attr` | `(node, attrName, value)` | -- |
+| `metamorf_node_child_count` | `(node): Integer` | Child count |
+| `metamorf_node_child` | `(node, index): TMorNode` | Child node |
+| `metamorf_error_count` | `(handle): Integer` | Diagnostic count |
+| `metamorf_has_errors` | `(handle): Boolean` | True if errors exist |
+| `metamorf_clear_errors` | `(handle)` | -- |
+| `metamorf_get_max_errors` | `(handle): Integer` | Max error limit |
+| `metamorf_set_max_errors` | `(handle, maxErrors)` | -- |
+| `metamorf_error_get_severity` | `(handle, index): Integer` | 0=Hint, 1=Warning, 2=Error, 3=Fatal |
+| `metamorf_error_get_code` | `(handle, index): PUTF8Char` | Error code |
+| `metamorf_error_get_message` | `(handle, index): PUTF8Char` | Error message |
+| `metamorf_error_get_filename` | `(handle, index): PUTF8Char` | Source filename |
+| `metamorf_error_get_line` | `(handle, index): Integer` | One-based line |
+| `metamorf_error_get_col` | `(handle, index): Integer` | One-based column |
+
+### Thread Safety
+
+Each `TMorHandle` is an independent instance with no shared state. Multiple handles can be used concurrently from different threads. A single handle must not be accessed from multiple threads simultaneously. Create one handle per thread for parallel compilation.
+
+
 ## Formal Grammar (EBNF)
 
 This section provides the complete EBNF grammar for the Metamorf meta-language. EBNF notation is used: brackets `[` and `]` denote optionality, braces `{` and `}` denote repetition (zero or more), parentheses `(` and `)` group alternatives, and the vertical bar `|` separates alternatives.
@@ -2576,7 +2899,7 @@ digit        = "0" | ... | "9" .
 ident        = letter { letter | digit } .
 integer      = digit { digit } .
 string       = '"' { character | escapeSeq } '"' .
-tripleString = "'''" { character } "'''" .
+tripleString = '"""' { character } '"""' .
 escapeSeq    = "\" ( "n" | "t" | "r" | "0" | "\" | '"' ) .
 comment      = "//" { character } newline .
 blockComment = "/*" { character } "*/" .
@@ -2747,7 +3070,7 @@ AttrAccess     = "@" ident .
 FuncCall       = ident "(" [ Expression { "," Expression } ] ")" .
 
 InterpolatedString = '"' { character | "{@" ident "}" | "{" Expression "}" } '"' .
-TripleString       = "'''" { character } "'''" .
+TripleString       = '"""' { character } '"""' .
 ```
 
 ### Handler Body Logic
@@ -2890,11 +3213,22 @@ These principles guide Metamorf's architecture and explain the reasoning behind 
 
 ## Building from Source
 
-Each release includes the full source alongside the binaries. No separate download required.
+Each release includes the full source alongside the binaries.
 
 1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases) and extract it
-2. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
-3. Build the project
+2. Open `projects\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
+3. Build the project group
+
+The project group contains four sub-projects:
+
+| Project | Output | Description |
+|---------|--------|-------------|
+| Metamorf | `Metamorf.dll` | Core engine as a C-callable shared library |
+| Mor | `Mor.exe` | Command-line compiler |
+| MorLSP | `MorLSP.exe` | Out-of-process LSP server |
+| MorTestbed | `MorTestbed.exe` | Test suite runner |
+
+All four projects share the source units in `src/`. The project files, entry points, and test harnesses live in `projects/`.
 
 
 ## Contributing, Support, and License

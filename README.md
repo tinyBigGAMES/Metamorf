@@ -13,7 +13,7 @@
 **Metamorf** is a Turing complete programming language for building compilers. You describe a complete programming language in a `.mor` file, covering tokens, types, grammar rules, semantic analysis, and C++23 code generation. Metamorf reads that file and immediately uses it to compile source files to native Win64/Linux64 binaries via Zig/Clang.
 
 ```bash
-Metamorf -l pascal.mor -s hello.pas -r
+Mor -l pascal.mor -s hello.pas -r
 ```
 
 One file defines your language. One command compiles and runs your program.
@@ -36,7 +36,7 @@ No host language glue code. No build system integration. No escape hatch to C, J
 
 ## How It Works
 
-Metamorf reads your `.mor` file, populates its internal dispatch tables (token definitions, grammar rules, semantic handlers, emitter handlers), then uses those tables to lex, parse, analyze, and generate C++23 from your source file. The generated C++ is compiled to a native binary via Zig/Clang.
+Metamorf reads your `.mor` file, populates its internal dispatch tables (token definitions, grammar rules, semantic handlers, emitter handlers), then uses those tables to lex, parse, analyze, and generate C++ 23 from your source file. The generated C++ is compiled to a native binary via Zig/Clang.
 
 ```
   ┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
@@ -64,20 +64,22 @@ See the [Metamorf Manual](docs/Metamorf.md) for the complete guide: architecture
 
 ## Getting Started
 
-Metamorf ships as a self-contained release with everything included. No separate toolchain download, no configuration.
+### Download the Release
 
-1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases)
-2. Extract the archive to any directory
+Always download the most recent release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases). The release archive contains everything you need: compiled binaries, the Zig/Clang toolchain, a source checkpoint matching the binaries, test files, and documentation. No separate toolchain download, no configuration.
+
+1. Download the latest release archive
+2. Extract it to any directory
 3. Write a `.mor` language definition and a source file, then compile:
 
 ```bash
-Metamorf -l mylang.mor -s hello.src
+Mor -l mylang.mor -s hello.src
 ```
 
 To build and run in one step:
 
 ```bash
-Metamorf -l mylang.mor -s hello.src -r
+Mor -l mylang.mor -s hello.src -r
 ```
 
 To target Linux from Windows, install WSL2 with Ubuntu:
@@ -86,18 +88,31 @@ To target Linux from Windows, install WSL2 with Ubuntu:
 wsl --install -d Ubuntu
 ```
 
-### Getting the Source
+### Release Contents
+
+Each release ships the following:
+
+| File | Description |
+|------|-------------|
+| `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. |
+| `MorLSP.exe` | Out-of-process Language Server Protocol (LSP) server. Provides editor integration for any Metamorf-defined language. |
+| `MorTestbed.exe` | Test suite runner. Exercises the full library including API tests and LSP tests. |
+| `Metamorf.dll` | C-callable API. Exposes the entire compilation pipeline for use from any programming language. |
+| `src/` | Source checkpoint matching the binaries. Rebuild from here if needed. |
+| `tests/` | Test `.mor` language definitions and source files including `pascal.mor`, `lua.mor`, and `scheme.mor`. |
+| `docs/` | Reference documentation including the Metamorf Manual. |
+| `bin/res/zig/` | Bundled Zig/Clang toolchain used for native code generation. |
+
+### Getting Source Between Releases
+
+The repository contains the latest source code, which may include bug fixes made after the most recent official release. To use these fixes:
+
+1. Clone or pull the latest source from the repository
+2. Copy the updated `src/` files into your release directory, overwriting the existing source checkpoint
+3. Rebuild from source (see [Building from Source](#building-from-source))
 
 ```bash
 git clone https://github.com/tinyBigGAMES/Metamorf.git
-```
-
-```
-Metamorf/repo/
-  src/              <- Metamorf core sources
-  tests/            <- Test files including pascal.mor, lua.mor, scheme.mor
-  docs/             <- Reference documentation
-  bin/              <- Executables run from here
 ```
 
 ## System Requirements
@@ -110,14 +125,31 @@ Metamorf/repo/
 
 ## Building from Source
 
-Each release includes the full source alongside the binaries. No separate download required.
+Each release includes the full source alongside the binaries.
 
 1. Download the latest release from [GitHub Releases](https://github.com/tinyBigGAMES/Metamorf/releases) and extract it
-2. Open `src\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
-3. Build the project
+2. Open `projects\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
+3. Build the project group
+
+The project group contains four sub-projects:
+
+| Project | Output | Description |
+|---------|--------|-------------|
+| Metamorf | `Metamorf.dll` | Core engine as a C-callable shared library |
+| Mor | `Mor.exe` | Command-line compiler |
+| MorLSP | `MorLSP.exe` | Out-of-process LSP server |
+| MorTestbed | `MorTestbed.exe` | Test suite runner |
 
 > [!IMPORTANT]
 > This repository is under active development. Language surfaces may change without notice. Each release aims to be stable and usable as we work toward v1.0. Follow the repo or join the [Discord](https://discord.gg/Wb6z8Wam7p) to track progress.
+
+## Language Server Protocol (LSP)
+
+Metamorf includes a full LSP implementation that provides editor integration for any language defined with a `.mor` file. The out-of-process server (`MorLSP.exe`) supports completions, hover, go-to-definition, find references, document symbols, semantic tokens, folding ranges, inlay hints, rename, formatting, code actions, and signature help. See the [Metamorf Manual](docs/Metamorf.md) for setup details and the full capabilities list.
+
+## C API
+
+`Metamorf.dll` exposes the entire compilation pipeline as a flat, C-callable API using opaque handles and UTF-8 strings. Any language that can load a shared library (C, C++, C#, Python, Rust, Go, and others) can drive Metamorf programmatically. The API supports one-shot compilation, stepped pipeline control with grammar reuse, full AST traversal for building custom tools like formatters and linters, and custom emit handler registration. See the [Metamorf Manual](docs/Metamorf.md) for the complete function reference.
 
 ## Contributing
 
