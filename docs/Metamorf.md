@@ -98,8 +98,11 @@ REQUIRED:
 OPTIONS:
   -o, --output  <path>   Output path (default: output)
   -r, --autorun          Build and run the compiled binary
+  -d, --debug            Build and debug the compiled binary (Win64 only)
   -h, --help             Display help message
 ```
+
+> **Note:** The `-r` and `-d` flags are mutually exclusive. Use `-r` to run immediately or `-d` to launch the interactive debugger, but not both.
 
 **Examples:**
 
@@ -107,6 +110,7 @@ OPTIONS:
 Mor -l mylang.mor -s hello.src
 Mor -l mylang.mor -s hello.src -o build
 Mor -l mylang.mor -s hello.src -r
+Mor -l mylang.mor -s hello.src -d
 ```
 
 ### Cross-Compilation via WSL2
@@ -122,6 +126,53 @@ Then set the target platform in your source file using a directive (if your lang
 ```
 @platform linux64
 ```
+
+### Debugging
+
+The `-d` flag compiles and builds your program, then launches it under the lldb-dap debugger with an interactive REPL. This gives you breakpoints, single-stepping, call stack inspection, and variable evaluation on your compiled native binary. Debugging is currently supported for Win64 targets only.
+
+```bash
+Mor -l pascal.mor -s hello.pas -d
+```
+
+After a successful build, the REPL starts and waits for commands. If a `.breakpoints` file exists next to the compiled executable, breakpoints are loaded automatically before execution begins.
+
+**REPL Commands:**
+
+| Command | Description |
+|---------|-------------|
+| `b <file>:<line>` | Set a breakpoint at the given file and line |
+| `bl` | List all breakpoints |
+| `bd <id>` | Delete a breakpoint by its list index |
+| `bc` | Clear all breakpoints |
+| `c` | Continue execution |
+| `n` | Step over (next line) |
+| `s` | Step into |
+| `finish` | Step out of the current function |
+| `bt` | Show the call stack (backtrace) |
+| `threads` | List all threads |
+| `locals` | Show local variables in the current frame |
+| `p <expr>` | Evaluate an expression and print the result |
+| `r` | Restart the program (preserves breakpoints) |
+| `file <path>` | Load a different executable |
+| `verbose on/off` | Toggle DAP message logging |
+| `quit` | Exit the REPL |
+
+**Breakpoints File:**
+
+The debugger looks for a TOML file named `<program>.breakpoints` in the same directory as the compiled executable. If found, breakpoints are set automatically before the program runs. The file uses the `[[breakpoints]]` array-of-tables syntax:
+
+```toml
+[[breakpoints]]
+file = "../../tests/hello_debug.pas"
+line = 5
+
+[[breakpoints]]
+file = "../../tests/hello_debug.pas"
+line = 9
+```
+
+File paths are relative to the executable's directory. The `.breakpoints` file is generated automatically when your `.mor` language definition uses the `addBreakpoint()` builtin during emission.
 
 ### Getting Source Between Releases
 
@@ -2699,6 +2750,16 @@ Each handle is fully independent. Multiple handles can be used concurrently from
 
 Call `metamorf_reset` to clear the parsed AST, scopes, and output from the most recent compilation while keeping the loaded `.mor` grammar. This allows compiling multiple source files against the same grammar without re-parsing the `.mor` file.
 
+### Run Mode Constants
+
+The `runMode` parameter on `metamorf_build` and `metamorf_compile` controls what happens after a successful build:
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MOR_RUN_NONE` | 0 | Build only. The compiled binary is not executed. |
+| `MOR_RUN_EXECUTE` | 1 | Build and execute the compiled binary. |
+| `MOR_RUN_DEBUG` | 2 | Build and launch the interactive debugger (Win64 only). |
+
 ### One-Shot Compilation
 
 The simplest way to compile is `metamorf_compile`, which runs the entire pipeline in one call:
@@ -2707,7 +2768,7 @@ The simplest way to compile is `metamorf_compile`, which runs the entire pipelin
 if metamorf_compile(LHandle,
   PUTF8Char(UTF8Encode('langs\pascal.mor')),
   PUTF8Char(UTF8Encode('hello.pas')),
-  PUTF8Char(UTF8Encode('output')), True) then
+  PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE) then
   WriteLn('Success')
 else
   WriteLn('Failed: ', metamorf_error_count(LHandle), ' error(s)');
@@ -2723,7 +2784,7 @@ The pipeline steps must be called in order. Each step requires the previous step
 2. `metamorf_parse_source(handle, sourceFile)` -- lex and parse the user source file into an AST.
 3. `metamorf_run_semantics(handle)` -- run multi-pass semantic analysis (type checking, symbol resolution, scope management, module imports).
 4. `metamorf_run_emitters(handle)` -- generate C++ source files from the AST using `.mor`-defined emitters.
-5. `metamorf_build(handle, outputPath, autoRun)` -- invoke Zig/Clang to produce a native binary.
+5. `metamorf_build(handle, outputPath, runMode)` -- invoke Zig/Clang to produce a native binary. Pass `MOR_RUN_EXECUTE` to run after build, `MOR_RUN_DEBUG` to launch the interactive debugger (Win64 only), or `MOR_RUN_NONE` to build only.
 
 ```pascal
 // Load grammar once
@@ -2733,7 +2794,7 @@ begin
   if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('hello.pas'))) then
     if metamorf_run_semantics(LHandle) then
       if metamorf_run_emitters(LHandle) then
-        metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), True);
+        metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
 
   // Reset pipeline state, keep grammar loaded
   metamorf_reset(LHandle);
@@ -2742,7 +2803,7 @@ begin
   if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('world.pas'))) then
     if metamorf_run_semantics(LHandle) then
       if metamorf_run_emitters(LHandle) then
-        metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), True);
+        metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
 end;
 ```
 
@@ -2861,8 +2922,8 @@ Diagnostics (hints, warnings, errors, fatals) accumulate during pipeline steps:
 | `metamorf_parse_source` | `(handle, sourceFile): Boolean` | True on success |
 | `metamorf_run_semantics` | `(handle): Boolean` | True on success |
 | `metamorf_run_emitters` | `(handle): Boolean` | True on success |
-| `metamorf_build` | `(handle, outputPath, autoRun): Boolean` | True on success |
-| `metamorf_compile` | `(handle, morFile, sourceFile, outputPath, autoRun): Boolean` | True on success |
+| `metamorf_build` | `(handle, outputPath, runMode): Boolean` | True on success |
+| `metamorf_compile` | `(handle, morFile, sourceFile, outputPath, runMode): Boolean` | True on success |
 | `metamorf_get_master_root` | `(handle): TMorNode` | Master root node |
 | `metamorf_node_kind` | `(handle, node): PUTF8Char` | Node kind string |
 | `metamorf_node_get_attr` | `(handle, node, attrName): PUTF8Char` | Attribute value |

@@ -32,6 +32,7 @@ No host language glue code. No build system integration. No escape hatch to C, J
 - **IR builder code generation** producing structured C++23 through typed builders
 - **Automatic C++ passthrough** so your language can interoperate with C/C++ without any `.mor` configuration
 - **Modular imports** for splitting large language definitions across multiple `.mor` files
+- **Interactive DAP debugger** with an lldb-dap backend and a built-in REPL for breakpoints, stepping, and variable inspection
 - **Native binary output** for Win64 and Linux64 via Zig/Clang, with cross-compilation through WSL2
 
 ## How It Works
@@ -80,6 +81,12 @@ To build and run in one step:
 
 ```bash
 Mor -l mylang.mor -s hello.src -r
+```
+
+To build and launch the interactive debugger:
+
+```bash
+Mor -l mylang.mor -s hello.src -d
 ```
 
 To target Linux from Windows, install WSL2 with Ubuntu:
