@@ -1933,6 +1933,28 @@ begin
       Result := TValue.From<Boolean>(False);
   end
 
+  // getNodeFile(node) / getNodeFile() -> string (source filename from AST range)
+  else if AName = 'getNodeFile' then
+  begin
+    if (Length(AArgs) > 0) and AArgs[0].IsObject() then
+      Result := TValue.From<string>(TASTNode(AArgs[0].AsObject()).GetRange().Filename)
+    else if FCurrentNode <> nil then
+      Result := TValue.From<string>(FCurrentNode.GetRange().Filename)
+    else
+      Result := TValue.From<string>('');
+  end
+
+  // getNodeLine(node) / getNodeLine() -> string (source start line from AST range)
+  else if AName = 'getNodeLine' then
+  begin
+    if (Length(AArgs) > 0) and AArgs[0].IsObject() then
+      Result := TValue.From<string>(IntToStr(TASTNode(AArgs[0].AsObject()).GetRange().StartLine))
+    else if FCurrentNode <> nil then
+      Result := TValue.From<string>(IntToStr(FCurrentNode.GetRange().StartLine))
+    else
+      Result := TValue.From<string>('0');
+  end
+
   // childCount(node) / child_count() / child_count(node)
   else if (AName = 'childCount') or (AName = 'child_count') then
   begin
@@ -2797,6 +2819,22 @@ begin
     Result := TValue.Empty;
   end
 
+  // addBreakpoint(file, line)
+  else if AName = 'addBreakpoint' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) >= 2) then
+      TBuild(FBuild).AddBreakpoint(MorToString(AArgs[0]), StrToIntDef(MorToString(AArgs[1]), 0));
+    Result := TValue.Empty;
+  end
+
+  // setLineDirectives(enabled)
+  else if AName = 'setLineDirectives' then
+  begin
+    if Assigned(FOutput) and (Length(AArgs) > 0) then
+      FOutput.SetLineDirectives(MorIsTrue(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
   else
   begin
     // Unknown built-in
@@ -3167,6 +3205,10 @@ var
 begin
   if AUserNode = nil then Exit;
   if Assigned(FErrors) and FErrors.ReachedMaxErrors() then Exit;
+
+  // Emit #line directive if enabled
+  if Assigned(FOutput) then
+    FOutput.EmitLineDirective(AUserNode);
 
   // Check native emit handlers first (C++ passthrough)
   if FNativeEmitHandlers.TryGetValue(AUserNode.GetKind(), LNativeHandler) then

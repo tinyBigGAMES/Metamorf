@@ -42,6 +42,8 @@ type
     FLineDirectives: Boolean;
     FLastLineFile: string;
     FLastLineNum: Integer;
+    FPendingLineFile: string;
+    FPendingLineNum: Integer;
     FCaptureStack: TList<TStringBuilder>;
     FEmitNodeCallback: TEmitNodeProc;
 
@@ -51,6 +53,7 @@ type
     {$HINTS ON}
     function GetIndent(): string;
     procedure CloseFuncSignature();
+    procedure FlushPendingLineDirective();
 
   public
     constructor Create(); override;
@@ -67,6 +70,7 @@ type
 
     // Line directives
     procedure SetLineDirectives(const AEnabled: Boolean);
+    procedure EmitLineDirective(const ANode: TASTNode);
 
     // Low-level output
     procedure EmitLine(const AText: string; const ATarget: TOutputTarget = otSource); overload;
@@ -187,9 +191,11 @@ begin
   FIndentLevel := 0;
   FInFuncSignature := False;
   FContext := TDictionary<string, string>.Create();
-  FLineDirectives := False;
+  FLineDirectives := True;
   FLastLineFile := '';
   FLastLineNum := 0;
+  FPendingLineFile := '';
+  FPendingLineNum := 0;
   FCaptureStack := TList<TStringBuilder>.Create();
   FEmitNodeCallback := nil;
 end;
@@ -268,6 +274,7 @@ procedure TCodeOutput.EmitNode(const ANode: TASTNode);
 begin
   if ANode = nil then
     Exit;
+
   if Assigned(FEmitNodeCallback) then
     FEmitNodeCallback(ANode)
   else
@@ -289,10 +296,56 @@ begin
   FLineDirectives := AEnabled;
 end;
 
+procedure TCodeOutput.EmitLineDirective(const ANode: TASTNode);
+var
+  LRange: TSourceRange;
+begin
+  if not FLineDirectives then
+    Exit;
+  if ANode = nil then
+    Exit;
+
+  LRange := ANode.GetRange();
+  if (LRange.StartLine > 0) and (LRange.Filename <> '') then
+  begin
+    // Set pending — will be flushed when actual code is emitted
+    FPendingLineFile := LRange.Filename;
+    FPendingLineNum := LRange.StartLine;
+  end;
+end;
+
+procedure TCodeOutput.FlushPendingLineDirective();
+var
+  LFile: string;
+begin
+  if FPendingLineNum <= 0 then
+    Exit;
+  if FPendingLineFile = '' then
+    Exit;
+  // Don't emit during capture mode (exprToString etc.)
+  if FCaptureStack.Count > 0 then
+    Exit;
+
+  // Only emit if different from last emitted
+  if (FPendingLineFile <> FLastLineFile) or (FPendingLineNum <> FLastLineNum) then
+  begin
+    LFile := FPendingLineFile.Replace('\', '/');
+    FSourceBuffer.AppendLine('#line ' + IntToStr(FPendingLineNum) + ' "' + LFile + '"');
+    FLastLineFile := FPendingLineFile;
+    FLastLineNum := FPendingLineNum;
+  end;
+
+  // Clear pending
+  FPendingLineFile := '';
+  FPendingLineNum := 0;
+end;
+
 { Low-level output }
 
 procedure TCodeOutput.EmitLine(const AText: string; const ATarget: TOutputTarget);
 begin
+  if ATarget = otSource then
+    FlushPendingLineDirective();
   GetBuffer(ATarget).AppendLine(GetIndent() + AText);
 end;
 
@@ -303,6 +356,8 @@ end;
 
 procedure TCodeOutput.Emit(const AText: string; const ATarget: TOutputTarget);
 begin
+  if ATarget = otSource then
+    FlushPendingLineDirective();
   GetBuffer(ATarget).Append(AText);
 end;
 

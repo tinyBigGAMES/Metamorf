@@ -6,7 +6,7 @@
 //
 //    Tokens        Keywords, operators, delimiters, comments, strings,
 //                  and source-level directives (@platform, @optimize,
-//                  @subsystem) using the directive_prefix API.
+//                  @subsystem, @breakpoint) using the directive_prefix API.
 //
 //    Grammar       Pratt-parser expression rules (arithmetic, comparison,
 //                  logical, call, grouped, div/mod), statement rules
@@ -110,6 +110,7 @@ tokens {
   token directive.platform  = "platform";
   token directive.optimize  = "optimize";
   token directive.subsystem = "subsystem";
+  token directive.breakpoint = "breakpoint";
 }
 
 grammar {
@@ -203,6 +204,9 @@ grammar {
   rule stmt.directive_subsystem {
     expect directive.subsystem;
     consume identifier -> @value;
+  }
+  rule stmt.directive_breakpoint {
+    expect directive.breakpoint;
   }
 
   // --- Statement rules ---
@@ -368,8 +372,11 @@ grammar {
     expect delimiter.colon;
     consume identifier -> @return_type;
     expect delimiter.semicolon;
+    parse many stmt until keyword.begin -> @decls;
+    expect keyword.begin;
     parse many stmt until keyword.end -> @func_body;
     expect keyword.end;
+    matchToken("delimiter.semicolon");
   }
   rule stmt.proc_decl {
     expect keyword.procedure;
@@ -388,8 +395,11 @@ grammar {
     }
     expect delimiter.rparen;
     expect delimiter.semicolon;
+    parse many stmt until keyword.begin -> @decls;
+    expect keyword.begin;
     parse many stmt until keyword.end -> @func_body;
     expect keyword.end;
+    matchToken("delimiter.semicolon");
   }
 }
 
@@ -510,7 +520,7 @@ emitters {
         if nodeKind(ch) == "stmt.func_decl" {
           let sig = resolveType(getAttr(ch, "return_type")) + " " + getAttr(ch, "func_name") + "(";
           let pi = 0;
-          let pc = childCount(ch) - 1;
+          let pc = childCount(ch) - 2;
           while pi < pc {
             let p = getChild(ch, pi);
             if pi > 0 {
@@ -525,7 +535,7 @@ emitters {
         if nodeKind(ch) == "stmt.proc_decl" {
           let sig = "void " + getAttr(ch, "func_name") + "(";
           let pi = 0;
-          let pc = childCount(ch) - 1;
+          let pc = childCount(ch) - 2;
           while pi < pc {
             let p = getChild(ch, pi);
             if pi > 0 {
@@ -597,6 +607,10 @@ emitters {
 
   on stmt.directive_subsystem {
     setSubsystem(getAttr(node, "value"));
+  }
+
+  on stmt.directive_breakpoint {
+    addBreakpoint(getNodeFile(node), getNodeLine(node));
   }
 
   on stmt.main_block {
@@ -689,9 +703,9 @@ emitters {
   on stmt.func_decl {
     let retType = resolveType(getAttr(node, "return_type"));
     func(getAttr(node, "func_name"), retType);
-    // Params: children before the body block
+    // Params: children before the decls and body blocks
     let i = 0;
-    while i < child_count() - 1 {
+    while i < child_count() - 2 {
       let p = getChild(node, i);
       param(getAttr(p, "param.name"), resolveType(getAttr(p, "param.type_text")));
       i = i + 1;
@@ -700,6 +714,9 @@ emitters {
     if retType != "void" {
       declVar("Result", retType);
     }
+    // Emit local declarations (var blocks before begin)
+    emitBlock(getChild(node, child_count() - 2));
+    // Emit body (between begin..end)
     emitBlock(getChild(node, child_count() - 1));
     if retType != "void" {
       returnVal("Result");
@@ -711,11 +728,14 @@ emitters {
   on stmt.proc_decl {
     func(getAttr(node, "func_name"), "void");
     let i = 0;
-    while i < child_count() - 1 {
+    while i < child_count() - 2 {
       let p = getChild(node, i);
       param(getAttr(p, "param.name"), resolveType(getAttr(p, "param.type_text")));
       i = i + 1;
     }
+    // Emit local declarations (var blocks before begin)
+    emitBlock(getChild(node, child_count() - 2));
+    // Emit body (between begin..end)
     emitBlock(getChild(node, child_count() - 1));
     endFunc();
     blankLine();

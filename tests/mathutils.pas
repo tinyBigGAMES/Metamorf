@@ -22,9 +22,11 @@
 unit mathutils;
 
 function doubleVal(x: integer): integer;
+begin
   Result := x * 2;
-end
+end;
 
 function triple(x: integer): integer;
+begin
   Result := x * 3;
-end
+end;

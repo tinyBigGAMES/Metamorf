@@ -93,6 +93,9 @@ type
     FVICopyright: string;
     FExeIcon: string;
 
+    // Breakpoints
+    FBreakpoints: TList<TBreakpointEntry>;
+
     function GenerateBuildZig(): string;
     function BuildFlagsString(): string;
     function GetZigTargetString(): string;
@@ -210,9 +213,18 @@ type
     function GetVICopyright(): string;
     procedure SetExeIcon(const AValue: string);
     function GetExeIcon(): string;
+
+    // Breakpoints
+    procedure AddBreakpoint(const AFileName: string; const ALineNumber: Integer);
+    procedure ClearBreakpoints();
+    function GetBreakpoints(): TArray<TBreakpointEntry>;
+    procedure WriteBreakpointsFile(const AExePath: string);
   end;
 
 implementation
+
+uses
+  Metamorf.Config;
 
 { TBuild }
 
@@ -247,10 +259,14 @@ begin
   FVICompanyName := '';
   FVICopyright := '';
   FExeIcon := '';
+
+  // Breakpoints
+  FBreakpoints := TList<TBreakpointEntry>.Create();
 end;
 
 destructor TBuild.Destroy();
 begin
+  FreeAndNil(FBreakpoints);
   FreeAndNil(FUndefines);
   FreeAndNil(FCopyDLLs);
   FreeAndNil(FDefines);
@@ -591,6 +607,7 @@ begin
   ClearDefines();
   ClearUndefines();
   ClearCopyDLLs();
+  ClearBreakpoints();
   FProjectName := 'parse_output';
   FBuildMode := bmExe;
   FOptimizeLevel := olDebug;
@@ -1520,6 +1537,9 @@ begin
   // Apply post-build resources (manifest, icon, version info)
   ApplyPostBuildResources(LOutputFile);
 
+  // Write breakpoints file if any were collected
+  WriteBreakpointsFile(LOutputFile);
+
   if AAutoRun then
     Result := Run()
   else
@@ -1765,6 +1785,58 @@ end;
 function TBuild.GetExeIcon(): string;
 begin
   Result := FExeIcon;
+end;
+
+// Breakpoints
+
+procedure TBuild.AddBreakpoint(const AFileName: string; const ALineNumber: Integer);
+var
+  LEntry: TBreakpointEntry;
+begin
+  LEntry.FileName := AFileName;
+  LEntry.LineNumber := ALineNumber;
+  FBreakpoints.Add(LEntry);
+end;
+
+procedure TBuild.ClearBreakpoints();
+begin
+  FBreakpoints.Clear();
+end;
+
+function TBuild.GetBreakpoints(): TArray<TBreakpointEntry>;
+begin
+  Result := FBreakpoints.ToArray();
+end;
+
+procedure TBuild.WriteBreakpointsFile(const AExePath: string);
+var
+  LBreakpointFile: string;
+  LConfig: TConfig;
+  LExeDir: string;
+  LRelativePath: string;
+  LI: Integer;
+  LIndex: Integer;
+begin
+  if FBreakpoints.Count = 0 then
+    Exit;
+
+  LBreakpointFile := TPath.ChangeExtension(AExePath, '.breakpoints');
+  LExeDir := TPath.GetDirectoryName(AExePath);
+
+  LConfig := TConfig.Create();
+  try
+    for LI := 0 to FBreakpoints.Count - 1 do
+    begin
+      LIndex := LConfig.AddTableEntry('breakpoints');
+      LRelativePath := ExtractRelativePath(LExeDir + PathDelim, FBreakpoints[LI].FileName);
+      LRelativePath := LRelativePath.Replace('\', '/');
+      LConfig.SetTableString('breakpoints', LIndex, 'file', LRelativePath);
+      LConfig.SetTableInteger('breakpoints', LIndex, 'line', FBreakpoints[LI].LineNumber);
+    end;
+    LConfig.SaveToFile(LBreakpointFile);
+  finally
+    LConfig.Free();
+  end;
 end;
 
 end.

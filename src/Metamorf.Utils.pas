@@ -32,6 +32,7 @@ const
   COLOR_GREEN  = #27'[32m';
   COLOR_YELLOW = #27'[33m';
   COLOR_BLUE   = #27'[34m';
+  COLOR_MAGENTA = #27'[35m';
   COLOR_CYAN   = #27'[36m';
   COLOR_WHITE  = #27'[37m';
 

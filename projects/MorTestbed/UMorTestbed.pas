@@ -27,7 +27,8 @@ uses
   Metamorf.Build,
   Metamorf.CLI,
   UTest.API,
-  UTest.LSP;
+  UTest.LSP,
+  UTest.Debug;
 
 function TestLang(const ALangFile: string; const ASrcFile: string): Boolean;
 var
@@ -78,6 +79,7 @@ begin
   try
 
     LNum := 1;
+    //LNum := 300;
 
     case LNum of
       // Languages
@@ -88,6 +90,7 @@ begin
       05: TestLang('..\tests\mylang', '..\tests\hello.ml');
       06: TestLang('..\tests\pascal2', '..\tests\hello2.pas');
       07: TestLang('..\tests\testbed', '..\tests\testbed.pas');
+      08: TestLang('..\tests\pascal', '..\tests\hello_debug.pas');
 
       // Test C-API
       100: UTest.API.Test_CompileBuild();
@@ -96,6 +99,9 @@ begin
       // Test LSP
       200: UTest.LSP.Test_LSP_InProcess();
       201: UTest.LSP.Test_LSP_OutOfProcess();
+
+      // Test Debug
+      300: UTest.Debug.Test01();
 
       // issue-3 (1000-1002) Fixed
       1000: TestLang('..\bugs\issue-3\root_ok', '..\bugs\issue-3\test.pas');

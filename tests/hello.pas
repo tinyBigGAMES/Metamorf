@@ -25,16 +25,18 @@ uses mathutils;
 #include <cstdio>
 
 function add(a: integer, b: integer): integer;
+begin
   Result := a + b;
-end
+end;
 
 function factorial(n: integer): integer;
+begin
   if n <= 1 then
     Result := 1;
   else
     Result := n * factorial(n - 1);
   end
-end
+end;
 
 var
   sum: integer;
