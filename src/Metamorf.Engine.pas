@@ -22,6 +22,7 @@ uses
   System.Generics.Collections,
   Metamorf.Utils,
   Metamorf.Resources,
+  Metamorf.Common,
   Metamorf.Build,
   Metamorf.AST,
   Metamorf.Lexer,
@@ -141,23 +142,26 @@ var
   LMorDisplay: string;
   LSrcDisplay: string;
   LI: Integer;
+  LMorFile: string;
 begin
   FErrors.Clear();
   FProcessedFiles.Clear();
   FImportedMorFiles.Clear();
 
-  LMorDisplay := TUtils.DisplayPath(AMorFile);
+  LMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
+
+  LMorDisplay := TUtils.DisplayPath(LMorFile);
   LSrcDisplay := TUtils.DisplayPath(ASourceFile);
 
   // --- Phase 1: Read and parse .mor file ---
-  if not TFile.Exists(AMorFile) then
+  if not TFile.Exists(LMorFile) then
   begin
     FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LMorDisplay]);
     Exit;
   end;
 
-  LMorSource := TFile.ReadAllText(AMorFile, TEncoding.UTF8);
+  LMorSource := TFile.ReadAllText(LMorFile, TEncoding.UTF8);
 
   // Lex .mor source
   Status(RSMorLexerTokenizing, [LMorDisplay]);
@@ -180,8 +184,8 @@ begin
 
   // --- Phase 2: Setup interpreter tables ---
   Status(RSMorInterpSetup);
-  FMorFileDir := TPath.GetDirectoryName(TPath.GetFullPath(AMorFile));
-  FImportedMorFiles.Add(TPath.GetFullPath(AMorFile), True);
+  FMorFileDir := TPath.GetDirectoryName(TPath.GetFullPath(LMorFile));
+  FImportedMorFiles.Add(TPath.GetFullPath(LMorFile), True);
 
   // Build .mor master root -- owns all .mor ASTs (main + imports)
   FMorMasterRoot := TASTNode.Create();

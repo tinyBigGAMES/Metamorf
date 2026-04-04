@@ -224,6 +224,7 @@ type
 implementation
 
 uses
+  Metamorf.Common,
   Metamorf.Config;
 
 { TBuild }
@@ -1821,7 +1822,7 @@ begin
   if FBreakpoints.Count = 0 then
     Exit;
 
-  LBreakpointFile := TPath.ChangeExtension(AExePath, '.breakpoints');
+  LBreakpointFile := TPath.ChangeExtension(AExePath, MOR_BREAKPOINT_EXT);
   LExeDir := TPath.GetDirectoryName(AExePath);
 
   LConfig := TConfig.Create();

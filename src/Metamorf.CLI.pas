@@ -16,7 +16,9 @@ unit Metamorf.CLI;
 interface
 
 uses
+  System.IOUtils,
   Metamorf.Utils,
+  Metamorf.Common,
   Metamorf.Engine;
 
 type
@@ -46,7 +48,6 @@ implementation
 
 uses
   System.SysUtils,
-  System.IOUtils,
   Metamorf.Build,
   Metamorf.Debug.REPL;
 
@@ -208,7 +209,7 @@ begin
         Result := False;
         Exit;
       end;
-      FLangFile := ParamStr(LI).Trim();
+      FLangFile := TPath.ChangeExtension(ParamStr(LI).Trim(), MOR_LANG_EXT);
     end
     else if (LFlag = '-s') or (LFlag = '--source') then
     begin

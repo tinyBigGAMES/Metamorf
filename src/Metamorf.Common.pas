@@ -20,6 +20,11 @@ uses
   Metamorf.Utils,
   Metamorf.AST;
 
+const
+  // File extension for breakpoint sidecar files (e.g. hello_debug.mbp)
+  MOR_BREAKPOINT_EXT = '.mbp';
+  MOR_LANG_EXT = '.mor';
+
 // Report an error with position info extracted from an AST node's token.
 procedure ReportNodeError(
   const AErrors: TErrors;

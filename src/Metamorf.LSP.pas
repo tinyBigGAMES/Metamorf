@@ -32,6 +32,7 @@ uses
   System.Math,
   System.StrUtils,
   Metamorf.Utils,
+  Metamorf.Common,
   Metamorf.AST,
   Metamorf.Interpreter,
   Metamorf.Scopes,
@@ -2041,7 +2042,7 @@ end;
 
 procedure TMorLSPServer.SetMorFile(const AMorFile: string);
 begin
-  FMorFile := AMorFile;
+  FMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
 end;
 
 procedure TMorLSPServer.SetStreams(const AInput: TStream;
