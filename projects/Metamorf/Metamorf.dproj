@@ -77,14 +77,14 @@
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
         <BT_BuildType>Debug</BT_BuildType>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=tinyBigGAMES™ LLC;FileDescription=Metamorf™ - Language Engineering Platform;FileVersion=0.1.0.0;InternalName=Metamorf™ - Language Engineering Platform;LegalCopyright=Copyright © 2025-present tinyBigGAMES™ LLC;LegalTrademarks=All Rights Reserved.;OriginalFilename=Metamorf.dll;ProgramID=com.tinybiggames.metamorf;ProductName=Metamorf™ - Language Engineering Platform;ProductVersion=1.0.0.0;Comments=https://metamorf.dev</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=tinyBigGAMES™ LLC;FileDescription=Metamorf™ - Language Engineering Platform;FileVersion=0.3.0.0;InternalName=Metamorf™ - Language Engineering Platform;LegalCopyright=Copyright © 2025-present tinyBigGAMES™ LLC;LegalTrademarks=All Rights Reserved.;OriginalFilename=Metamorf.dll;ProgramID=com.tinybiggames.metamorf;ProductName=Metamorf™ - Language Engineering Platform;ProductVersion=1.0.0.0;Comments=https://metamorf.dev</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <DCC_ExeOutput>..\..\bin</DCC_ExeOutput>
         <VerInfo_DLL>true</VerInfo_DLL>
         <Manifest_File>..\..\src\(None)</Manifest_File>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
         <VerInfo_MajorVer>0</VerInfo_MajorVer>
-        <VerInfo_MinorVer>1</VerInfo_MinorVer>
+        <VerInfo_MinorVer>3</VerInfo_MinorVer>
         <DCC_Define>METAMORF_EXPORTS;$(DCC_Define)</DCC_Define>
         <DCC_UnitSearchPath>..\..\src;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
     </PropertyGroup>
@@ -105,7 +105,7 @@
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <VerInfo_MajorVer>0</VerInfo_MajorVer>
-        <VerInfo_MinorVer>1</VerInfo_MinorVer>
+        <VerInfo_MinorVer>3</VerInfo_MinorVer>
         <VerInfo_DLL>true</VerInfo_DLL>
         <Manifest_File>..\..\..\src\(None)</Manifest_File>
     </PropertyGroup>
@@ -119,9 +119,9 @@
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_DLL>true</VerInfo_DLL>
         <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Keys>CompanyName=tinyBigGAMES™ LLC;FileDescription=Metamorf™ - Language Engineering Platform;FileVersion=0.1.0.0;InternalName=Metamorf™ - Language Engineering Platform;LegalCopyright=Copyright © 2025-present tinyBigGAMES™ LLC;LegalTrademarks=All Rights Reserved.;OriginalFilename=MetamorfAPI.dll;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=Metamorf™ - Language Engineering Platform;ProductVersion=1.0.0.0;Comments=https://metamorf.dev</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=tinyBigGAMES™ LLC;FileDescription=Metamorf™ - Language Engineering Platform;FileVersion=0.3.0.0;InternalName=Metamorf™ - Language Engineering Platform;LegalCopyright=Copyright © 2025-present tinyBigGAMES™ LLC;LegalTrademarks=All Rights Reserved.;OriginalFilename=MetamorfAPI.dll;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=Metamorf™ - Language Engineering Platform;ProductVersion=1.0.0.0;Comments=https://metamorf.dev</VerInfo_Keys>
         <VerInfo_MajorVer>0</VerInfo_MajorVer>
-        <VerInfo_MinorVer>1</VerInfo_MinorVer>
+        <VerInfo_MinorVer>3</VerInfo_MinorVer>
         <Manifest_File>..\..\..\src\(None)</Manifest_File>
     </PropertyGroup>
     <ItemGroup>
