@@ -829,7 +829,7 @@ begin
   if NavigateToTable(AKeyPath, True, LTable, LFinalKey) then
   begin
     LArray    := LTable.GetOrCreateArray(LFinalKey);
-    LNewTable := TToml.Create();
+    LNewTable := LTable.CreateOwnedTable();
     LArray.Add(TTomlValue.CreateTable(LNewTable));
     Result := LArray.Count - 1;
   end;

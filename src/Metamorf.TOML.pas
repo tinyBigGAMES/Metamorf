@@ -181,11 +181,11 @@ type
       const APath: TArray<string>; const AValue: TTomlValue);
     function  PathToString(const APath: TArray<string>): string;
 
+  public
     // Ownership
     function CreateOwnedTable(): TToml;
     function CreateOwnedArray(): TTomlArray;
 
-  public
     constructor Create();
     destructor Destroy(); override;
 
