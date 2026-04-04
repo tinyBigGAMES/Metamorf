@@ -28,12 +28,14 @@ type
     FSourceFile: string;
     FOutputPath: string;
     FAutoRun:    Boolean;
+    FDebug:      Boolean;
     procedure ShowBanner();
     procedure ShowHelp();
     procedure ShowErrors();
     procedure SetupCallbacks();
     function  ParseArgs(): Boolean;
     procedure RunCompile();
+    procedure RunDebug();
   public
     constructor Create();
     destructor Destroy(); override;
@@ -44,7 +46,9 @@ implementation
 
 uses
   System.SysUtils,
-  System.IOUtils;
+  System.IOUtils,
+  Metamorf.Build,
+  Metamorf.Debug.REPL;
 
 { TMorCLI }
 
@@ -56,6 +60,7 @@ begin
   FSourceFile := '';
   FOutputPath := 'output';
   FAutoRun    := False;
+  FDebug      := False;
 end;
 
 destructor TMorCLI.Destroy();
@@ -102,6 +107,8 @@ begin
     '   Output path (default: output)');
   TUtils.PrintLn('  ' + COLOR_CYAN + '-r, --autorun       ' + COLOR_RESET +
     '   Build and run the compiled binary');
+  TUtils.PrintLn('  ' + COLOR_CYAN + '-d, --debug         ' + COLOR_RESET +
+    '   Build and debug the compiled binary');
   TUtils.PrintLn('  ' + COLOR_CYAN + '-h, --help          ' + COLOR_RESET +
     '   Display this help message');
   TUtils.PrintLn('');
@@ -235,6 +242,10 @@ begin
     begin
       FAutoRun := True;
     end
+    else if (LFlag = '-d') or (LFlag = '--debug') then
+    begin
+      FDebug := True;
+    end
     else
     begin
       TUtils.PrintLn(COLOR_RED + 'Error: Unknown flag: ' +
@@ -277,6 +288,16 @@ begin
     Result := False;
     Exit;
   end;
+
+  if FAutoRun and FDebug then
+  begin
+    TUtils.PrintLn(COLOR_RED +
+      'Error: -r and -d cannot be used together');
+    TUtils.PrintLn('');
+    ExitCode := 2;
+    Result := False;
+    Exit;
+  end;
 end;
 
 procedure TMorCLI.RunCompile();
@@ -299,6 +320,28 @@ begin
   end;
 end;
 
+procedure TMorCLI.RunDebug();
+var
+  LExePath: string;
+begin
+  // Debug REPL requires Win64 target (lldb-dap is Windows-only)
+  if FEngine.GetBuild().GetTarget() <> tpWin64 then
+  begin
+    TUtils.PrintLn(COLOR_RED +
+      'Error: Debugging is only supported for Win64 targets');
+    ExitCode := 1;
+    Exit;
+  end;
+
+  // Build exe path
+  LExePath := TPath.Combine(FOutputPath,
+    TPath.Combine('zig-out',
+      TPath.Combine('bin',
+        FEngine.GetBuild().GetProjectName() + '.exe')));
+
+  RunDebugSession(LExePath);
+end;
+
 procedure TMorCLI.Execute();
 begin
   ShowBanner();
@@ -308,6 +351,10 @@ begin
 
   try
     RunCompile();
+
+    // Launch debug REPL if -d flag and build succeeded
+    if FDebug and (not FEngine.GetErrors().HasErrors()) then
+      RunDebug();
   except
     on E: Exception do
     begin

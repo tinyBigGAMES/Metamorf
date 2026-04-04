@@ -81,7 +81,7 @@ begin
       PUTF8Char(UTF8Encode('..\tests\pascal.mor')),
       PUTF8Char(UTF8Encode('..\tests\hello.pas')),
       PUTF8Char(UTF8Encode('output')),
-      True) then
+      MOR_RUN_EXECUTE) then
     begin
       WriteLn('');
       PrintErrors(LHandle);

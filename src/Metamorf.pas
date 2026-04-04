@@ -50,7 +50,7 @@
 ///       if metamorf_compile(LHandle,
 ///         PUTF8Char(UTF8Encode('langs\pascal.mor')),
 ///         PUTF8Char(UTF8Encode('hello.pas')),
-///         PUTF8Char(UTF8Encode('output')), True) then
+///         PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE) then
 ///         WriteLn('Success')
 ///       else
 ///         WriteLn('Failed with ', metamorf_error_count(LHandle), ' error(s)');
@@ -73,14 +73,14 @@
 ///         if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('hello.pas'))) then
 ///           if metamorf_run_semantics(LHandle) then
 ///             if metamorf_run_emitters(LHandle) then
-///               metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), True);
+///               metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
 ///
 ///         metamorf_reset(LHandle);  // clear pipeline state, keep grammar
 ///
 ///         if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('world.pas'))) then
 ///           if metamorf_run_semantics(LHandle) then
 ///             if metamorf_run_emitters(LHandle) then
-///               metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), True);
+///               metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
 ///       end;
 ///     finally
 ///       metamorf_destroy(LHandle);
@@ -122,6 +122,26 @@ const
   ///   unit bind to at load time. Change this constant if the DLL is renamed.
   /// </summary>
   METAMORF_DLL = 'Metamorf.dll';
+
+  /// <summary>
+  ///   Build only. The compiled binary is not executed after a successful
+  ///   build.
+  /// </summary>
+  MOR_RUN_NONE = 0;
+
+  /// <summary>
+  ///   Build and execute. The compiled binary is launched automatically
+  ///   after a successful build.
+  /// </summary>
+  MOR_RUN_EXECUTE = 1;
+
+  /// <summary>
+  ///   Build and debug. The compiled binary is launched under the lldb-dap
+  ///   debugger with an interactive REPL after a successful build. Only
+  ///   supported for Win64 targets.
+  /// </summary>
+  MOR_RUN_DEBUG = 2;
+
 
 type
 
@@ -460,15 +480,16 @@ function metamorf_run_emitters(const AHandle: TMorHandle): Boolean;
 ///   Null-terminated UTF-8 path to the output directory. If empty, uses the
 ///   output path established during metamorf_run_emitters.
 /// </param>
-/// <param name="AAutoRun">
-///   When True, the built executable is launched automatically after a
-///   successful build (Win64 console and Linux64 via WSL only).
+/// <param name="ARunMode">
+///   Controls post-build behavior. MOR_RUN_NONE (0) builds only.
+///   MOR_RUN_EXECUTE (1) builds and runs the binary. MOR_RUN_DEBUG (2)
+///   builds and launches the interactive debugger (Win64 targets only).
 /// </param>
 /// <returns>
 ///   True if the build succeeded; False if errors occurred.
 /// </returns>
 function metamorf_build(const AHandle: TMorHandle;
-  const AOutputPath: PUTF8Char; const AAutoRun: Boolean): Boolean;
+  const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
   external METAMORF_DLL;
 
 /// <summary>
@@ -494,16 +515,17 @@ function metamorf_build(const AHandle: TMorHandle;
 /// <param name="AOutputPath">
 ///   Null-terminated UTF-8 path to the output directory.
 /// </param>
-/// <param name="AAutoRun">
-///   When True, the built executable is launched automatically after a
-///   successful build.
+/// <param name="ARunMode">
+///   Controls post-build behavior. MOR_RUN_NONE (0) builds only.
+///   MOR_RUN_EXECUTE (1) builds and runs the binary. MOR_RUN_DEBUG (2)
+///   builds and launches the interactive debugger (Win64 targets only).
 /// </param>
 /// <returns>
 ///   True if all pipeline steps succeeded; False if any step failed.
 /// </returns>
 function metamorf_compile(const AHandle: TMorHandle;
   const AMorFile: PUTF8Char; const ASourceFile: PUTF8Char;
-  const AOutputPath: PUTF8Char; const AAutoRun: Boolean): Boolean;
+  const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
   external METAMORF_DLL;
 
 // ---------------------------------------------------------------------------

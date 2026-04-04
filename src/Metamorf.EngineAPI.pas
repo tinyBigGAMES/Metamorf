@@ -34,6 +34,11 @@ const
   ERR_ENGINEAPI_SEM_NOT_RUN    = 'EA003';
   ERR_ENGINEAPI_EMIT_NOT_RUN   = 'EA004';
 
+  // Run mode constants for DLL surface
+  MOR_RUN_NONE    = 0;
+  MOR_RUN_EXECUTE = 1;
+  MOR_RUN_DEBUG   = 2;
+
 type
 
   { Callback types for DLL consumers }
@@ -108,12 +113,14 @@ type
     function RunSemantics(): Boolean;
     function RunEmitters(): Boolean;
     function Build(const AOutputPath: string;
-      const AAutoRun: Boolean = False): Boolean;
+      const AAutoRun: Boolean = False;
+      const ADebug: Boolean = False): Boolean;
 
     // One-shot convenience (equivalent to TMorEngine.Compile)
     function CompileAll(const AMorFile: string;
       const ASourceFile: string; const AOutputPath: string;
-      const AAutoRun: Boolean = False): Boolean;
+      const AAutoRun: Boolean = False;
+      const ADebug: Boolean = False): Boolean;
 
     // Cleanup between compilations
     procedure Reset();
@@ -135,6 +142,7 @@ uses
   System.Classes,
   Metamorf.Resources,
   Metamorf.Build,
+  Metamorf.Debug.REPL,
   Metamorf.GenericLexer,
   Metamorf.GenericParser,
   Metamorf.Cpp;
@@ -533,10 +541,11 @@ begin
 end;
 
 function TMorEngineAPI.Build(const AOutputPath: string;
-  const AAutoRun: Boolean): Boolean;
+  const AAutoRun: Boolean; const ADebug: Boolean): Boolean;
 var
   LBuild: TBuild;
   LErrors: TErrors;
+  LExePath: string;
 begin
   Result := False;
   LErrors := FEngine.GetErrors();
@@ -581,11 +590,21 @@ begin
   LBuild.Process(AAutoRun);
 
   Result := not LErrors.HasErrors();
+
+  // Launch debug REPL if requested and build succeeded
+  if Result and ADebug and (LBuild.GetTarget() = tpWin64) then
+  begin
+    LExePath := TPath.Combine(AOutputPath,
+      TPath.Combine('zig-out',
+        TPath.Combine('bin',
+          LBuild.GetProjectName() + '.exe')));
+    RunDebugSession(LExePath);
+  end;
 end;
 
 function TMorEngineAPI.CompileAll(const AMorFile: string;
   const ASourceFile: string; const AOutputPath: string;
-  const AAutoRun: Boolean): Boolean;
+  const AAutoRun: Boolean; const ADebug: Boolean): Boolean;
 begin
   FOutputPath := AOutputPath;
 
@@ -601,7 +620,7 @@ begin
   if not RunEmitters() then
     Exit(False);
 
-  Result := Build(AOutputPath, AAutoRun);
+  Result := Build(AOutputPath, AAutoRun, ADebug);
 end;
 
 procedure TMorEngineAPI.Reset();
@@ -863,19 +882,23 @@ begin
 end;
 
 function metamorf_build(const AHandle: UInt64;
-  const AOutputPath: PUTF8Char; const AAutoRun: Boolean): Boolean;
+  const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).Build(
-    UTF8ToString(AOutputPath), AAutoRun);
+    UTF8ToString(AOutputPath),
+    ARunMode = MOR_RUN_EXECUTE,
+    ARunMode = MOR_RUN_DEBUG);
 end;
 
 function metamorf_compile(const AHandle: UInt64;
   const AMorFile: PUTF8Char; const ASourceFile: PUTF8Char;
-  const AOutputPath: PUTF8Char; const AAutoRun: Boolean): Boolean;
+  const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).CompileAll(
     UTF8ToString(AMorFile), UTF8ToString(ASourceFile),
-    UTF8ToString(AOutputPath), AAutoRun);
+    UTF8ToString(AOutputPath),
+    ARunMode = MOR_RUN_EXECUTE,
+    ARunMode = MOR_RUN_DEBUG);
 end;
 
 // --- AST query ---
