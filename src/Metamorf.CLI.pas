@@ -323,8 +323,9 @@ end;
 procedure TMorCLI.RunDebug();
 var
   LExePath: string;
+  LREPL: TMetamorfDebugREPL;
 begin
-  // Debug REPL requires Win64 target (lldb-dap is Windows-only)
+  // Debug requires Win64 target
   if FEngine.GetBuild().GetTarget() <> tpWin64 then
   begin
     TUtils.PrintLn(COLOR_RED +
@@ -339,7 +340,19 @@ begin
       TPath.Combine('bin',
         FEngine.GetBuild().GetProjectName() + '.exe')));
 
-  RunDebugSession(LExePath);
+  if not FileExists(LExePath) then
+  begin
+    TUtils.PrintLn(COLOR_RED + 'Executable not found: ' + LExePath);
+    ExitCode := 1;
+    Exit;
+  end;
+
+  LREPL := TMetamorfDebugREPL.Create();
+  try
+    LREPL.Run(LExePath);
+  finally
+    LREPL.Free();
+  end;
 end;
 
 procedure TMorCLI.Execute();

@@ -2823,7 +2823,7 @@ begin
   else if AName = 'addBreakpoint' then
   begin
     if Assigned(FBuild) and (Length(AArgs) >= 2) then
-      TBuild(FBuild).AddBreakpoint(MorToString(AArgs[0]), StrToIntDef(MorToString(AArgs[1]), 0));
+      TBuild(FBuild).AddBreakpoint(MorToString(AArgs[0]), StrToIntDef(MorToString(AArgs[1]), 0) + 1);
     Result := TValue.Empty;
   end
 

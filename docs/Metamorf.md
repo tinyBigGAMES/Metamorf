@@ -129,7 +129,9 @@ Then set the target platform in your source file using a directive (if your lang
 
 ### Debugging
 
-The `-d` flag compiles and builds your program, then launches it under the lldb-dap debugger with an interactive REPL. This gives you breakpoints, single-stepping, call stack inspection, and variable evaluation on your compiled native binary. Debugging is currently supported for Win64 targets only.
+The `-d` flag compiles and builds your program, then launches it under Metamorf's native debugger with an interactive REPL. The debugger uses the Windows Debug API for out-of-process debugging and reads PDB debug info (produced by Zig/Clang) via DbgHelp for source-level mapping. This gives you breakpoints, single-stepping (step in, step over, step out), call stack inspection, and local variable evaluation on your compiled native binary.
+
+Debugging is currently supported for Win64 targets only. The compiled binary includes full debug information (PDB) and frame pointers for reliable stack unwinding.
 
 ```bash
 Mor -l pascal.mor -s hello.pas -d

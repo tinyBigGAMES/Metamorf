@@ -142,7 +142,7 @@ uses
   System.Classes,
   Metamorf.Resources,
   Metamorf.Build,
-  Metamorf.Debug.REPL,
+  Metamorf.Debug.Server,
   Metamorf.GenericLexer,
   Metamorf.GenericParser,
   Metamorf.Cpp;
@@ -546,6 +546,8 @@ var
   LBuild: TBuild;
   LErrors: TErrors;
   LExePath: string;
+  LServer: TMetamorfDebugServer;
+  LPort: Integer;
 begin
   Result := False;
   LErrors := FEngine.GetErrors();
@@ -591,14 +593,32 @@ begin
 
   Result := not LErrors.HasErrors();
 
-  // Launch debug REPL if requested and build succeeded
+  // Launch DAP debug server if requested and build succeeded
   if Result and ADebug and (LBuild.GetTarget() = tpWin64) then
   begin
+    LPort := 4711;
     LExePath := TPath.Combine(AOutputPath,
       TPath.Combine('zig-out',
         TPath.Combine('bin',
           LBuild.GetProjectName() + '.exe')));
-    RunDebugSession(LExePath);
+
+    LServer := TMetamorfDebugServer.Create();
+    try
+      LServer.SetStatusCallback(
+        procedure(const AText: string; const AUserData: Pointer)
+        begin
+          FEngine.Status('%s', [AText]);
+        end);
+
+      if not LServer.DebugExe(LExePath, LPort) then
+      begin
+        if LServer.HasErrors() then
+          LErrors.Add(esFatal, 'ERR_DEBUG', LServer.GetErrorText());
+        Result := False;
+      end;
+    finally
+      LServer.Free();
+    end;
   end;
 end;
 

@@ -127,8 +127,13 @@
         <DCCReference Include="..\..\src\Metamorf.Common.pas"/>
         <DCCReference Include="..\..\src\Metamorf.Config.pas"/>
         <DCCReference Include="..\..\src\Metamorf.Cpp.pas"/>
-        <DCCReference Include="..\..\src\Metamorf.Debug.pas"/>
+        <DCCReference Include="..\..\src\Metamorf.Debug.Client.pas"/>
+        <DCCReference Include="..\..\src\Metamorf.Debug.DAP.pas"/>
+        <DCCReference Include="..\..\src\Metamorf.Debug.PDB.pas"/>
         <DCCReference Include="..\..\src\Metamorf.Debug.REPL.pas"/>
+        <DCCReference Include="..\..\src\Metamorf.Debug.Runtime.pas"/>
+        <DCCReference Include="..\..\src\Metamorf.Debug.Server.pas"/>
+        <DCCReference Include="..\..\src\Metamorf.Debug.Target.pas"/>
         <DCCReference Include="..\..\src\Metamorf.Engine.pas"/>
         <DCCReference Include="..\..\src\Metamorf.EngineAPI.pas"/>
         <DCCReference Include="..\..\src\Metamorf.Environment.pas"/>

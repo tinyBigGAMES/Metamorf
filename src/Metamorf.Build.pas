@@ -810,6 +810,7 @@ begin
     LFlags.Add('"-Wno-unused-command-line-argument"');  // Suppress Zig-injected flags like -fno-rtlib-defaultlib
     LFlags.Add('"-fdeclspec"');
     LFlags.Add('"-fms-extensions"');
+    LFlags.Add('"-fno-omit-frame-pointer"');  // Required for debugger stack unwinding via [RBP+8]
 
     // Hide symbols by default in DLLs to prevent runtime symbol conflicts
     if FBuildMode = bmDll then
