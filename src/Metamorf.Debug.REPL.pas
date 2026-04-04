@@ -22,6 +22,7 @@ uses
   System.IOUtils,
   System.Generics.Collections,
   Metamorf.Utils,
+  Metamorf.Common,
   Metamorf.Debug.Server,
   Metamorf.Debug.Client;
 
@@ -396,7 +397,7 @@ begin
     end;
 
   // Load breakpoints from sidecar file if it exists
-  LBreakpointFile := TPath.ChangeExtension(FExePath, '.breakpoints');
+  LBreakpointFile := TPath.ChangeExtension(FExePath, MOR_BREAKPOINT_EXT);
   if TFile.Exists(LBreakpointFile) then
     LoadBreakpointsFromFile(LBreakpointFile);
 
@@ -762,7 +763,7 @@ begin
   end;
 
   TUtils.PrintLn('Continuing...');
-  if FClient.Continue() then
+  if FClient.DoContinue() then
   begin
     FClient.ProcessPendingEvents(FTimeoutContinueMS);
     if FClient.State = dcsStopped then

@@ -129,7 +129,7 @@ type
       const AHitConditions: array of Integer): Boolean; overload;
 
     // Execution control
-    function Continue(): Boolean;
+    function DoContinue(): Boolean;
     function StepOver(): Boolean;
     function StepIn(): Boolean;
     function StepOut(): Boolean;
@@ -749,7 +749,7 @@ end;
 // Execution Control
 //------------------------------------------------------------------------------
 
-function TMetamorfDebugClient.Continue(): Boolean;
+function TMetamorfDebugClient.DoContinue(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;

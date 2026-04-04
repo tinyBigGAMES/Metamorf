@@ -779,7 +779,7 @@ begin
   SendResponse(ASeq, 'continue', True, LBody);
 
   FState := dsRunning;
-  FRuntime.Continue();
+  FRuntime.DoContinue();
 end;
 
 procedure TDAPServer.HandleNext(const ASeq: Integer);

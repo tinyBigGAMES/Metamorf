@@ -138,7 +138,7 @@ type
     function RemoveBreakpoint(const AID: Integer): Boolean;
 
     // Execution control
-    function Continue(): Boolean;
+    function DoContinue(const ASetTrapFlag: Boolean = False): Boolean;
     function StepOver(): Boolean;
     function StepIn(): Boolean;
     function StepOut(): Boolean;
@@ -594,7 +594,7 @@ end;
 // Execution Control
 //------------------------------------------------------------------------------
 
-function TDebugRuntime.Continue(): Boolean;
+function TDebugRuntime.DoContinue(const ASetTrapFlag: Boolean): Boolean;
 var
   LBPInfo: TBreakpointInfo;
   LContext: TContext;
@@ -609,6 +609,8 @@ begin
   // Guard: if no valid stop context yet (Rip=0), just resume
   if LContext.Rip = 0 then
   begin
+    if ASetTrapFlag then
+      FTarget.SetTrapFlag();
     FTarget.Resume();
     Result := True;
     Exit;
@@ -632,7 +634,9 @@ begin
 
     // Tell target to re-patch at this address after single-step
     FTarget.SetRepatchOffset(Int64(LAddress));
-  end;
+  end
+  else if ASetTrapFlag then
+    FTarget.SetTrapFlag();
 
   // Resume execution
   FTarget.Resume();
@@ -730,7 +734,7 @@ begin
   FBreakpoints.SetTempBreakpoint(LNextAddress);
 
   // Continue execution (handles stepping past current breakpoint)
-  Result := Continue();
+  Result := DoContinue();
 end;
 
 function TDebugRuntime.StepIn(): Boolean;
@@ -766,7 +770,7 @@ begin
     if FTarget.IsOurCode(LCallTarget) then
     begin
       FBreakpoints.SetTempBreakpoint(LCallTarget);
-      Result := Continue();
+      Result := DoContinue();
       Exit;
     end;
   end;
@@ -801,12 +805,12 @@ begin
   if not FTarget.IsOurCode(LReturnAddr) then
   begin
     // Returning to non-user code -- just continue
-    Result := Continue();
+    Result := DoContinue();
     Exit;
   end;
 
   FBreakpoints.SetTempBreakpoint(LReturnAddr);
-  Result := Continue();
+  Result := DoContinue();
 end;
 
 function TDebugRuntime.WaitForStop(): Boolean;
@@ -875,7 +879,7 @@ begin
       if LFound and (not LShouldBreak) then
       begin
         FBreakpoints.RemoveAllTemp();
-        Self.Continue();
+        Self.DoContinue();
         Continue;  // Loop back to WaitForStop
       end;
     end;
