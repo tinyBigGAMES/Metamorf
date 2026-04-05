@@ -118,7 +118,7 @@ begin
   FRunning := False;
   FExePath := '';
   FPort := CDefaultDAPPort;
-  FPrompt := '(mor-dbg) ';
+  FPrompt := '(dbg) ';
   FTimeoutContinueMS := CTimeoutContinueMS;
   FTimeoutStepMS := CTimeoutStepMS;
 end;

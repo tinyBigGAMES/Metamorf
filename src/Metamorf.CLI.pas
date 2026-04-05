@@ -94,20 +94,31 @@ end;
 procedure TMorCLI.ShowBanner();
 var
   LVersion: TVersionInfo;
-  LSource: string;
 begin
   if FBakedMode then
-    LSource := ''  // reads from self (ParamStr(0))
-  else
-    LSource := 'Metamorf.dll';
-
-  if TUtils.GetVersionInfo(LVersion, LSource) then
   begin
-    TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
-      LVersion.ProductName + ' v' + LVersion.VersionString);
-    TUtils.PrintLn(COLOR_WHITE + LVersion.Copyright);
-    if LVersion.URL <> '' then
-      TUtils.PrintLn(COLOR_YELLOW + LVersion.URL);
+    // Baked mode: read all branding from self's VERSIONINFO
+    if TUtils.GetVersionInfo(LVersion, '') then
+    begin
+      TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
+        LVersion.ProductName + ' v' + LVersion.VersionString);
+      TUtils.PrintLn(COLOR_WHITE + LVersion.Copyright);
+      if LVersion.URL <> '' then
+        TUtils.PrintLn(COLOR_YELLOW + LVersion.URL);
+    end;
+  end
+  else
+  begin
+    // Normal mode: hardcoded branding, version from Metamorf.dll
+    if TUtils.GetVersionInfo(LVersion, 'Metamorf.dll') then
+      TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
+        'Metamorf™ Compiler v' + LVersion.VersionString)
+    else
+      TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
+        'Metamorf™ Compiler v0.0.0');
+    TUtils.PrintLn(COLOR_WHITE +
+      'Copyright © 2025-present tinyBigGAMES™ LLC, All Rights Reserved.');
+    TUtils.PrintLn(COLOR_YELLOW + 'https://metamorf.dev');
   end;
   TUtils.PrintLn('');
 end;
