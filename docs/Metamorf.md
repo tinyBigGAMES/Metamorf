@@ -14,15 +14,16 @@
 10. [The Imperative Language](#the-imperative-language)
 11. [Routines and Constants](#routines-and-constants)
 12. [Fragments, Imports, and Includes](#fragments-imports-and-includes)
-13. [Built-in Functions Reference](#built-in-functions-reference)
-14. [C++ Passthrough](#c-passthrough)
-15. [Language Server Protocol (LSP)](#language-server-protocol-lsp)
-16. [C API (Metamorf.dll)](#c-api-metamorfdll)
-17. [Formal Grammar (EBNF)](#formal-grammar-ebnf)
-18. [Design Principles](#design-principles)
-19. [System Requirements](#system-requirements)
-20. [Building from Source](#building-from-source)
-21. [Contributing, Support, and License](#contributing-support-and-license)
+13. [Baking Standalone Compilers](#baking-standalone-compilers)
+14. [Built-in Functions Reference](#built-in-functions-reference)
+15. [C++ Passthrough](#c-passthrough)
+16. [Language Server Protocol (LSP)](#language-server-protocol-lsp)
+17. [C API (Metamorf.dll)](#c-api-metamorfdll)
+18. [Formal Grammar (EBNF)](#formal-grammar-ebnf)
+19. [Design Principles](#design-principles)
+20. [System Requirements](#system-requirements)
+21. [Building from Source](#building-from-source)
+22. [Contributing, Support, and License](#contributing-support-and-license)
 
 
 ## Overview
@@ -76,7 +77,7 @@ Each release ships the following:
 
 | File | Description |
 |------|-------------|
-| `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. |
+| `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. Supports `--bake` for creating standalone compilers. |
 | `MorLSP.exe` | Out-of-process LSP server. Provides editor integration (completions, hover, go-to-definition, and more) for any Metamorf-defined language. |
 | `MorTestbed.exe` | Test suite runner. Exercises the full Metamorf library including API and LSP tests. |
 | `Metamorf.dll` | C-callable shared library. Exposes the entire compilation pipeline for use from any programming language. |
@@ -2235,6 +2236,76 @@ tokens {
   }
 }
 ```
+
+
+## Baking Standalone Compilers
+
+The bake feature lets you package a `.mor` language definition into a standalone compiler executable. The baked exe embeds the pre-validated AST as an RT_RCDATA resource, so end users never need `.mor` files or Metamorf itself. They get a single exe that compiles source files in your language to native binaries.
+
+### When to Use Baking
+
+Baking is for distribution. When you want to ship your language to users who should not need to know about Metamorf or `.mor` files, bake your language into a standalone compiler. Distribute the baked exe alongside the Zig/Clang toolchain (required at compile time for native code generation).
+
+### The Bake Command
+
+```bash
+Mor --bake <file.mor> -o <output.exe> [branding options]
+```
+
+Both `--bake` and `-o` are required. The `.mor` file is fully parsed and validated before baking. If lexing, parsing, or semantic analysis fails, no output is produced.
+
+### Branding Flags
+
+All branding flags are optional. They control the VERSIONINFO resource embedded in the baked exe and the banner displayed when the baked compiler runs.
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--bake <file.mor>` | Yes | Language definition to bake |
+| `-o <output.exe>` | Yes | Output path for the baked compiler |
+| `--product <name>` | No | Product name (default: output filename) |
+| `--company <name>` | No | Company name |
+| `--description <text>` | No | File description |
+| `--copyright <text>` | No | Copyright string |
+| `--version <M.N.P>` | No | Version (default: 1.0.0) |
+| `--icon <file.ico>` | No | Custom icon |
+| `--url <url>` | No | URL shown in banner |
+
+### Full Example
+
+```bash
+Mor --bake pascal.mor -o mypascal.exe --product "MyPascal Compiler" --company "Acme Corp" --version 1.0.0 --icon mypascal.ico --url "https://mypascal.dev" --copyright "Copyright 2025 Acme Corp"
+```
+
+This produces `mypascal.exe` with custom branding, a custom icon, and the complete Pascal language definition embedded inside.
+
+### Using a Baked Compiler
+
+A baked compiler has a stripped-down CLI. It accepts source files and compiles them through the normal pipeline (lex, parse, analyze, generate C++, build via Zig/Clang).
+
+```bash
+mypascal -s hello.pas              # compile
+mypascal -s hello.pas -o build     # compile to specific output directory
+mypascal -s hello.pas -r           # compile and run
+mypascal -s hello.pas -d           # compile and launch debugger
+mypascal -h                        # show help
+```
+
+The `-l` flag, `--bake` flag, and all branding flags are hidden in baked mode. Only `-s`, `-o`, `-r`, `-d`, and `-h` are available.
+
+### What the Baked Exe Contains
+
+The baked exe is a copy of `Mor.exe` with the following resources applied:
+
+- The complete validated `.mor` AST (including all imported subtrees) serialized with a MOR1 header and embedded as RT_RCDATA
+- Custom VERSIONINFO with the branding fields you specified
+- Optional custom icon replacing the default Metamorf icon
+- The same Zig/Clang toolchain requirement as `Mor.exe` (the baked exe does not embed the toolchain; Zig must be available at runtime)
+
+### How It Works Internally
+
+At bake time, Metamorf lexes, parses, and resolves all imports in the `.mor` file, producing a complete master AST. That AST is serialized with a MOR1 binary header (magic bytes, version, node count) and embedded as an RT_RCDATA resource in a copy of `Mor.exe`. The branding flags are applied as VERSIONINFO resource updates, and an optional icon is swapped in.
+
+At runtime, the baked exe detects the embedded AST resource on startup. It deserializes the AST, rebuilds the interpreter dispatch tables via RunSetup on each child node, then compiles user source through the normal pipeline: lex, parse, semantic analysis, C++23 code generation, and native build via Zig/Clang.
 
 
 ## Built-in Functions Reference

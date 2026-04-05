@@ -63,6 +63,22 @@ Metamorf reads your `.mor` file, populates its internal dispatch tables (token d
 
 See the [Metamorf Manual](docs/Metamorf.md) for the complete guide: architecture, grammar rules, semantic analysis, code emission, type inference, worked examples, and a checklist for building a new language.
 
+## Bake a Standalone Compiler
+
+Turn any `.mor` language definition into a standalone compiler executable. The baked exe embeds the pre-validated AST as a resource, so end users never need `.mor` files or Metamorf itself. The Zig/Clang toolchain is still required at compile time for native code generation.
+
+```bash
+Mor --bake pascal.mor -o mypascal.exe --product "MyPascal Compiler" --version 1.0.0
+```
+
+The result is a self-contained compiler with a stripped-down CLI:
+
+```bash
+mypascal -s hello.pas -r
+```
+
+Add custom branding with `--company`, `--copyright`, `--icon`, `--url`, and `--description`. See the [Metamorf Manual](docs/Metamorf.md) for the full bake reference.
+
 ## Getting Started
 
 ### Download the Release
@@ -101,7 +117,7 @@ Each release ships the following:
 
 | File | Description |
 |------|-------------|
-| `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. |
+| `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. Supports `--bake` for creating standalone compilers. |
 | `MorLSP.exe` | Out-of-process Language Server Protocol (LSP) server. Provides editor integration for any Metamorf-defined language. |
 | `MorTestbed.exe` | Test suite runner. Exercises the full library including API tests and LSP tests. |
 | `Metamorf.dll` | C-callable API. Exposes the entire compilation pipeline for use from any programming language. |
