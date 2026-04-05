@@ -698,7 +698,7 @@ begin
     TUtils.UpdateVersionInfoResource(LOutputExe,
       LMajor, LMinor, LPatch,
       LProductName, LDescription, LFilename,
-      FBakeCompany, FBakeCopyright);
+      FBakeCompany, FBakeCopyright, FBakeURL);
 
     // 4d. AST payload
     TUtils.UpdateRCDataResource(LOutputExe, MOR_BAKED_AST_RES, LASTStream);
