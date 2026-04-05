@@ -16,6 +16,7 @@ unit Metamorf.Engine;
 interface
 
 uses
+  WinApi.Windows,
   System.SysUtils,
   System.IOUtils,
   System.Classes,
@@ -62,6 +63,10 @@ type
     // .mor import callback (called by interpreter during setup)
     function ImportMorFile(const AMorPath: string): TASTNode;
 
+    // Shared user source compilation (phases 3-7)
+    procedure CompileUserSource(const ASourceFile: string;
+      const AOutputPath: string; const AAutoRun: Boolean);
+
   public
     constructor Create(); override;
     destructor Destroy(); override;
@@ -71,10 +76,21 @@ type
       const ASourceFile: string; const AOutputPath: string;
       const AAutoRun: Boolean = False);
 
+    // Setup .mor language only (lex, parse, setup, resolve imports).
+    // Returns True on success. After success, GetMorMasterRoot() holds
+    // the complete validated AST including all imported subtrees.
+    function SetupLanguage(const AMorFile: string): Boolean;
+
+    // Compile user source using a baked (embedded) AST resource.
+    // Loads the AST from RT_RCDATA, runs setup, then compiles user source.
+    procedure CompileBaked(const ASourceFile: string;
+      const AOutputPath: string; const AAutoRun: Boolean);
+
     // Access to subcomponents
     function GetBuild(): TBuild;
     function GetInterpreter(): TMorInterpreter;
     function GetErrors(): TErrors;
+    function GetMorMasterRoot(): TASTNode;
   end;
 
 implementation
@@ -124,24 +140,7 @@ var
   LMorSource: string;
   LMorTokens: TList<TToken>;
   LMorAST: TASTNode;
-  LUserSource: string;
-  LUserTokens: TList<TToken>;
-  LGenLexer: TGenericLexer;
-  LGenParser: TGenericParser;
-  LMasterRoot: TASTNode;
-  LUserBranch: TASTNode;
-  LScopes: TScopeManager;
-  LOutput: TCodeOutput;
-  LBranchOutput: TCodeOutput;
-  LBranch: TASTNode;
-  LGeneratedPath: string;
-  LHeaderPath: string;
-  LSourcePath: string;
-  LProjectName: string;
-  LBranchName: string;
   LMorDisplay: string;
-  LSrcDisplay: string;
-  LI: Integer;
   LMorFile: string;
 begin
   FErrors.Clear();
@@ -151,7 +150,6 @@ begin
   LMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
 
   LMorDisplay := TUtils.DisplayPath(LMorFile);
-  LSrcDisplay := TUtils.DisplayPath(ASourceFile);
 
   // --- Phase 1: Read and parse .mor file ---
   if not TFile.Exists(LMorFile) then
@@ -200,6 +198,36 @@ begin
   // Register C++ passthrough (AFTER custom lang setup)
   ConfigCpp(FInterp);
   Status(RSEngineCppPassthrough);
+
+  try
+    CompileUserSource(ASourceFile, AOutputPath, AAutoRun);
+  finally
+    FreeAndNil(FMorMasterRoot);
+  end;
+end;
+
+procedure TMorEngine.CompileUserSource(const ASourceFile: string;
+  const AOutputPath: string; const AAutoRun: Boolean);
+var
+  LUserSource: string;
+  LUserTokens: TList<TToken>;
+  LGenLexer: TGenericLexer;
+  LGenParser: TGenericParser;
+  LMasterRoot: TASTNode;
+  LUserBranch: TASTNode;
+  LScopes: TScopeManager;
+  LOutput: TCodeOutput;
+  LBranchOutput: TCodeOutput;
+  LBranch: TASTNode;
+  LGeneratedPath: string;
+  LHeaderPath: string;
+  LSourcePath: string;
+  LProjectName: string;
+  LBranchName: string;
+  LSrcDisplay: string;
+  LI: Integer;
+begin
+  LSrcDisplay := TUtils.DisplayPath(ASourceFile);
 
   // --- Phase 3: Read and process user source ---
   if not TFile.Exists(ASourceFile) then
@@ -361,9 +389,49 @@ begin
     LOutput.Free();
     LScopes.Free();
     LMasterRoot.Free();
+  end;
+end;
+
+procedure TMorEngine.CompileBaked(const ASourceFile: string;
+  const AOutputPath: string; const AAutoRun: Boolean);
+var
+  LResStream: TResourceStream;
+  LI: Integer;
+begin
+  FErrors.Clear();
+  FProcessedFiles.Clear();
+  FImportedMorFiles.Clear();
+
+  // Load baked AST from embedded resource
+  LResStream := TResourceStream.Create(HInstance, MOR_BAKED_AST_RES, RT_RCDATA);
+  try
+    FMorMasterRoot := TASTNode.LoadASTFromStream(LResStream);
+  finally
+    LResStream.Free();
+  end;
+
+  // Run setup on each child AST to rebuild interpreter dispatch tables
+  for LI := 0 to FMorMasterRoot.ChildCount() - 1 do
+  begin
+    FInterp.RunSetup(FMorMasterRoot.GetChild(LI));
+    if FErrors.HasErrors() then
+    begin
+      FreeAndNil(FMorMasterRoot);
+      Exit;
+    end;
+  end;
+
+  // Register C++ passthrough
+  ConfigCpp(FInterp);
+
+  // Compile user source using shared pipeline
+  try
+    CompileUserSource(ASourceFile, AOutputPath, AAutoRun);
+  finally
     FreeAndNil(FMorMasterRoot);
   end;
 end;
+
 
 function TMorEngine.CompileModule(const AModuleName: string): Boolean;
 var
@@ -504,6 +572,79 @@ end;
 function TMorEngine.GetErrors(): TErrors;
 begin
   Result := FErrors;
+end;
+
+function TMorEngine.GetMorMasterRoot(): TASTNode;
+begin
+  Result := FMorMasterRoot;
+end;
+
+function TMorEngine.SetupLanguage(const AMorFile: string): Boolean;
+var
+  LMorSource: string;
+  LMorTokens: TList<TToken>;
+  LMorAST: TASTNode;
+  LMorDisplay: string;
+  LMorFile: string;
+begin
+  Result := False;
+
+  FErrors.Clear();
+  FProcessedFiles.Clear();
+  FImportedMorFiles.Clear();
+
+  LMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
+  LMorDisplay := TUtils.DisplayPath(LMorFile);
+
+  // Read .mor file
+  if not TFile.Exists(LMorFile) then
+  begin
+    FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
+      RSFatalFileNotFound, [LMorDisplay]);
+    Exit;
+  end;
+
+  LMorSource := TFile.ReadAllText(LMorFile, TEncoding.UTF8);
+
+  // Lex .mor source
+  Status(RSMorLexerTokenizing, [LMorDisplay]);
+  LMorTokens := FMorLexer.Tokenize(LMorSource, LMorDisplay);
+  if FErrors.HasErrors() then
+  begin
+    LMorTokens.Free();
+    Exit;
+  end;
+
+  // Parse .mor source
+  Status(RSMorParserParsing, [LMorDisplay]);
+  LMorAST := FMorParser.Parse(LMorTokens, LMorDisplay);
+  LMorTokens.Free();
+  if FErrors.HasErrors() then
+  begin
+    LMorAST.Free();
+    Exit;
+  end;
+
+  // Setup interpreter tables
+  Status(RSMorInterpSetup);
+  FMorFileDir := TPath.GetDirectoryName(TPath.GetFullPath(LMorFile));
+  FImportedMorFiles.Add(TPath.GetFullPath(LMorFile), True);
+
+  // Build .mor master root -- owns all .mor ASTs (main + imports)
+  FMorMasterRoot := TASTNode.Create();
+  FMorMasterRoot.SetKind('mor.master');
+  FMorMasterRoot.AddChild(LMorAST);
+
+  FInterp.SetImportMorFunc(ImportMorFile);
+  FInterp.RunSetup(LMorAST);
+  FInterp.SetImportMorFunc(nil);
+  if FErrors.HasErrors() then Exit;
+
+  // Register C++ passthrough
+  ConfigCpp(FInterp);
+  Status(RSEngineCppPassthrough);
+
+  Result := True;
 end;
 
 end.

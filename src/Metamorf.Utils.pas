@@ -61,6 +61,11 @@ type
     Patch: Word;
     Build: Word;
     VersionString: string;
+    ProductName: string;
+    CompanyName: string;
+    Copyright: string;
+    Description: string;
+    URL: string;
   end;
 
   { TUtils }
@@ -114,9 +119,10 @@ type
 
     class function  IsValidWin64PE(const AFilePath: string): Boolean; static;
     class procedure UpdateIconResource(const AExeFilePath, AIconFilePath: string); static;
-    class procedure UpdateVersionInfoResource(const PEFilePath: string; const AMajor, AMinor, APatch: Word; const AProductName, ADescription, AFilename, ACompanyName, ACopyright: string); static;
+    class procedure UpdateVersionInfoResource(const PEFilePath: string; const AMajor, AMinor, APatch: Word; const AProductName, ADescription, AFilename, ACompanyName, ACopyright: string; const AURL: string = ''); static;
     class function  ResourceExist(const AResName: string): Boolean; static;
     class function  AddResManifestFromResource(const AResName: string; const AModuleFile: string; ALanguage: Integer = 1033): Boolean; static;
+    class procedure UpdateRCDataResource(const AExeFilePath: string; const AResourceName: string; const AData: TStream); static;
 
     class function  GetFileSHA256(const APath: string): string; static;
     class function  GetRelativePath(const ABasePath, AFullPath: string): string; static;
@@ -1310,6 +1316,18 @@ var
   LBuffer: Pointer;
   LFileInfo: PVSFixedFileInfo;
   LLen: UINT;
+  LStrValue: PChar;
+  LStrLen: UINT;
+
+  function ReadStringValue(const AKey: string): string;
+  begin
+    Result := '';
+    if VerQueryValue(LBuffer,
+       PChar('\StringFileInfo\040904B0\' + AKey),
+       Pointer(LStrValue), LStrLen) and (LStrLen > 0) then
+      Result := LStrValue;
+  end;
+
 begin
   // Initialize output
   AVersionInfo.Major := 0;
@@ -1317,6 +1335,11 @@ begin
   AVersionInfo.Patch := 0;
   AVersionInfo.Build := 0;
   AVersionInfo.VersionString := '';
+  AVersionInfo.ProductName := '';
+  AVersionInfo.CompanyName := '';
+  AVersionInfo.Copyright := '';
+  AVersionInfo.Description := '';
+  AVersionInfo.URL := '';
 
   // Determine which file to query
   if AFilePath = '' then
@@ -1347,6 +1370,13 @@ begin
 
     // Format version string (Major.Minor.Patch)
     AVersionInfo.VersionString := Format('%d.%d.%d', [AVersionInfo.Major, AVersionInfo.Minor, AVersionInfo.Patch]);
+
+    // Read string table entries
+    AVersionInfo.ProductName := ReadStringValue('ProductName');
+    AVersionInfo.CompanyName := ReadStringValue('CompanyName');
+    AVersionInfo.Copyright := ReadStringValue('LegalCopyright');
+    AVersionInfo.Description := ReadStringValue('FileDescription');
+    AVersionInfo.URL := ReadStringValue('Comments');
 
     Result := True;
   finally
@@ -1529,7 +1559,7 @@ begin
   end;
 end;
 
-class procedure TUtils.UpdateVersionInfoResource(const PEFilePath: string; const AMajor, AMinor, APatch: Word; const AProductName, ADescription, AFilename, ACompanyName, ACopyright: string);
+class procedure TUtils.UpdateVersionInfoResource(const PEFilePath: string; const AMajor, AMinor, APatch: Word; const AProductName, ADescription, AFilename, ACompanyName, ACopyright: string; const AURL: string);
 type
   TVSFixedFileInfo = packed record
     dwSignature: DWORD;
@@ -1623,15 +1653,16 @@ begin
   LPatch := EnsureRange(APatch, 0, MaxWord);
   LVersion := Format('%d.%d.%d.0', [LMajor, LMinor, LPatch]);
 
-  SetLength(LStringPairs, 8);
-  LStringPairs[0].Key := 'CompanyName';      LStringPairs[0].Value := ACompanyName;
-  LStringPairs[1].Key := 'FileDescription';  LStringPairs[1].Value := ADescription;
-  LStringPairs[2].Key := 'FileVersion';      LStringPairs[2].Value := LVersion;
-  LStringPairs[3].Key := 'InternalName';     LStringPairs[3].Value := ADescription;
-  LStringPairs[4].Key := 'LegalCopyright';   LStringPairs[4].Value := ACopyright;
-  LStringPairs[5].Key := 'OriginalFilename'; LStringPairs[5].Value := AFilename;
-  LStringPairs[6].Key := 'ProductName';      LStringPairs[6].Value := AProductName;
-  LStringPairs[7].Key := 'ProductVersion';   LStringPairs[7].Value := LVersion;
+  SetLength(LStringPairs, 9);
+  LStringPairs[0].Key := 'Comments';         LStringPairs[0].Value := AURL;
+  LStringPairs[1].Key := 'CompanyName';      LStringPairs[1].Value := ACompanyName;
+  LStringPairs[2].Key := 'FileDescription';  LStringPairs[2].Value := ADescription;
+  LStringPairs[3].Key := 'FileVersion';      LStringPairs[3].Value := LVersion;
+  LStringPairs[4].Key := 'InternalName';     LStringPairs[4].Value := ADescription;
+  LStringPairs[5].Key := 'LegalCopyright';   LStringPairs[5].Value := ACopyright;
+  LStringPairs[6].Key := 'OriginalFilename'; LStringPairs[6].Value := AFilename;
+  LStringPairs[7].Key := 'ProductName';      LStringPairs[7].Value := AProductName;
+  LStringPairs[8].Key := 'ProductVersion';   LStringPairs[8].Value := LVersion;
 
   // Initialize fixed info structure
   FillChar(LFixedInfo, SizeOf(LFixedInfo), 0);
@@ -1799,6 +1830,39 @@ begin
     end;
   finally
     FreeAndNil(LManifestStream);
+  end;
+end;
+
+class procedure TUtils.UpdateRCDataResource(const AExeFilePath: string;
+  const AResourceName: string; const AData: TStream);
+var
+  LHandleUpdate: THandle;
+  LBuffer: TMemoryStream;
+begin
+  // Copy stream data to a memory buffer for UpdateResource
+  LBuffer := TMemoryStream.Create();
+  try
+    AData.Position := 0;
+    LBuffer.CopyFrom(AData, AData.Size);
+
+    LHandleUpdate := BeginUpdateResource(PChar(AExeFilePath), False);
+    if LHandleUpdate = 0 then
+      RaiseLastOSError();
+
+    try
+      if not UpdateResourceW(LHandleUpdate, RT_RCDATA,
+         PChar(AResourceName), MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL),
+         LBuffer.Memory, LBuffer.Size) then
+        RaiseLastOSError();
+
+      if not EndUpdateResource(LHandleUpdate, False) then
+        RaiseLastOSError();
+    except
+      EndUpdateResource(LHandleUpdate, True);
+      raise;
+    end;
+  finally
+    LBuffer.Free();
   end;
 end;
 

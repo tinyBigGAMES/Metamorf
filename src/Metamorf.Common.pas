@@ -25,6 +25,11 @@ const
   MOR_BREAKPOINT_EXT = '.mbp';
   MOR_LANG_EXT = '.mor';
 
+  // Baked compiler resource name and AST stream format identifiers
+  MOR_BAKED_AST_RES = 'MOR_BAKED_AST';
+  MOR_AST_MAGIC     = $314D4F52; // 'MOR1' as DWORD (little-endian: R, O, M, 1)
+  MOR_AST_VERSION   = 1;
+
 // Report an error with position info extracted from an AST node's token.
 procedure ReportNodeError(
   const AErrors: TErrors;
