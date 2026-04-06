@@ -62,6 +62,7 @@ type
   { TStringStyleEntry }
   TStringStyleEntry = record
     OpenText: string;
+    CloseText: string;
     Kind: string;
     Flags: string;
   end;
@@ -131,6 +132,7 @@ type
     FLineComments: TList<string>;
     FBlockComments: TList<TPair<string, string>>;
     FDirectives: TDictionary<string, string>;
+    FDirectiveFlags: TDictionary<string, string>;
     FLexerConfig: TLexerConfig;
 
     // From types {} block
@@ -173,6 +175,7 @@ type
     FBuild: TObject;
     FActiveParser: TObject;
     FRuleErrorSnapshot: Integer;
+    FCurrentInfixPower: Integer;
     FModuleExtension: string;
     FCompileModuleFunc: TCompileModuleFunc;
     FImportMorFunc: TImportMorFunc;
@@ -230,6 +233,7 @@ type
     function GetBlockComments(): TList<TPair<string, string>>;
     function GetLexerConfig(): TLexerConfig;
     function GetDirectives(): TDictionary<string, string>;
+    function GetDirectiveFlags(): TDictionary<string, string>;
     function GetPrefixRules(): TDictionary<string, TASTNode>;
     function GetInfixRules(): TDictionary<string, TInfixEntry>;
     function GetStmtRules(): TDictionary<string, TList<TASTNode>>;
@@ -246,6 +250,8 @@ type
     procedure SetActiveParser(const AParser: TObject);
     function GetOutput(): TCodeOutput;
     function GetActiveParser(): TObject;
+    procedure SetCurrentInfixPower(const APower: Integer);
+    function GetCurrentInfixPower(): Integer;
     procedure SetCompileModuleFunc(const AFunc: TCompileModuleFunc);
     procedure SetImportMorFunc(const AFunc: TImportMorFunc);
     function GetModuleExtension(): string;
@@ -313,6 +319,7 @@ begin
   FLineComments := TList<string>.Create();
   FBlockComments := TList<TPair<string, string>>.Create();
   FDirectives := TDictionary<string, string>.Create();
+  FDirectiveFlags := TDictionary<string, string>.Create();
   FLexerConfig.CaseSensitive := True;
   FLexerConfig.Terminator := '';
   FLexerConfig.BlockOpen := '';
@@ -403,6 +410,7 @@ begin
   FreeAndNil(FTypeMappings);
   FreeAndNil(FTypeKeywords);
   FreeAndNil(FBlockComments);
+  FreeAndNil(FDirectiveFlags);
   FreeAndNil(FDirectives);
   FreeAndNil(FLineComments);
   FreeAndNil(FStringStyles);
@@ -537,10 +545,19 @@ begin
         LStyle.OpenText := LText;
         LStyle.Kind := LTokenKind;
         LStyle.Flags := LFlags;
+        // Close delimiter defaults to last char of open (e.g., w" closes on ")
+        if Length(LText) > 0 then
+          LStyle.CloseText := LText[Length(LText)]
+        else
+          LStyle.CloseText := '';
         FStringStyles.Add(LStyle);
       end
       else if LTokenKind.StartsWith('directive.') then
+      begin
         FDirectives.AddOrSetValue(LText, LTokenKind);
+        if LFlags <> '' then
+          FDirectiveFlags.AddOrSetValue(LText, LFlags);
+      end;
     end
     else if LKind = 'meta.config_entry' then
     begin
@@ -1196,7 +1213,7 @@ begin
       if LMode = 'expr' then
       begin
         LExprNode := LGenParser.ParseExpression(
-          StrToIntDef(ANode.GetAttr('bind_power'), 0));
+          StrToIntDef(ANode.GetAttr('bind_power'), FCurrentInfixPower));
         if Assigned(FResultNode) then
         begin
           FResultNode.AddChild(LExprNode);
@@ -1887,6 +1904,7 @@ var
   LTokenKind: string;
   LDepth: Int64;
   LRawAccum: string;
+  LSym: TSymbol;
 begin
   // Common functions
 
@@ -2643,6 +2661,21 @@ begin
       Result := TValue.From<Boolean>(False);
   end
 
+  // lookupSymbolType(name) -> string
+  else if AName = 'lookupSymbolType' then
+  begin
+    if Assigned(FScopes) and (Length(AArgs) > 0) then
+    begin
+      LSym := FScopes.LookupGlobal(MorToString(AArgs[0]));
+      if Assigned(LSym) then
+        Result := TValue.From<string>(LSym.GetTypeName())
+      else
+        Result := TValue.From<string>('');
+    end
+    else
+      Result := TValue.From<string>('');
+  end
+
   // demoteCLinkageForPrefix(prefix) -> int
   else if AName = 'demoteCLinkageForPrefix' then
   begin
@@ -2936,6 +2969,11 @@ begin
   Result := FDirectives;
 end;
 
+function TMorInterpreter.GetDirectiveFlags(): TDictionary<string, string>;
+begin
+  Result := FDirectiveFlags;
+end;
+
 function TMorInterpreter.GetPrefixRules(): TDictionary<string, TASTNode>;
 begin
   Result := FPrefixRules;
@@ -3008,6 +3046,16 @@ end;
 function TMorInterpreter.GetActiveParser(): TObject;
 begin
   Result := FActiveParser;
+end;
+
+procedure TMorInterpreter.SetCurrentInfixPower(const APower: Integer);
+begin
+  FCurrentInfixPower := APower;
+end;
+
+function TMorInterpreter.GetCurrentInfixPower(): Integer;
+begin
+  Result := FCurrentInfixPower;
 end;
 
 procedure TMorInterpreter.SetCompileModuleFunc(const AFunc: TCompileModuleFunc);
@@ -3228,6 +3276,8 @@ begin
       try
         ExecBlock(LHandler);
       except
+        on E: EReturnSignal do
+          ; // return exits the emitter handler normally
         on E: Exception do
           ReportNodeError(FErrors, AUserNode, ERR_MORINTERP_EMITTER_CRASH,
             RSMorInterpEmitterCrash, [AUserNode.GetKind(), E.Message]);

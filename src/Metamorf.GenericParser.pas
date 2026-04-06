@@ -241,7 +241,9 @@ begin
           if LInfixEntry.Power <= AMinPower then Break;
         end;
         LSavedPos := FPos;
+        FInterp.SetCurrentInfixPower(LInfixEntry.Power);
         LLeft := FInterp.ExecuteGrammarRule(LInfixEntry.RuleAST, LLeft);
+        FInterp.SetCurrentInfixPower(0);
         if FPos = LSavedPos then Break; // stuck protection
       end
       else

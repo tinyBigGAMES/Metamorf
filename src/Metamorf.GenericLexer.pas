@@ -33,6 +33,12 @@ const
 
 type
 
+  { TCondEntry - tracks one level of conditional compilation nesting }
+  TCondEntry = record
+    ParentSkipping: Boolean; // was FSkipping when this level was entered?
+    BranchTaken: Boolean;    // did any branch at this level already emit?
+  end;
+
   { TGenericLexer }
   TGenericLexer = class(TErrorsObject)
   private
@@ -48,8 +54,14 @@ type
     FLineComments: TList<string>;
     FBlockComments: TList<TPair<string, string>>;
     FDirectives: TDictionary<string, string>;
+    FDirectiveFlags: TDictionary<string, string>;
     FDirectivePrefix: string;
     FConfig: TLexerConfig;
+
+    // Conditional compilation state
+    FDefines: TDictionary<string, Boolean>;
+    FCondStack: TList<TCondEntry>;
+    FSkipping: Boolean;
 
     function AtEnd(): Boolean;
     function Current(): Char;
@@ -86,10 +98,16 @@ begin
   FStringStyles := nil;
   FLineComments := nil;
   FBlockComments := nil;
+  FDirectiveFlags := nil;
+  FDefines := TDictionary<string, Boolean>.Create();
+  FCondStack := TList<TCondEntry>.Create();
+  FSkipping := False;
 end;
 
 destructor TGenericLexer.Destroy();
 begin
+  FreeAndNil(FCondStack);
+  FreeAndNil(FDefines);
   // We don't own these - they belong to the interpreter
   inherited;
 end;
@@ -102,6 +120,7 @@ begin
   FLineComments := AInterp.GetLineComments();
   FBlockComments := AInterp.GetBlockComments();
   FDirectives := AInterp.GetDirectives();
+  FDirectiveFlags := AInterp.GetDirectiveFlags();
   FConfig := AInterp.GetLexerConfig();
   FDirectivePrefix := FConfig.DirectivePrefix;
 end;
@@ -333,10 +352,10 @@ begin
       LText := '';
       while not AtEnd() do
       begin
-        // Check for closing delimiter (same as open for most styles)
-        if Current() = LStyle.OpenText[1] then
+        // Check for closing delimiter
+        if (LStyle.CloseText <> '') and (Current() = LStyle.CloseText[1]) then
         begin
-          if LNoEscape or (LText = '') or (LText[Length(LText)] <> LStyle.OpenText[1]) then
+          if LNoEscape or (LText = '') or (LText[Length(LText)] <> LStyle.CloseText[1]) then
           begin
             Advance();
             AToken := MakeToken(LStyle.Kind, LText, LStartLine, LStartCol);
@@ -459,12 +478,20 @@ function TGenericLexer.Tokenize(const ASource: string;
   const AFilename: string): TList<TToken>;
 var
   LToken: TToken;
+  LFlag: string;
+  LSymbol: string;
+  LEntry: TCondEntry;
 begin
   FSource := ASource;
   FFilename := AFilename;
   FPos := 1;
   FLine := 1;
   FCol := 1;
+
+  // Reset conditional compilation state
+  FDefines.Clear();
+  FCondStack.Clear();
+  FSkipping := False;
 
   Result := TList<TToken>.Create();
 
@@ -479,6 +506,160 @@ begin
     if SkipComment() then Continue;
     if AtEnd() then Break;
     if Current().IsWhiteSpace then Continue;
+
+    // Try directive FIRST (must be processed even when skipping, for nesting)
+    if (FDirectivePrefix <> '') and (Current() = FDirectivePrefix[1]) then
+    begin
+      LToken.Filename := FFilename;
+      LToken.Line := FLine;
+      LToken.Col := FCol;
+      Advance(); // skip prefix char
+      // Read the directive word
+      LToken.Text := '';
+      while not AtEnd() and (Current().IsLetterOrDigit or (Current() = '_')) do
+      begin
+        LToken.Text := LToken.Text + Current();
+        Advance();
+      end;
+      if FDirectives.TryGetValue(LToken.Text, LToken.Kind) then
+      begin
+        // Check if this is a conditional compilation directive
+        if Assigned(FDirectiveFlags) and
+           FDirectiveFlags.TryGetValue(LToken.Text, LFlag) then
+        begin
+          // Read symbol name for directives that need one
+          if (LFlag = 'define') or (LFlag = 'undef') or
+             (LFlag = 'ifdef') or (LFlag = 'ifndef') or
+             (LFlag = 'elseif') then
+          begin
+            // Skip whitespace to the symbol
+            while not AtEnd() and Current().IsWhiteSpace and
+                  (Current() <> #10) do
+              Advance();
+            LSymbol := '';
+            while not AtEnd() and
+                  (Current().IsLetterOrDigit or (Current() = '_')) do
+            begin
+              LSymbol := LSymbol + Current();
+              Advance();
+            end;
+          end;
+
+          if LFlag = 'define' then
+          begin
+            if not FSkipping then
+              FDefines.AddOrSetValue(LSymbol, True);
+          end
+          else if LFlag = 'undef' then
+          begin
+            if not FSkipping then
+              FDefines.Remove(LSymbol);
+          end
+          else if LFlag = 'ifdef' then
+          begin
+            LEntry.ParentSkipping := FSkipping;
+            LEntry.BranchTaken := False;
+            if not FSkipping then
+            begin
+              if FDefines.ContainsKey(LSymbol) then
+                LEntry.BranchTaken := True
+              else
+                FSkipping := True;
+            end;
+            FCondStack.Add(LEntry);
+          end
+          else if LFlag = 'ifndef' then
+          begin
+            LEntry.ParentSkipping := FSkipping;
+            LEntry.BranchTaken := False;
+            if not FSkipping then
+            begin
+              if not FDefines.ContainsKey(LSymbol) then
+                LEntry.BranchTaken := True
+              else
+                FSkipping := True;
+            end;
+            FCondStack.Add(LEntry);
+          end
+          else if LFlag = 'elseif' then
+          begin
+            if FCondStack.Count > 0 then
+            begin
+              LEntry := FCondStack[FCondStack.Count - 1];
+              if LEntry.ParentSkipping then
+              begin
+                // Parent is skipping, stay skipping
+                FSkipping := True;
+              end
+              else if LEntry.BranchTaken then
+              begin
+                // A branch already ran, skip
+                FSkipping := True;
+              end
+              else if FDefines.ContainsKey(LSymbol) then
+              begin
+                // This branch is active
+                FSkipping := False;
+                LEntry.BranchTaken := True;
+                FCondStack[FCondStack.Count - 1] := LEntry;
+              end
+              else
+                FSkipping := True;
+            end;
+          end
+          else if LFlag = 'else' then
+          begin
+            if FCondStack.Count > 0 then
+            begin
+              LEntry := FCondStack[FCondStack.Count - 1];
+              if LEntry.ParentSkipping then
+                FSkipping := True
+              else if LEntry.BranchTaken then
+                FSkipping := True
+              else
+              begin
+                FSkipping := False;
+                LEntry.BranchTaken := True;
+                FCondStack[FCondStack.Count - 1] := LEntry;
+              end;
+            end;
+          end
+          else if LFlag = 'endif' then
+          begin
+            if FCondStack.Count > 0 then
+            begin
+              LEntry := FCondStack[FCondStack.Count - 1];
+              FSkipping := LEntry.ParentSkipping;
+              FCondStack.Delete(FCondStack.Count - 1);
+            end;
+          end;
+          // Conditional directives are consumed, not emitted
+          Continue;
+        end;
+
+        // Regular directive (non-conditional) -- emit if not skipping
+        if not FSkipping then
+          Result.Add(LToken);
+        Continue;
+      end;
+      // Not a registered directive -- treat prefix + word as unknown
+      if not FSkipping then
+      begin
+        if Assigned(FErrors) then
+          FErrors.Add(FFilename, LToken.Line, LToken.Col,
+            esError, ERR_USERLEXER_UNEXPECTED_CHAR,
+            RSUserLexerUnexpectedChar, [FDirectivePrefix]);
+      end;
+      Continue;
+    end;
+
+    // When skipping, consume but don't emit non-directive tokens
+    if FSkipping then
+    begin
+      // Skip the current character/token
+      Advance();
+      Continue;
+    end;
 
     // Try string literal first (before operators, since ' might be both)
     if TryStringLiteral(LToken) then
@@ -496,33 +677,6 @@ begin
     if TryOperator(LToken) then
     begin
       Result.Add(LToken);
-      Continue;
-    end;
-
-    // Try directive (e.g., @platform, @optimize)
-    if (FDirectivePrefix <> '') and (Current() = FDirectivePrefix[1]) then
-    begin
-      LToken.Filename := FFilename;
-      LToken.Line := FLine;
-      LToken.Col := FCol;
-      Advance(); // skip prefix char
-      // Read the directive word
-      LToken.Text := '';
-      while not AtEnd() and (Current().IsLetterOrDigit or (Current() = '_')) do
-      begin
-        LToken.Text := LToken.Text + Current();
-        Advance();
-      end;
-      if FDirectives.TryGetValue(LToken.Text, LToken.Kind) then
-      begin
-        Result.Add(LToken);
-        Continue;
-      end;
-      // Not a registered directive -- treat prefix + word as unknown
-      if Assigned(FErrors) then
-        FErrors.Add(FFilename, LToken.Line, LToken.Col,
-          esError, ERR_USERLEXER_UNEXPECTED_CHAR,
-          RSUserLexerUnexpectedChar, [FDirectivePrefix]);
       Continue;
     end;
 
