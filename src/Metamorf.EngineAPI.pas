@@ -482,8 +482,8 @@ begin
   FEngine.SetProjectName(LProjectName);
   FEngine.ClearSourceFiles();
   FEngine.AddIncludePath(LGeneratedPath);
-  FEngine.AddIncludePath('res/runtime');
-  FEngine.AddSourceFile('res/runtime/mor_runtime.cpp');
+  FEngine.AddIncludePath(FEngine.GetRuntimePath());
+  FEngine.AddSourceFile(FEngine.GetRuntimePath('mor_runtime.cpp'));
 
   // Pass 1: module branches (index 1+)
   for LI := 1 to FMasterRoot.ChildCount() - 1 do

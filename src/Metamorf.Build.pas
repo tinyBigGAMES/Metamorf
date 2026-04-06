@@ -22,6 +22,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   Metamorf.Utils,
+  Metamorf.Config,
   Metamorf.Resources;
 
 type
@@ -80,6 +81,11 @@ type
     FOutput: TCallback<TCaptureConsoleCallback>;
     FLastExitCode: DWORD;
     FRawOutput: Boolean;
+
+    // Toolchain path
+    FToolchainPath: string;
+    FBuildConfig: TConfig;
+    FBuildConfigPath: string;
 
     // Version info / post-build resources
     FAddVersionInfo: Boolean;
@@ -219,13 +225,20 @@ type
     procedure ClearBreakpoints();
     function GetBreakpoints(): TArray<TBreakpointEntry>;
     procedure WriteBreakpointsFile(const AExePath: string);
+
+    // Toolchain paths
+    procedure SetToolchainPath(const APath: string);
+    function GetToolchainPath(): string;
+    function GetZigPath(const AFilename: string = ''): string;
+    function GetRuntimePath(const AFilename: string = ''): string;
+    function GetLibsPath(const AFilename: string = ''): string;
+    function GetAssetsPath(const AFilename: string = ''): string;
   end;
 
 implementation
 
 uses
-  Metamorf.Common,
-  Metamorf.Config;
+  Metamorf.Common;
 
 { TBuild }
 
@@ -263,10 +276,46 @@ begin
 
   // Breakpoints
   FBreakpoints := TList<TBreakpointEntry>.Create();
+
+  // Toolchain config
+  FBuildConfig := TConfig.Create();
+  FBuildConfigPath := TPath.Combine(
+    TPath.GetDirectoryName(ParamStr(0)),
+    'build.toml'
+  );
+  FToolchainPath := '';
+  if TFile.Exists(FBuildConfigPath) then
+  begin
+    FBuildConfig.LoadFromFile(FBuildConfigPath);
+    FToolchainPath := FBuildConfig.GetString('build.toolchain_path', '');
+  end;
+
+  // Resolve toolchain path: empty means default "toolchain" in exe dir
+  // Non-empty means parent folder; "toolchain" is always appended
+  if FToolchainPath = '' then
+    FToolchainPath := TPath.Combine(
+      TPath.GetDirectoryName(ParamStr(0)),
+      'toolchain'
+    )
+  else
+  begin
+    if not TPath.IsPathRooted(FToolchainPath) then
+      FToolchainPath := TPath.Combine(
+        TPath.GetDirectoryName(ParamStr(0)),
+        FToolchainPath
+      );
+    FToolchainPath := TPath.Combine(FToolchainPath, 'toolchain');
+  end;
 end;
 
 destructor TBuild.Destroy();
 begin
+  // Save toolchain config
+  FBuildConfig.SetString('build.toolchain_path',
+    FBuildConfig.GetString('build.toolchain_path', ''));
+  FBuildConfig.SaveToFile(FBuildConfigPath);
+  FreeAndNil(FBuildConfig);
+
   FreeAndNil(FBreakpoints);
   FreeAndNil(FUndefines);
   FreeAndNil(FCopyDLLs);
@@ -1468,7 +1517,7 @@ begin
     Exit;
 
   // Find zig executable
-  LZigExe := TUtils.GetZigExePath();
+  LZigExe := GetZigPath('zig.exe');
   if (LZigExe = '') or (not TFile.Exists(LZigExe)) then
   begin
     if Assigned(FErrors) then
@@ -1839,6 +1888,64 @@ begin
   finally
     LConfig.Free();
   end;
+end;
+
+// -- Toolchain paths ----------------------------------------------------------
+
+procedure TBuild.SetToolchainPath(const APath: string);
+begin
+  if APath = '' then
+    FToolchainPath := TPath.Combine(
+      TPath.GetDirectoryName(ParamStr(0)),
+      'toolchain'
+    )
+  else
+  begin
+    if not TPath.IsPathRooted(APath) then
+      FToolchainPath := TPath.Combine(
+        TPath.GetDirectoryName(ParamStr(0)),
+        APath
+      )
+    else
+      FToolchainPath := APath;
+    FToolchainPath := TPath.Combine(FToolchainPath, 'toolchain');
+  end;
+
+  // Persist the raw value (empty or user-provided)
+  FBuildConfig.SetString('build.toolchain_path', APath);
+end;
+
+function TBuild.GetToolchainPath(): string;
+begin
+  Result := FToolchainPath;
+end;
+
+function TBuild.GetZigPath(const AFilename: string): string;
+begin
+  Result := TPath.Combine(FToolchainPath, 'zig');
+  if AFilename <> '' then
+    Result := TPath.Combine(Result, AFilename);
+end;
+
+function TBuild.GetRuntimePath(const AFilename: string): string;
+begin
+  Result := TPath.Combine(FToolchainPath, 'runtime');
+  if AFilename <> '' then
+    Result := TPath.Combine(Result, AFilename);
+end;
+
+function TBuild.GetLibsPath(const AFilename: string): string;
+begin
+  Result := TPath.Combine(FToolchainPath, 'libs');
+  if AFilename <> '' then
+    Result := TPath.Combine(Result, AFilename);
+end;
+
+function TBuild.GetAssetsPath(const AFilename: string): string;
+begin
+  Result := TPath.Combine(FToolchainPath, 'assets');
+  if AFilename <> '' then
+    Result := TPath.Combine(Result, AFilename);
 end;
 
 end.

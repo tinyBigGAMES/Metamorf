@@ -107,8 +107,6 @@ type
 
     class function  CreateDirInPath(const AFilename: string): Boolean;
     class function  GetVersionInfo(out AVersionInfo: TVersionInfo; const AFilePath: string = ''): Boolean; static;
-    class function  GetZigExePath(): string; static;
-    class function  GetExePath(): string; static;
 
     class procedure CopyFilePreservingEncoding(const ASourceFile, ADestFile: string); static;
     class function  DetectFileEncoding(const AFilePath: string): TEncoding; static;
@@ -1118,22 +1116,6 @@ begin
     TDirectory.CreateDirectory(LPath);
 
   Result := True;
-end;
-
-class function TUtils.GetZigExePath(): string;
-var
-  LBase: string;
-begin
-  LBase := TPath.GetDirectoryName(ParamStr(0));
-  Result := TPath.Combine(
-    LBase,
-    TPath.Combine('res', TPath.Combine('zig', 'zig.exe'))
-  );
-end;
-
-class function TUtils.GetExePath(): string;
-begin
-  Result := TPath.GetDirectoryName(ParamStr(0));
 end;
 
 class procedure TUtils.CopyFilePreservingEncoding(const ASourceFile, ADestFile: string);

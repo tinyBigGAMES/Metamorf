@@ -120,6 +120,14 @@ type
     function GetInterpreter(): TMorInterpreter;
     function GetErrors(): TErrors;
     function GetMorMasterRoot(): TASTNode;
+
+    // Toolchain paths
+    procedure SetToolchainPath(const APath: string);
+    function GetToolchainPath(): string;
+    function GetZigPath(const AFilename: string = ''): string;
+    function GetRuntimePath(const AFilename: string = ''): string;
+    function GetLibsPath(const AFilename: string = ''): string;
+    function GetAssetsPath(const AFilename: string = ''): string;
   end;
 
 implementation
@@ -331,8 +339,8 @@ begin
     FBuild.SetProjectName(LProjectName);
     FBuild.ClearSourceFiles();
     FBuild.AddIncludePath(LGeneratedPath);
-    FBuild.AddIncludePath('res/runtime');
-    FBuild.AddSourceFile('res/runtime/mor_runtime.cpp');
+    FBuild.AddIncludePath(FBuild.GetRuntimePath());
+    FBuild.AddSourceFile(FBuild.GetRuntimePath('mor_runtime.cpp'));
 
     // Pass 1: module branches (index 1+)
     for LI := 1 to LMasterRoot.ChildCount() - 1 do
@@ -771,6 +779,38 @@ begin
   Status(RSEngineCppPassthrough);
 
   Result := True;
+end;
+
+// -- Toolchain path wrappers --------------------------------------------------
+
+procedure TMorEngine.SetToolchainPath(const APath: string);
+begin
+  FBuild.SetToolchainPath(APath);
+end;
+
+function TMorEngine.GetToolchainPath(): string;
+begin
+  Result := FBuild.GetToolchainPath();
+end;
+
+function TMorEngine.GetZigPath(const AFilename: string): string;
+begin
+  Result := FBuild.GetZigPath(AFilename);
+end;
+
+function TMorEngine.GetRuntimePath(const AFilename: string): string;
+begin
+  Result := FBuild.GetRuntimePath(AFilename);
+end;
+
+function TMorEngine.GetLibsPath(const AFilename: string): string;
+begin
+  Result := FBuild.GetLibsPath(AFilename);
+end;
+
+function TMorEngine.GetAssetsPath(const AFilename: string): string;
+begin
+  Result := FBuild.GetAssetsPath(AFilename);
 end;
 
 end.
