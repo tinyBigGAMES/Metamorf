@@ -51,7 +51,9 @@ procedure ConfigCppTokens(const AInterp: TMorInterpreter);
 var
   LKeywords: TDictionary<string, string>;
   LOperators: TList<TOperatorEntryInterp>;
+  LStyles: TList<TStringStyleEntry>;
   LEntry: TOperatorEntryInterp;
+  LStyle: TStringStyleEntry;
   LI: Integer;
 begin
   LKeywords := AInterp.GetKeywords();
@@ -111,6 +113,14 @@ begin
   LOperators.Add(LEntry);
   LEntry.Text := ']'; LEntry.Kind := 'delimiter.rbracket';
   LOperators.Add(LEntry);
+
+  // C++ char literal: 'x'
+  LStyles := AInterp.GetStringStyles();
+  LStyle.OpenText := '''';
+  LStyle.CloseText := '''';
+  LStyle.Kind := 'cpp.string.char';
+  LStyle.Flags := '';
+  LStyles.Add(LStyle);
 
   // Re-sort operators longest-first after adding C++ ones
   LOperators.Sort(
@@ -175,15 +185,21 @@ begin
     end;
 
     // Expression mode: stop at boundaries when depth <= 0
-    if (not AStmtMode) and (LDepth <= 0) then
+    // Expression mode: stop at boundaries
+    if not AStmtMode then
     begin
-      if (LKind = 'delimiter.comma') or
-         (LKind = 'delimiter.semicolon') or
-         (LKind = 'delimiter.rparen') or
-         (LKind = 'delimiter.rbracket') then
+      // Comma and semicolon stop at depth <= 0
+      if (LDepth <= 0) and
+         ((LKind = 'delimiter.comma') or
+          (LKind = 'delimiter.semicolon')) then
         Break;
-      // Stop at any custom language keyword
-      if LKind.StartsWith('keyword.') then
+      // Closing delimiters stop only at depth < 0 (unmatched from outer context)
+      if (LDepth < 0) and
+         ((LKind = 'delimiter.rparen') or
+          (LKind = 'delimiter.rbracket')) then
+        Break;
+      // Stop at any custom language keyword at depth <= 0
+      if (LDepth <= 0) and LKind.StartsWith('keyword.') then
         Break;
     end;
 
@@ -192,6 +208,8 @@ begin
       Result := Result + ' ';
     if LKind.StartsWith('string.') then
       Result := Result + '"' + LText + '"'
+    else if LKind = 'cpp.string.char' then
+      Result := Result + '''' + LText + ''''
     else
       Result := Result + LText;
     LNeedSpace := True;
