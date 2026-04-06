@@ -230,7 +230,7 @@ begin
   FOutputProc := AProc;
   FOutputUserData := AUserData;
   // Wire to build output callback
-  FEngine.GetBuild().SetOutputCallback(
+  FEngine.SetOutputCallback(
     procedure(const ALine: string; const AUserData: Pointer)
     begin
       OnBuildOutput(ALine);
@@ -448,7 +448,6 @@ function TMorEngineAPI.RunEmitters(): Boolean;
 var
   LErrors: TErrors;
   LInterp: TMorInterpreter;
-  LBuild: TBuild;
   LBranch: TASTNode;
   LBranchOutput: TCodeOutput;
   LGeneratedPath: string;
@@ -469,7 +468,6 @@ begin
   end;
 
   LInterp := FEngine.GetInterpreter();
-  LBuild := TBuild(FEngine.GetBuild());
 
   // Setup build paths
   LProjectName := '';
@@ -480,12 +478,12 @@ begin
 
   LGeneratedPath := TPath.Combine(FOutputPath, 'generated');
   TDirectory.CreateDirectory(LGeneratedPath);
-  LBuild.SetOutputPath(FOutputPath);
-  LBuild.SetProjectName(LProjectName);
-  LBuild.ClearSourceFiles();
-  LBuild.AddIncludePath(LGeneratedPath);
-  LBuild.AddIncludePath('res/runtime');
-  LBuild.AddSourceFile('res/runtime/mor_runtime.cpp');
+  FEngine.SetOutputPath(FOutputPath);
+  FEngine.SetProjectName(LProjectName);
+  FEngine.ClearSourceFiles();
+  FEngine.AddIncludePath(LGeneratedPath);
+  FEngine.AddIncludePath('res/runtime');
+  FEngine.AddSourceFile('res/runtime/mor_runtime.cpp');
 
   // Pass 1: module branches (index 1+)
   for LI := 1 to FMasterRoot.ChildCount() - 1 do
@@ -506,7 +504,7 @@ begin
       LHeaderPath := TPath.Combine(LGeneratedPath, LBranchName + '.h');
       LSourcePath := TPath.Combine(LGeneratedPath, LBranchName + '.cpp');
       LBranchOutput.SaveToFiles(LHeaderPath, LSourcePath);
-      LBuild.AddSourceFile(LSourcePath);
+      FEngine.AddSourceFile(LSourcePath);
     finally
       LBranchOutput.Free();
     end;
@@ -531,7 +529,7 @@ begin
       LHeaderPath := TPath.Combine(LGeneratedPath, LBranchName + '.h');
       LSourcePath := TPath.Combine(LGeneratedPath, LBranchName + '.cpp');
       LBranchOutput.SaveToFiles(LHeaderPath, LSourcePath);
-      LBuild.AddSourceFile(LSourcePath);
+      FEngine.AddSourceFile(LSourcePath);
     finally
       LBranchOutput.Free();
     end;
@@ -546,7 +544,6 @@ end;
 function TMorEngineAPI.Build(const AOutputPath: string;
   const AAutoRun: Boolean; const ADebug: Boolean): Boolean;
 var
-  LBuild: TBuild;
   LErrors: TErrors;
   LExePath: string;
   LServer: TMetamorfDebugServer;
@@ -562,14 +559,13 @@ begin
     Exit;
   end;
 
-  LBuild := TBuild(FEngine.GetBuild());
   if AOutputPath <> '' then
-    LBuild.SetOutputPath(AOutputPath);
+    FEngine.SetOutputPath(AOutputPath);
 
   // Report build configuration
-  if LBuild.GetTarget() = tpWin64 then
+  if FEngine.GetTarget() = tpWin64 then
   begin
-    if LBuild.GetSubsystem() = stGUI then
+    if FEngine.GetSubsystem() = stGUI then
       FEngine.Status(RSEngineTargetPlatform, [COLOR_CYAN + 'Win64 (GUI)'])
     else
       FEngine.Status(RSEngineTargetPlatform, [COLOR_CYAN + 'Win64 (Console)']);
@@ -577,33 +573,33 @@ begin
   else
     FEngine.Status(RSEngineTargetPlatform, [COLOR_CYAN + 'Linux64']);
 
-  if LBuild.GetBuildMode() = bmExe then
+  if FEngine.GetBuildMode() = bmExe then
     FEngine.Status(RSEngineBuildMode, [COLOR_CYAN + 'Executable'])
-  else if LBuild.GetBuildMode() = bmDll then
+  else if FEngine.GetBuildMode() = bmDll then
     FEngine.Status(RSEngineBuildMode, [COLOR_CYAN + 'DLL'])
   else
     FEngine.Status(RSEngineBuildMode, [COLOR_CYAN + 'Library']);
 
-  if LBuild.GetOptimizeLevel() = olDebug then
+  if FEngine.GetOptimizeLevel() = olDebug then
     FEngine.Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'Debug'])
-  else if LBuild.GetOptimizeLevel() = olReleaseSafe then
+  else if FEngine.GetOptimizeLevel() = olReleaseSafe then
     FEngine.Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'ReleaseSafe'])
-  else if LBuild.GetOptimizeLevel() = olReleaseFast then
+  else if FEngine.GetOptimizeLevel() = olReleaseFast then
     FEngine.Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'ReleaseFast'])
   else
     FEngine.Status(RSEngineOptimizeLevel, [COLOR_CYAN + 'ReleaseSmall']);
-  LBuild.Process(AAutoRun);
+  FEngine.Process(AAutoRun);
 
   Result := not LErrors.HasErrors();
 
   // Launch DAP debug server if requested and build succeeded
-  if Result and ADebug and (LBuild.GetTarget() = tpWin64) then
+  if Result and ADebug and (FEngine.GetTarget() = tpWin64) then
   begin
     LPort := 4711;
     LExePath := TPath.Combine(AOutputPath,
       TPath.Combine('zig-out',
         TPath.Combine('bin',
-          LBuild.GetProjectName() + '.exe')));
+          FEngine.GetProjectName() + '.exe')));
 
     LServer := TMetamorfDebugServer.Create();
     try

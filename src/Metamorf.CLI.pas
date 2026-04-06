@@ -263,7 +263,7 @@ begin
       TUtils.PrintLn(AText);
     end);
 
-  FEngine.GetBuild().SetOutputCallback(
+  FEngine.SetOutputCallback(
     procedure(const ALine: string; const AUserData: Pointer)
     begin
       TUtils.Print(ALine);
@@ -592,7 +592,7 @@ var
   LREPL: TMetamorfDebugREPL;
 begin
   // Debug requires Win64 target
-  if FEngine.GetBuild().GetTarget() <> tpWin64 then
+  if FEngine.GetTarget() <> tpWin64 then
   begin
     TUtils.PrintLn(COLOR_RED +
       'Error: Debugging is only supported for Win64 targets');
@@ -604,7 +604,7 @@ begin
   LExePath := TPath.Combine(FOutputPath,
     TPath.Combine('zig-out',
       TPath.Combine('bin',
-        FEngine.GetBuild().GetProjectName() + '.exe')));
+        FEngine.GetProjectName() + '.exe')));
 
   if not FileExists(LExePath) then
   begin

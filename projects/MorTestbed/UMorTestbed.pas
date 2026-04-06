@@ -46,7 +46,7 @@ begin
       end);
 
     // Print program output (no newline - output drives its own line endings)
-    LEngine.GetBuild().SetOutputCallback(
+    LEngine.SetOutputCallback(
       procedure(const ALine: string; const AUserData: Pointer)
       begin
         TUtils.Print(ALine);
@@ -59,7 +59,7 @@ begin
     if not TFile.Exists(LLangFile) then Exit;
     if not TFile.Exists(LSrcFile) then Exit;
 
-    //LEngine.GetBuild().SetTarget(tpLinux64);
+    //LEngine.SetTarget(tpLinux64);
 
     LEngine.Compile(LLangFile, LSrcFile, 'output', True);
 
@@ -78,8 +78,9 @@ var
 begin
   try
 
-    LNum := 1;
+    //LNum := 8;
     //LNum := 300;
+    LNum := 100;
 
     case LNum of
       // Languages
@@ -125,7 +126,7 @@ begin
     on E: Exception do
     begin
       TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + 'EXCEPTION: ' + E.Message + COLOR_RESET);
+      TUtils.PrintLn(COLOR_RED + 'EXCEPTION: %s', [E.Message]);
     end;
   end;
 

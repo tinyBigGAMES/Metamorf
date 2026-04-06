@@ -86,8 +86,37 @@ type
     procedure CompileBaked(const ASourceFile: string;
       const AOutputPath: string; const AAutoRun: Boolean);
 
+    // Build configuration wrappers
+    procedure SetTarget(const ATarget: TTargetPlatform);
+    function GetTarget(): TTargetPlatform;
+    procedure SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
+    function GetOptimizeLevel(): TOptimizeLevel;
+    procedure SetSubsystem(const ASubsystem: TSubsystemType);
+    function GetSubsystem(): TSubsystemType;
+    procedure SetBuildMode(const ABuildMode: TBuildMode);
+    function GetBuildMode(): TBuildMode;
+    procedure SetOutputCallback(const ACallback: TCaptureConsoleCallback;
+      const AUserData: Pointer = nil);
+    procedure SetOutputPath(const APath: string);
+    function GetOutputPath(): string;
+    procedure SetProjectName(const AProjectName: string);
+    function GetProjectName(): string;
+
+    // Defines
+    procedure SetDefine(const ADefineName: string); overload;
+    procedure SetDefine(const ADefineName: string;
+      const AValue: string); overload;
+
+    // Source/include management
+    procedure AddSourceFile(const ASourceFile: string);
+    procedure ClearSourceFiles();
+    procedure AddIncludePath(const APath: string);
+
+    // Build actions
+    function Process(const AAutoRun: Boolean = True): Boolean;
+    function GetLastExitCode(): DWORD;
+
     // Access to subcomponents
-    function GetBuild(): TBuild;
     function GetInterpreter(): TMorInterpreter;
     function GetErrors(): TErrors;
     function GetMorMasterRoot(): TASTNode;
@@ -559,9 +588,106 @@ begin
   Result := LAST;
 end;
 
-function TMorEngine.GetBuild(): TBuild;
+procedure TMorEngine.SetTarget(const ATarget: TTargetPlatform);
 begin
-  Result := FBuild;
+  FBuild.SetTarget(ATarget);
+end;
+
+function TMorEngine.GetTarget(): TTargetPlatform;
+begin
+  Result := FBuild.GetTarget();
+end;
+
+procedure TMorEngine.SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
+begin
+  FBuild.SetOptimizeLevel(AOptimizeLevel);
+end;
+
+function TMorEngine.GetOptimizeLevel(): TOptimizeLevel;
+begin
+  Result := FBuild.GetOptimizeLevel();
+end;
+
+procedure TMorEngine.SetSubsystem(const ASubsystem: TSubsystemType);
+begin
+  FBuild.SetSubsystem(ASubsystem);
+end;
+
+function TMorEngine.GetSubsystem(): TSubsystemType;
+begin
+  Result := FBuild.GetSubsystem();
+end;
+
+procedure TMorEngine.SetBuildMode(const ABuildMode: TBuildMode);
+begin
+  FBuild.SetBuildMode(ABuildMode);
+end;
+
+function TMorEngine.GetBuildMode(): TBuildMode;
+begin
+  Result := FBuild.GetBuildMode();
+end;
+
+procedure TMorEngine.SetOutputCallback(const ACallback: TCaptureConsoleCallback;
+  const AUserData: Pointer);
+begin
+  FBuild.SetOutputCallback(ACallback, AUserData);
+end;
+
+procedure TMorEngine.SetOutputPath(const APath: string);
+begin
+  FBuild.SetOutputPath(APath);
+end;
+
+function TMorEngine.GetOutputPath(): string;
+begin
+  Result := FBuild.GetOutputPath();
+end;
+
+procedure TMorEngine.SetProjectName(const AProjectName: string);
+begin
+  FBuild.SetProjectName(AProjectName);
+end;
+
+function TMorEngine.GetProjectName(): string;
+begin
+  Result := FBuild.GetProjectName();
+end;
+
+procedure TMorEngine.SetDefine(const ADefineName: string);
+begin
+  FBuild.SetDefine(ADefineName);
+end;
+
+procedure TMorEngine.SetDefine(const ADefineName: string;
+  const AValue: string);
+begin
+  FBuild.SetDefine(ADefineName, AValue);
+end;
+
+procedure TMorEngine.AddSourceFile(const ASourceFile: string);
+begin
+  FBuild.AddSourceFile(ASourceFile);
+end;
+
+procedure TMorEngine.ClearSourceFiles();
+begin
+  FBuild.ClearSourceFiles();
+end;
+
+procedure TMorEngine.AddIncludePath(const APath: string);
+begin
+  FBuild.AddIncludePath(APath);
+end;
+
+function TMorEngine.Process(const AAutoRun: Boolean): Boolean;
+begin
+  Result := FBuild.Process(AAutoRun);
+end;
+
+function TMorEngine.GetLastExitCode(): DWORD;
+begin
+  Result := FBuild.GetLastExitCode();
 end;
 
 function TMorEngine.GetInterpreter(): TMorInterpreter;
