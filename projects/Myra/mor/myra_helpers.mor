@@ -32,6 +32,10 @@ routine resolveType(typeText: string) -> string {
   if typeText == "string" { return "std::string"; }
   if typeText == "wstring" { return "std::wstring"; }
   if typeText == "pointer" { return "void*"; }
+  if startsWith(typeText, "pointer to ") {
+    return resolveType(substr(typeText, 11, len(typeText) - 11)) + "*";
+  }
+  if typeText == "set" or startsWith(typeText, "set ") { return "MorSet"; }
   return typeText;
 }
 

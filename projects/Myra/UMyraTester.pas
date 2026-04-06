@@ -103,7 +103,7 @@ begin
       LTester.RegisterTest(0453, 'test_exe_raylib', False);
 
       //LTester.RunAllTests();
-      LTester.RunTestByIndex(152);
+      LTester.RunTestByIndex(159);
     finally
       LTester.Free();
     end;

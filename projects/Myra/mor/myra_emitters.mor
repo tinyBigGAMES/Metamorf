@@ -209,6 +209,7 @@ emitters {
       let pointee = getAttr(node, "type.pointee");
       let isConst = getAttr(node, "type.pointer_const");
       if pointee != "" {
+        emitLine("struct " + resolveType(pointee) + ";");
         if isConst == "true" {
           emitLine("using " + tname + " = const " + resolveType(pointee) + "*;");
         } else {
@@ -401,7 +402,7 @@ emitters {
     let rname = getAttr(node, "decl.name");
     let retType = getAttr(node, "decl.return_type");
     let sig = buildRoutineSig(node, rname, retType);
-    emitLine(sig + " {");
+    emitLine("virtual " + sig + " {");
     indentIn();
     let bi = 0;
     while bi < child_count() {
@@ -451,6 +452,14 @@ emitters {
 
   // Expression-statement (identifier-led: assignment or call)
   on stmt.expr {
+    emitLine(exprToString(getChild(node, 0)) + ";");
+  }
+
+  on stmt.self_expr {
+    emitLine(exprToString(getChild(node, 0)) + ";");
+  }
+
+  on stmt.parent_expr {
     emitLine(exprToString(getChild(node, 0)) + ";");
   }
 
@@ -747,6 +756,33 @@ emitters {
       return;
     }
 
+    // Method call: child 0 is field_access (obj.method pattern)
+    if child_count() > 0 {
+      let ch0 = getChild(node, 0);
+      let ch0Kind = nodeKind(ch0);
+      if ch0Kind == "expr.field_access" or ch0Kind == "expr.cpp_arrow" {
+        let fieldName = getAttr(ch0, "field.name");
+        let objNode = getChild(ch0, 0);
+        let sep = ".";
+        let objKind = nodeKind(objNode);
+        if objKind == "expr.self" { sep = "->"; }
+        else if objKind == "expr.parent" { sep = "::"; }
+        else if getAttr(ch0, "pointer_access") == "true" { sep = "->"; }
+        if ch0Kind == "expr.cpp_arrow" { sep = "->"; }
+        let margs = "";
+        let mi = 1;
+        let mfirst = true;
+        while mi < child_count() {
+          if not mfirst { margs = margs + ", "; }
+          margs = margs + exprToString(getChild(node, mi));
+          mfirst = false;
+          mi = mi + 1;
+        }
+        emit exprToString(objNode) + sep + fieldName + "(" + margs + ")";
+        return;
+      }
+    }
+
     let args = "";
     let ai = 0;
     let an = child_count();
@@ -787,6 +823,10 @@ emitters {
     let obj = exprToString(getChild(fieldNode, 0));
     let sep = ".";
     if nodeKind(fieldNode) == "expr.cpp_arrow" { sep = "->"; }
+    let objKind = nodeKind(getChild(fieldNode, 0));
+    if objKind == "expr.self" { sep = "->"; }
+    else if objKind == "expr.parent" { sep = "::"; }
+    else if getAttr(fieldNode, "pointer_access") == "true" { sep = "->"; }
     let args = "";
     let ai = 1;
     while ai < child_count() {
@@ -799,7 +839,13 @@ emitters {
 
   on expr.field_access {
     let fieldName = getAttr(node, "field.name");
-    emit exprToString(getChild(node, 0)) + "." + fieldName;
+    let objNode = getChild(node, 0);
+    let sep = ".";
+    let objKind = nodeKind(objNode);
+    if objKind == "expr.self" { sep = "->"; }
+    else if objKind == "expr.parent" { sep = "::"; }
+    else if getAttr(node, "pointer_access") == "true" { sep = "->"; }
+    emit exprToString(objNode) + sep + fieldName;
   }
 
   on expr.array_index {
@@ -871,23 +917,39 @@ emitters {
     emit "Super";
   }
 
+  // Pointer type cast: pointer to TypeName(expr) -> (TypeName*)(expr)
+  on expr.pointer_cast {
+    let ptype = getAttr(node, "pointee_type");
+    let isConst = getAttr(node, "const");
+    emit "(";
+    if isConst == "true" {
+      emit "const ";
+    }
+    emit ptype + "*)(";
+    emit exprToString(getChild(node, 0));
+    emit ")";
+  }
+
   // Set literal: [elem, elem..elem, ...]
   on expr.set_literal {
-    let result = "mor_set({";
     let si = 0;
     let sn = child_count();
-    while si < sn {
-      let elem = getChild(node, si);
-      if si > 0 { result = result + ", "; }
-      if childCount(elem) == 2 {
-        // Range element: expand via helper
-        result = result + "mor_range(" + exprToString(getChild(elem, 0)) + ", " + exprToString(getChild(elem, 1)) + ")";
-      } else {
-        result = result + exprToString(getChild(elem, 0));
+    if sn == 0 {
+      emit "MorSet()";
+    } else {
+      let result = "";
+      while si < sn {
+        let elem = getChild(node, si);
+        if si > 0 { result = result + " + "; }
+        if childCount(elem) == 2 {
+          result = result + "mor_range(" + exprToString(getChild(elem, 0)) + ", " + exprToString(getChild(elem, 1)) + ")";
+        } else {
+          result = result + "mor_elem(" + exprToString(getChild(elem, 0)) + ")";
+        }
+        si = si + 1;
       }
-      si = si + 1;
+      emit result;
     }
-    emit result + "})";
   }
 
   on expr.type_ref {

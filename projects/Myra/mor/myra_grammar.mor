@@ -74,6 +74,21 @@ grammar {
   rule expr.parent {
     expect keyword.parent;
   }
+
+  // Pointer type cast: pointer to [const] TypeName(expr)
+  rule expr.pointer_cast {
+    expect keyword.pointer;
+    let nd = getResultNode();
+    requireToken("keyword.to");
+    if matchToken("keyword.const") {
+      setAttr(nd, "const", "true");
+    }
+    setAttr(nd, "pointee_type", collectTypeText());
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+  }
+
   rule expr.varargs {
     expect keyword.varargs;
     if matchToken("delimiter.dot") {
@@ -935,6 +950,24 @@ grammar {
   rule stmt.expr {
     let nd = getResultNode();
     addChild(nd, parseExpr(0));
+    matchToken("delimiter.semicolon");
+  }
+
+  // Self-led expression-statement (self.Field := value;)
+  rule stmt.self_expr {
+    expect keyword.self;
+    let nd = getResultNode();
+    let selfNode = createNode("expr.self");
+    addChild(nd, parseExprFrom(selfNode, 0));
+    matchToken("delimiter.semicolon");
+  }
+
+  // Parent-led expression-statement (parent.Method();)
+  rule stmt.parent_expr {
+    expect keyword.parent;
+    let nd = getResultNode();
+    let parentNode = createNode("expr.parent");
+    addChild(nd, parseExprFrom(parentNode, 0));
     matchToken("delimiter.semicolon");
   }
 

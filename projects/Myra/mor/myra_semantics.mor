@@ -79,7 +79,13 @@ semantics {
   on stmt.type_block  { visit children; }
   on stmt.type_decl   {
     setAttr(node, "tname", getAttr(node, "decl.name"));
-    declare @tname as type;
+    let tkind = getAttr(node, "type.kind");
+    if tkind == "pointer" {
+      setAttr(node, "type_base", "pointer to " + getAttr(node, "type.pointee"));
+      declare @tname as type typed @type_base;
+    } else {
+      declare @tname as type;
+    }
     visit children;
   }
 
@@ -135,6 +141,13 @@ semantics {
     setAttr(node, "rname", rname);
     setAttr(node, "sig", sig);
     declare @sig as routine;
+    // Store return type for pointer-access resolution
+    let retType = getAttr(node, "decl.return_type");
+    if retType != "" {
+      setAttr(node, "retkey", "__rettype:" + rname);
+      setAttr(node, "rtype", retType);
+      declare @retkey as routine typed @rtype;
+    }
     // Mark variadic routines for call-site stamping
     if getAttr(node, "decl.variadic") == "true" {
       setAttr(node, "va_marker", "__va:" + rname);
@@ -147,6 +160,12 @@ semantics {
 
   on stmt.method_decl {
     setAttr(node, "mname", getAttr(node, "decl.name"));
+    let retType = getAttr(node, "decl.return_type");
+    if retType != "" {
+      setAttr(node, "retkey", "__rettype:" + getAttr(node, "decl.name"));
+      setAttr(node, "mret", retType);
+      declare @retkey as method typed @mret;
+    }
     scope @mname {
       visit children;
     }
@@ -154,7 +173,8 @@ semantics {
 
   on stmt.param_decl {
     setAttr(node, "pname", getAttr(node, "param.name"));
-    declare @pname as parameter;
+    setAttr(node, "ptype", getAttr(node, "param.type_text"));
+    declare @pname as parameter typed @ptype;
   }
 
   // Statement handlers: visit children
@@ -205,7 +225,45 @@ semantics {
   on expr.unary_plus   { visit children; }
   on expr.address_of   { visit children; }
   on expr.grouped      { visit children; }
-  on expr.field_access { visit children; }
+  on expr.field_access {
+    visit children;
+    let ch0 = getChild(node, 0);
+    let ch0Kind = nodeKind(ch0);
+    // Pointer variable (direct or via type alias)
+    if ch0Kind == "expr.ident" {
+      let objType = lookupSymbolType(getAttr(ch0, "name"));
+      if contains(objType, "pointer to") {
+        setAttr(node, "pointer_access", "true");
+      } else {
+        let resolvedType = lookupSymbolType(objType);
+        if contains(resolvedType, "pointer to") {
+          setAttr(node, "pointer_access", "true");
+        }
+      }
+    }
+    // Call returning a pointer type
+    else if ch0Kind == "expr.call" {
+      let callCh0 = getChild(ch0, 0);
+      let callCh0Kind = nodeKind(callCh0);
+      let methodName = "";
+      if callCh0Kind == "expr.field_access" {
+        methodName = getAttr(callCh0, "field.name");
+      } else if callCh0Kind == "expr.ident" {
+        methodName = getAttr(callCh0, "name");
+      }
+      if methodName != "" {
+        let retType = lookupSymbolType("__rettype:" + methodName);
+        if contains(retType, "pointer to") {
+          setAttr(node, "pointer_access", "true");
+        } else if retType != "" {
+          let resolvedRet = lookupSymbolType(retType);
+          if contains(resolvedRet, "pointer to") {
+            setAttr(node, "pointer_access", "true");
+          }
+        }
+      }
+    }
+  }
   on expr.array_index  { visit children; }
   on expr.deref        { visit children; }
   on expr.shl          { visit children; }
@@ -224,5 +282,8 @@ semantics {
   on expr.bool         { }
   on expr.self         { }
   on expr.parent       { }
+  on expr.pointer_cast { visit children; }
+  on stmt.self_expr    { visit children; }
+  on stmt.parent_expr  { visit children; }
 
 } // end semantics

@@ -355,7 +355,7 @@ begin
         // Check for closing delimiter
         if (LStyle.CloseText <> '') and (Current() = LStyle.CloseText[1]) then
         begin
-          if LNoEscape or (LText = '') or (LText[Length(LText)] <> LStyle.CloseText[1]) then
+          if (not LNoEscape) or (LText = '') or (LText[Length(LText)] <> LStyle.CloseText[1]) then
           begin
             Advance();
             AToken := MakeToken(LStyle.Kind, LText, LStartLine, LStartCol);

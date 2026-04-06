@@ -61,6 +61,8 @@ type
 
     // Parsing entry points
     function ParseExpression(const AMinPower: Integer): TASTNode;
+    function ParseExpressionFrom(const ALeft: TASTNode;
+      const AMinPower: Integer): TASTNode;
     function ParseStatement(): TASTNode;
     function ParseProgram(const ATokens: TList<TToken>;
       const AFilename: string = ''): TASTNode;
@@ -245,6 +247,72 @@ begin
         LLeft := FInterp.ExecuteGrammarRule(LInfixEntry.RuleAST, LLeft);
         FInterp.SetCurrentInfixPower(0);
         if FPos = LSavedPos then Break; // stuck protection
+      end
+      else
+        Break;
+    end;
+
+    Result := LLeft;
+  finally
+    FInterp.SetActiveParser(LSavedParser);
+  end;
+end;
+
+function TGenericParser.ParseExpressionFrom(const ALeft: TASTNode;
+  const AMinPower: Integer): TASTNode;
+var
+  LInfixEntry: TInfixEntry;
+  LNativeInfixEntry: TNativeInfixEntry;
+  LLeft: TASTNode;
+  LInfixRules: TDictionary<string, TInfixEntry>;
+  LNativeInfixRules: TDictionary<string, TNativeInfixEntry>;
+  LCurrentKind: string;
+  LSavedParser: TObject;
+  LSavedPos: Integer;
+begin
+  LInfixRules := FInterp.GetInfixRules();
+  LNativeInfixRules := FInterp.GetNativeInfixRules();
+  LLeft := ALeft;
+
+  // Set active parser so interpreter/native handlers can access us
+  LSavedParser := FInterp.GetActiveParser();
+  FInterp.SetActiveParser(Self);
+  try
+    // Infix loop (same as ParseExpression, but prefix already handled)
+    while not AtEnd() do
+    begin
+      LCurrentKind := Current().Kind;
+
+      // Check native infix handlers first
+      if LNativeInfixRules.TryGetValue(LCurrentKind, LNativeInfixEntry) then
+      begin
+        if LNativeInfixEntry.Assoc = 'right' then
+        begin
+          if LNativeInfixEntry.Power < AMinPower then Break;
+        end
+        else
+        begin
+          if LNativeInfixEntry.Power <= AMinPower then Break;
+        end;
+        LSavedPos := FPos;
+        LLeft := LNativeInfixEntry.Handler(LLeft);
+        if FPos = LSavedPos then Break;
+      end
+      else if LInfixRules.TryGetValue(LCurrentKind, LInfixEntry) then
+      begin
+        if LInfixEntry.Assoc = 'right' then
+        begin
+          if LInfixEntry.Power < AMinPower then Break;
+        end
+        else
+        begin
+          if LInfixEntry.Power <= AMinPower then Break;
+        end;
+        LSavedPos := FPos;
+        FInterp.SetCurrentInfixPower(LInfixEntry.Power);
+        LLeft := FInterp.ExecuteGrammarRule(LInfixEntry.RuleAST, LLeft);
+        FInterp.SetCurrentInfixPower(0);
+        if FPos = LSavedPos then Break;
       end
       else
         Break;

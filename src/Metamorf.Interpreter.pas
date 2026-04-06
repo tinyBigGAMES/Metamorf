@@ -1891,6 +1891,94 @@ begin
   end;
 end;
 
+{ Format String Escape }
+
+// Escape literal braces in a C++ std::format string.
+// Preserves format placeholders ({}, {:spec}, {0}, {0:spec}).
+// Doubles lone { or } that aren't part of a placeholder.
+function MorFmtEscape(const AStr: string): string;
+var
+  LI: Integer;
+  LJ: Integer;
+  LLen: Integer;
+begin
+  Result := '';
+  LI := 1;
+  LLen := Length(AStr);
+  while LI <= LLen do
+  begin
+    if AStr[LI] = '{' then
+    begin
+      if (LI + 1 <= LLen) and (AStr[LI + 1] = '}') then
+      begin
+        // {} placeholder
+        Result := Result + '{}';
+        Inc(LI, 2);
+      end
+      else if (LI + 1 <= LLen) and (AStr[LI + 1] = ':') then
+      begin
+        // {:spec} placeholder - copy until closing }
+        Result := Result + '{';
+        Inc(LI);
+        while (LI <= LLen) and (AStr[LI] <> '}') do
+        begin
+          Result := Result + AStr[LI];
+          Inc(LI);
+        end;
+        if LI <= LLen then
+        begin
+          Result := Result + '}';
+          Inc(LI);
+        end;
+      end
+      else if (LI + 1 <= LLen) and (AStr[LI + 1] >= '0') and (AStr[LI + 1] <= '9') then
+      begin
+        // {N...} - scan digits, then must see } or : to be valid
+        LJ := LI + 1;
+        while (LJ <= LLen) and (AStr[LJ] >= '0') and (AStr[LJ] <= '9') do
+          Inc(LJ);
+        if (LJ <= LLen) and ((AStr[LJ] = '}') or (AStr[LJ] = ':')) then
+        begin
+          // Valid {N} or {N:spec} - copy until closing }
+          Result := Result + '{';
+          Inc(LI);
+          while (LI <= LLen) and (AStr[LI] <> '}') do
+          begin
+            Result := Result + AStr[LI];
+            Inc(LI);
+          end;
+          if LI <= LLen then
+          begin
+            Result := Result + '}';
+            Inc(LI);
+          end;
+        end
+        else
+        begin
+          // Not a valid placeholder (e.g., {1,3,5})
+          Result := Result + '{{';
+          Inc(LI);
+        end;
+      end
+      else
+      begin
+        Result := Result + '{{';
+        Inc(LI);
+      end;
+    end
+    else if AStr[LI] = '}' then
+    begin
+      Result := Result + '}}';
+      Inc(LI);
+    end
+    else
+    begin
+      Result := Result + AStr[LI];
+      Inc(LI);
+    end;
+  end;
+end;
+
 { Built-in Functions }
 
 function TMorInterpreter.CallBuiltin(const AName: string;
@@ -2173,6 +2261,15 @@ begin
       Result := TValue.From<Int64>(0);
   end
 
+  // fmtEscape(s) -> string -- escape literal braces for C++ std::format
+  else if AName = 'fmtEscape' then
+  begin
+    if Length(AArgs) > 0 then
+      Result := TValue.From<string>(MorFmtEscape(MorToString(AArgs[0])))
+    else
+      Result := TValue.From<string>('');
+  end
+
   // Diagnostics
   // error(msg)
   else if AName = 'error' then
@@ -2284,6 +2381,22 @@ begin
       else
         Result := TValue.From<TASTNode>(
           TGenericParser(FActiveParser).ParseExpression(0));
+    end
+    else
+      Result := TValue.Empty;
+  end
+
+  // parseExprFrom(leftNode, power) -> node
+  // Continues infix expression parsing from a pre-built left-hand node.
+  // Used when a rule has already consumed the prefix token (e.g. expect keyword.self).
+  else if AName = 'parseExprFrom' then
+  begin
+    if Assigned(FActiveParser) and (Length(AArgs) >= 2) then
+    begin
+      Result := TValue.From<TASTNode>(
+        TGenericParser(FActiveParser).ParseExpressionFrom(
+          AArgs[0].AsType<TASTNode>(),
+          AArgs[1].AsInt64()));
     end
     else
       Result := TValue.Empty;

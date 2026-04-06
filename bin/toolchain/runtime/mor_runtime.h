@@ -14,6 +14,8 @@
 
 #include <string>
 #include <cstdint>
+#include <algorithm>
+#include <type_traits>
 
 /*******************************************************************************
  * Exception Codes (Platform-Independent)
@@ -152,6 +154,20 @@ void* mor_resizemem(void* ptr, size_t size);
  */
 void mor_freemem(void* ptr);
 
+/**
+ * Create (allocate and default-construct) a typed object.
+ * Works for both classes and records. The variable must be a pointer type.
+ * @param p Pointer variable to receive the new instance
+ */
+#define mor_create(p) ((p) = new std::remove_pointer_t<decltype(p)>())
+
+/**
+ * Destroy (delete and null) a typed object.
+ * Works for both classes and records. Safe to call on nullptr.
+ * @param p Pointer variable to delete and set to nullptr
+ */
+#define mor_destroy(p) do { delete (p); (p) = nullptr; } while(0)
+
 /*******************************************************************************
  * Unit Testing API
  ******************************************************************************/
@@ -263,5 +279,107 @@ struct mor_varargs {
     va_start((va).ap, count_param); \
     (va).count = count_param; \
     (va).active = true
+
+
+/*******************************************************************************
+ * Set Support (bitmask-based, up to 64 elements with base offset)
+ ******************************************************************************/
+
+/**
+ * MorSet - Bitmask-based set type supporting up to 64 elements.
+ *
+ * Elements are stored relative to a base offset, allowing sets like
+ * set of 100..163 to work within a 64-bit bitmask.
+ *
+ * Arithmetic operators are overloaded for set semantics:
+ *   + = union (bitwise OR)
+ *   * = intersection (bitwise AND)
+ *   - = difference (AND NOT)
+ */
+struct MorSet {
+  uint64_t bits;
+  int32_t base;
+
+  MorSet() : bits(0), base(0) {}
+  MorSet(uint64_t b, int32_t base) : bits(b), base(base) {}
+
+  // Union: reconcile bases and OR
+  MorSet operator+(const MorSet& rhs) const {
+    if (bits == 0) return rhs;
+    if (rhs.bits == 0) return *this;
+    int32_t nb = std::min(base, rhs.base);
+    return MorSet((bits << (base - nb)) | (rhs.bits << (rhs.base - nb)), nb);
+  }
+
+  // Intersection: reconcile bases and AND
+  MorSet operator*(const MorSet& rhs) const {
+    if (bits == 0 || rhs.bits == 0) return MorSet();
+    int32_t nb = std::min(base, rhs.base);
+    return MorSet((bits << (base - nb)) & (rhs.bits << (rhs.base - nb)), nb);
+  }
+
+  // Difference: reconcile bases and AND NOT
+  MorSet operator-(const MorSet& rhs) const {
+    if (bits == 0) return MorSet();
+    if (rhs.bits == 0) return *this;
+    int32_t nb = std::min(base, rhs.base);
+    return MorSet((bits << (base - nb)) & ~(rhs.bits << (rhs.base - nb)), nb);
+  }
+
+  // Equality: reconcile bases and compare
+  bool operator==(const MorSet& rhs) const {
+    if (bits == 0 && rhs.bits == 0) return true;
+    if (bits == 0 || rhs.bits == 0) return false;
+    int32_t nb = std::min(base, rhs.base);
+    return (bits << (base - nb)) == (rhs.bits << (rhs.base - nb));
+  }
+  bool operator!=(const MorSet& rhs) const { return !(*this == rhs); }
+
+  // Assignment from uint64_t (base-0 set)
+  MorSet& operator=(uint64_t b) { bits = b; base = 0; return *this; }
+
+  // Conversion to integer types for casting
+  explicit operator int8_t() const { return static_cast<int8_t>(bits); }
+  explicit operator int16_t() const { return static_cast<int16_t>(bits); }
+  explicit operator int32_t() const { return static_cast<int32_t>(bits); }
+  explicit operator int64_t() const { return static_cast<int64_t>(bits); }
+  explicit operator uint8_t() const { return static_cast<uint8_t>(bits); }
+  explicit operator uint16_t() const { return static_cast<uint16_t>(bits); }
+  explicit operator uint32_t() const { return static_cast<uint32_t>(bits); }
+  explicit operator uint64_t() const { return bits; }
+};
+
+/**
+ * Create a single-element set from an element value.
+ * Elements 0..63 use base=0 (traditional bitmask).
+ * Elements >= 64 use element value as base (offset sets).
+ */
+inline MorSet mor_elem(int32_t val) {
+  if (val < 64) {
+    return MorSet(1ULL << val, 0);
+  } else {
+    return MorSet(1ULL, val);
+  }
+}
+
+/**
+ * Create a set for a range of elements [low..high].
+ * Ranges starting < 64 use base=0; ranges >= 64 use low as base.
+ */
+inline MorSet mor_range(int32_t low, int32_t high) {
+  int32_t b = (low < 64) ? 0 : low;
+  uint64_t r = 0;
+  for (int32_t i = low; i <= high; i++) r |= (1ULL << (i - b));
+  return MorSet(r, b);
+}
+
+/**
+ * Test whether an element is in a set.
+ */
+inline bool mor_contains(MorSet s, int32_t elem) {
+  int32_t bit = elem - s.base;
+  if (bit < 0 || bit >= 64) return false;
+  return (s.bits & (1ULL << bit)) != 0;
+}
 
 #endif /* MOR_RUNTIME_H */

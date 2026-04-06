@@ -236,6 +236,7 @@ types {
   type string   = "type.string";
   type wstring  = "type.wstring";
   type pointer  = "type.pointer";
+  type set      = "type.set";
 
   // Type mappings: internal kind -> C++ output type
   map "type.int8"    -> "int8_t";
@@ -254,6 +255,7 @@ types {
   map "type.string"  -> "std::string";
   map "type.wstring" -> "std::wstring";
   map "type.pointer" -> "void*";
+  map "type.set"     -> "MorSet";
 
   // Literal type mappings: AST node kind -> type kind
   literal "expr.integer" = "type.int32";

@@ -45,7 +45,7 @@ begin
   // Test 8-bit set
   writeln("Testing 8-bit set (0..7)...");
   small := [1, 3, 5];
-  writeln("{1,3,5} raw: {}", int32(small));
+  writeln("{{1,3,5}} raw: {}", int32(small));
   
   if 1 in small then
     writeln("1 in small: true");
@@ -71,9 +71,9 @@ begin
   writeln("Testing 32-bit set (0..31)...");
   medium := [1, 15, 31];
   if 1 in medium then
-    write("{1,15,31} in medium: true");
+    write("{{1,15,31}} in medium: true");
   else
-    write("{1,15,31} in medium: false");
+    write("{{1,15,31}} in medium: false");
   end;
   if 15 in medium then
     write(" true");
