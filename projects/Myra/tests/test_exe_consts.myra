@@ -1,0 +1,19 @@
+﻿/* EXPECT:
+Myra Test
+100
+1
+*/
+
+// test_exe_consts — Constant declarations
+module exe test_exe_consts;
+
+const
+  MaxItems: int32 = 100;
+  AppName = "Myra Test";
+  Version = 1;
+
+begin
+  writeln("{}", AppName);
+  writeln("{}", MaxItems);
+  writeln("{}", Version);
+end.

@@ -1,0 +1,45 @@
+/* EXPECT:
+1
+2
+3
+4
+5
+5
+4
+3
+2
+1
+55
+5
+*/
+
+// test_exe_loops — For, while, repeat loops
+module exe test_exe_loops;
+
+var
+  i: int32;
+  sum: int32;
+
+begin
+  for i := 1 to 5 do
+    writeln("{}", i);
+  end;
+
+  for i := 5 downto 1 do
+    writeln("{}", i);
+  end;
+
+  sum := 0;
+  i := 1;
+  while i <= 10 do
+    sum := sum + i;
+    i := i + 1;
+  end;
+  writeln("{}", sum);
+
+  i := 0;
+  repeat
+    i := i + 1;
+  until i = 5;
+  writeln("{}", i);
+end.

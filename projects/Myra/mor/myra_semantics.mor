@@ -1,0 +1,228 @@
+// ===========================================================================
+//  Myra_semantics.mor -- Semantic analysis for Myra
+//
+//  Handles:
+//    Module scoping and build mode configuration
+//    Module compilation for imports
+//    Symbol declaration (variables, constants, types, routines, parameters)
+//    Exported attribute stamping
+//    Overload detection with signature-based declaration
+//    Scope management for routines and methods
+//    Visit-through handlers for all statement and expression nodes
+// ===========================================================================
+
+semantics {
+
+  on program.root {
+    scope "global" {
+      visit children;
+    }
+  }
+
+  // Module: set build mode, scope, visit
+  on stmt.module {
+    let kind = getAttr(node, "module.kind");
+    if kind == "exe" { setBuildMode("exe"); }
+    else if kind == "lib" { setBuildMode("lib"); }
+    else if kind == "dll" { setBuildMode("dll"); }
+    let mname = getAttr(node, "module.name");
+    setAttr(node, "mname", mname);
+    scope @mname {
+      visit children;
+    }
+  }
+
+  // Import item: trigger module compilation
+  on stmt.import_item {
+    setModuleExtension("myra");
+    compileModule(getAttr(node, "import.name"));
+  }
+
+  on stmt.import_clause { visit children; }
+
+  // Directive semantics (no-op; configuration wired in emitters)
+  on stmt.directive_optimize    { }
+  on stmt.directive_subsystem   { }
+  on stmt.directive_target      { }
+  on stmt.directive_addverinfo  { }
+  on stmt.directive_vimajor     { }
+  on stmt.directive_viminor     { }
+  on stmt.directive_vipatch     { }
+  on stmt.directive_viproductname { }
+  on stmt.directive_videscription { }
+  on stmt.directive_vifilename  { }
+  on stmt.directive_vicompanyname { }
+  on stmt.directive_vicopyright { }
+  on stmt.directive_exeicon     { }
+  on stmt.directive_copydll     { }
+  on stmt.directive_linklibrary { }
+  on stmt.directive_librarypath { }
+  on stmt.directive_modulepath  { }
+  on stmt.directive_includepath { }
+  on stmt.directive_breakpoint  { }
+  on stmt.directive_message     { }
+
+  // Declaration semantics
+  on stmt.var_block  { visit children; }
+  on stmt.var_decl   {
+    setAttr(node, "vname", getAttr(node, "var.name"));
+    setAttr(node, "vtype", getAttr(node, "var.type_text"));
+    declare @vname as variable typed @vtype;
+    visit children;
+  }
+  on stmt.const_block { visit children; }
+  on stmt.const_decl  {
+    setAttr(node, "cname", getAttr(node, "const.name"));
+    declare @cname as constant;
+    visit children;
+  }
+  on stmt.type_block  { visit children; }
+  on stmt.type_decl   {
+    setAttr(node, "tname", getAttr(node, "decl.name"));
+    declare @tname as type;
+    visit children;
+  }
+
+  // Anonymous overlay/record inside type definitions
+  on stmt.anon_overlay { visit children; }
+  on stmt.anon_record  { visit children; }
+  on stmt.field_decl   { visit children; }
+  on stmt.choices_value { }
+
+  // Exported: stamp exported attributes on child
+  on stmt.exported {
+    let n = child_count();
+    if n > 0 {
+      let ch = getChild(node, 0);
+      let chKind = nodeKind(ch);
+      if chKind == "stmt.routine_decl" {
+        setAttr(ch, "decl.exported", "true");
+      } else if chKind == "stmt.var_block" {
+        let vi = 0;
+        while vi < childCount(ch) {
+          let vch = getChild(ch, vi);
+          if nodeKind(vch) == "stmt.var_decl" {
+            setAttr(vch, "var.exported", "true");
+          }
+          vi = vi + 1;
+        }
+      }
+    }
+    visit children;
+  }
+
+  // Routine: overload detection, symbol declaration, scoping
+  on stmt.routine_decl {
+    let rname = getAttr(node, "decl.name");
+    // Build signature key: "Name(type1,type2)"
+    let sig = rname + "(";
+    let first = true;
+    let pi = 0;
+    while pi < child_count() {
+      let pch = getChild(node, pi);
+      if nodeKind(pch) == "stmt.param_decl" {
+        if not first { sig = sig + ","; }
+        sig = sig + getAttr(pch, "param.type_text");
+        first = false;
+      }
+      pi = pi + 1;
+    }
+    sig = sig + ")";
+    // Overload detection
+    if symbolExistsWithPrefix(rname + "(") {
+      demoteCLinkageForPrefix(rname + "(");
+    }
+    setAttr(node, "rname", rname);
+    setAttr(node, "sig", sig);
+    declare @sig as routine;
+    // Mark variadic routines for call-site stamping
+    if getAttr(node, "decl.variadic") == "true" {
+      setAttr(node, "va_marker", "__va:" + rname);
+      declare @va_marker as variable;
+    }
+    scope @rname {
+      visit children;
+    }
+  }
+
+  on stmt.method_decl {
+    setAttr(node, "mname", getAttr(node, "decl.name"));
+    scope @mname {
+      visit children;
+    }
+  }
+
+  on stmt.param_decl {
+    setAttr(node, "pname", getAttr(node, "param.name"));
+    declare @pname as parameter;
+  }
+
+  // Statement handlers: visit children
+  on stmt.begin_block  { visit children; }
+  on stmt.module_body  { visit children; }
+  on stmt.then_branch  { visit children; }
+  on stmt.else_branch  { visit children; }
+  on stmt.if           { visit children; }
+  on stmt.while        { visit children; }
+  on stmt.for          { visit children; }
+  on stmt.repeat       { visit children; }
+  on stmt.return       { visit children; }
+  on stmt.guard        { visit children; }
+  on stmt.guard_body   { visit children; }
+  on stmt.except_block { visit children; }
+  on stmt.finally_block { visit children; }
+  on stmt.match        { visit children; }
+  on stmt.match_arm    { visit children; }
+  on stmt.match_label  { visit children; }
+  on stmt.match_else   { visit children; }
+  on stmt.writeln      { visit children; }
+  on stmt.write        { visit children; }
+
+  // Memory management and exception statements
+  on stmt.create              { visit children; }
+  on stmt.destroy             { visit children; }
+  on stmt.getmem              { visit children; }
+  on stmt.freemem             { visit children; }
+  on stmt.resizemem           { visit children; }
+  on stmt.setlength           { visit children; }
+  on stmt.raiseexception      { visit children; }
+  on stmt.raiseexceptioncode  { visit children; }
+
+  // Expression handlers
+  on expr.assign       { visit children; }
+  on expr.call {
+    let cname = getAttr(node, "call.name");
+    if cname != "" {
+      if symbolExistsWithPrefix("__va:" + cname) {
+        setAttr(node, "call.variadic", "true");
+      }
+    }
+    visit children;
+  }
+  on expr.binary       { visit children; }
+  on expr.not          { visit children; }
+  on expr.negate       { visit children; }
+  on expr.unary_plus   { visit children; }
+  on expr.address_of   { visit children; }
+  on expr.grouped      { visit children; }
+  on expr.field_access { visit children; }
+  on expr.array_index  { visit children; }
+  on expr.deref        { visit children; }
+  on expr.shl          { visit children; }
+  on expr.shr          { visit children; }
+  on expr.in           { visit children; }
+  on expr.set_literal  { visit children; }
+  on expr.set_element  { visit children; }
+  on expr.varargs      { }
+  on expr.type_ref     { }
+  on expr.ident        { }
+  on expr.integer      { }
+  on expr.float        { }
+  on expr.cstring      { }
+  on expr.wstring      { }
+  on expr.nil          { }
+  on expr.bool         { }
+  on expr.self         { }
+  on expr.parent       { }
+
+} // end semantics

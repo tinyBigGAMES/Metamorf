@@ -1,0 +1,161 @@
+﻿/*===============================================================================
+  Myra Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myra.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module exe test_exe_sdl3_image;
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_image.h>
+
+@includepath "../libs/SDL3/include"
+@copydll "../libs/SDL3/bin/SDL3.dll"
+@copydll "../libs/SDL3/bin/SDL3_image.dll"
+@linklibrary "SDL3"
+@linklibrary "SDL3_image"
+@exeicon "res/assets/icons/pax.ico"
+
+const
+  CScreenWidth = 1280;
+  CScreenHeight = 720;
+  CWindowTitle = "Myra + SDL3_image Demo";
+
+var
+  LWindow: pointer to SDL_Window;
+  LRenderer: pointer to SDL_Renderer;
+  LTexture: pointer to SDL_Texture;
+  LEvent: SDL_Event;
+  LRunning: boolean;
+  LHue: float32;
+  LLastTime: uint64;
+  LCurrentTime: uint64;
+  LDeltaTime: float32;
+  LR: uint8;
+  LG: uint8;
+  LB: uint8;
+  LRect: SDL_FRect;
+  LTexW: float32;
+  LTexH: float32;
+
+routine HsvToRgb(const AH: float32; const ASat: float32; const AV: float32; var AR: uint8; var AG: uint8; var AB: uint8);
+var
+  LI: int32;
+  LF: float32;
+  LP: float32;
+  LQ: float32;
+  LT: float32;
+  LR: float32;
+  LG: float32;
+  LB: float32;
+begin
+  LI := int32(AH * 6.0);
+  LF := AH * 6.0 - float32(LI);
+  LP := AV * (1.0 - ASat);
+  LQ := AV * (1.0 - LF * ASat);
+  LT := AV * (1.0 - (1.0 - LF) * ASat);
+  
+  match LI mod 6 of
+    0: LR := AV; LG := LT; LB := LP;
+    1: LR := LQ; LG := AV; LB := LP;
+    2: LR := LP; LG := AV; LB := LT;
+    3: LR := LP; LG := LQ; LB := AV;
+    4: LR := LT; LG := LP; LB := AV;
+  else
+    LR := AV; LG := LP; LB := LQ;
+  end;
+  
+  AR := uint8(LR * 255.0);
+  AG := uint8(LG * 255.0);
+  AB := uint8(LB * 255.0);
+end;
+
+begin
+  LWindow := nil;
+  LRenderer := nil;
+  LTexture := nil;
+  LRunning := true;
+  LHue := 0.0;
+
+  if not SDL_Init(SDL_INIT_VIDEO) then
+    writeln("failed to init SDL");
+    SDL_Quit();
+  end;
+  
+  LWindow := SDL_CreateWindow(CWindowTitle, CScreenWidth, CScreenHeight, 0);
+  if LWindow = nil then
+    writeln("failed to create window");
+    SDL_Quit();
+    return 1;
+  end;
+  
+  LRenderer := SDL_CreateRenderer(LWindow, nil);
+  if LRenderer = nil then
+    writeln("failed to create renderer");
+    SDL_DestroyWindow(LWindow);
+    SDL_Quit();
+    return 1;
+  end;
+  
+  // Load texture using SDL3_image
+  LTexture := IMG_LoadTexture(LRenderer, "../../../res/assets/images/logo.png");
+  if LTexture = nil then
+    writeln("failed to load image");
+    SDL_DestroyRenderer(LRenderer);
+    SDL_DestroyWindow(LWindow);
+    SDL_Quit();
+    return 1;
+  end;
+  
+  // Get texture dimensions
+  SDL_GetTextureSize(LTexture, address of LTexW, address of LTexH);
+  
+  LLastTime := SDL_GetPerformanceCounter();
+  
+  while LRunning do
+    while SDL_PollEvent(address of LEvent) do
+      if LEvent.type = SDL_EVENT_QUIT then
+        LRunning := false;
+      end;
+      if LEvent.type = SDL_EVENT_KEY_DOWN then
+        if LEvent.key.key = SDLK_ESCAPE then
+          LRunning := false;
+        end;
+      end;
+    end;
+    
+    LCurrentTime := SDL_GetPerformanceCounter();
+    LDeltaTime := float32(LCurrentTime - LLastTime) / float32(SDL_GetPerformanceFrequency());
+    LLastTime := LCurrentTime;
+    
+    // Animate background hue
+    LHue := LHue + LDeltaTime * 0.1;
+    if LHue > 1.0 then
+      LHue := LHue - 1.0;
+    end;
+    
+    // Clear with animated background color
+    HsvToRgb(LHue, 0.3, 0.2, LR, LG, LB);
+    SDL_SetRenderDrawColor(LRenderer, LR, LG, LB, 255);
+    SDL_RenderClear(LRenderer);
+    
+    // Render texture centered on screen
+    LRect.x := (float32(CScreenWidth) - LTexW) / 2.0;
+    LRect.y := (float32(CScreenHeight) - LTexH) / 2.0;
+    LRect.w := LTexW;
+    LRect.h := LTexH;
+    SDL_RenderTexture(LRenderer, LTexture, nil, address of LRect);
+    
+    SDL_RenderPresent(LRenderer);
+  end;
+  
+  SDL_DestroyTexture(LTexture);
+  SDL_DestroyRenderer(LRenderer);
+  SDL_DestroyWindow(LWindow);
+  SDL_Quit();
+end.

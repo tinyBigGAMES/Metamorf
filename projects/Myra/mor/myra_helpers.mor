@@ -1,0 +1,440 @@
+// ===========================================================================
+//  Myra_helpers.mor -- Shared routines and fragments for Myra
+//
+//  Helper routines used by grammar, semantics, and emitters:
+//    resolveType()               Map Myra type names to C++ types
+//    collectTypeText()           Collect compound type text from token stream
+//    emitBlock()                 Walk children and emit each
+//    buildRoutineSig()           Build C++ function signature string
+//    parseCallArgs()             Parse ( [expr, ...] ) argument list
+//    isDirectiveToken()          Check if current token is a directive
+//    emitArrayVarDecl()          Emit array variable declaration
+//    emitPointerVarDecl()        Emit pointer variable declaration
+//    emitRoutineForwardDecl()    Emit forward declaration to header
+//    emitExportedVarForwardDecls() Emit extern declarations to header
+// ===========================================================================
+
+// Map Myra type names to C++ types
+routine resolveType(typeText: string) -> string {
+  if typeText == "int8" { return "int8_t"; }
+  if typeText == "int16" { return "int16_t"; }
+  if typeText == "int32" { return "int32_t"; }
+  if typeText == "int64" { return "int64_t"; }
+  if typeText == "uint8" { return "uint8_t"; }
+  if typeText == "uint16" { return "uint16_t"; }
+  if typeText == "uint32" { return "uint32_t"; }
+  if typeText == "uint64" { return "uint64_t"; }
+  if typeText == "float32" { return "float"; }
+  if typeText == "float64" { return "double"; }
+  if typeText == "boolean" { return "bool"; }
+  if typeText == "char" { return "char"; }
+  if typeText == "wchar" { return "wchar_t"; }
+  if typeText == "string" { return "std::string"; }
+  if typeText == "wstring" { return "std::wstring"; }
+  if typeText == "pointer" { return "void*"; }
+  return typeText;
+}
+
+// Walk children of a block node and emit each
+routine emitBlock(blk: node) {
+  let i = 0;
+  while i < child_count(blk) {
+    emitNode(getChild(blk, i));
+    i = i + 1;
+  }
+}
+
+// Build C++ function signature string from routine decl node
+routine buildRoutineSig(nd: node, rname: string, retType: string) -> string {
+  let sig = "";
+  if retType != "" {
+    sig = resolveType(retType) + " " + rname + "(";
+  } else {
+    sig = "void " + rname + "(";
+  }
+  let first = true;
+  let pi = 0;
+  while pi < childCount(nd) {
+    let pch = getChild(nd, pi);
+    if nodeKind(pch) == "stmt.param_decl" {
+      if not first { sig = sig + ", "; }
+      let ptype = getAttr(pch, "param.type_text");
+      let pname = getAttr(pch, "param.name");
+      let pmod = getAttr(pch, "param.modifier");
+      // Resolve compound types (array of T -> std::vector<T>)
+      let resolvedType = "";
+      if startsWith(ptype, "array") {
+        // Find " of " to extract element type
+        let ofIdx = -1;
+        let si2 = 0;
+        let slen2 = len(ptype);
+        while si2 < slen2 - 3 {
+          if substr(ptype, si2, 4) == " of " {
+            ofIdx = si2;
+          }
+          si2 = si2 + 1;
+        }
+        if ofIdx >= 0 {
+          let elemT = resolveType(substr(ptype, ofIdx + 4, slen2 - ofIdx - 4));
+          resolvedType = "std::vector<" + elemT + ">";
+        } else {
+          resolvedType = resolveType(ptype);
+        }
+      } else if startsWith(ptype, "pointer") {
+        // pointer to T -> T*
+        if contains(ptype, " to ") {
+          let toIdx = -1;
+          let si3 = 0;
+          let slen3 = len(ptype);
+          while si3 < slen3 - 3 {
+            if substr(ptype, si3, 4) == " to " {
+              toIdx = si3;
+            }
+            si3 = si3 + 1;
+          }
+          if toIdx >= 0 {
+            resolvedType = resolveType(substr(ptype, toIdx + 4, slen3 - toIdx - 4)) + "*";
+          } else {
+            resolvedType = "void*";
+          }
+        } else {
+          resolvedType = "void*";
+        }
+      } else {
+        resolvedType = resolveType(ptype);
+      }
+      if pmod == "var" {
+        sig = sig + resolvedType + "& " + pname;
+      } else {
+        sig = sig + resolvedType + " " + pname;
+      }
+      first = false;
+    }
+    pi = pi + 1;
+  }
+  if getAttr(nd, "decl.variadic") == "true" {
+    if not first { sig = sig + ", "; }
+    sig = sig + "int32_t __mor_vararg_count, ...";
+  }
+  sig = sig + ")";
+  return sig;
+}
+
+// Parse call argument list: ( [expr, ...] )
+routine parseCallArgs(nd: node) {
+  requireToken("delimiter.lparen");
+  if not checkToken("delimiter.rparen") {
+    addChild(nd, parseExpr(0));
+    while matchToken("delimiter.comma") {
+      addChild(nd, parseExpr(0));
+    }
+  }
+  requireToken("delimiter.rparen");
+}
+
+// Check if current parser token is a directive
+routine isDirectiveToken() -> bool {
+  return startsWith(currentKind(), "directive.");
+}
+
+// Emit array variable declaration
+routine emitArrayVarDecl(nameStr: string, typeStr: string) {
+  // Iteratively peel nested array[lo..hi] of layers, collecting dimensions.
+  // e.g. "array[0..1] of array[0..2] of int32" -> dims="[2][3]", base="int32"
+  let dims = "";
+  let remaining = typeStr;
+  let done = false;
+
+  while not done {
+    if not startsWith(remaining, "array") {
+      done = true;
+    } else {
+      // Check for brackets in this layer
+      let hasB = contains(remaining, "[");
+      if not hasB {
+        // Dynamic array: array of T
+        let oi = 0;
+        let olen = len(remaining);
+        let oPos = -1;
+        while oi < olen - 3 {
+          if substr(remaining, oi, 4) == " of " {
+            oPos = oi;
+            oi = olen;
+          }
+          oi = oi + 1;
+        }
+        if oPos >= 0 {
+          remaining = substr(remaining, oPos + 4, len(remaining) - oPos - 4);
+        }
+        if dims != "" {
+          // Mixed: outer static dims then dynamic inner
+          emitLine("std::vector<" + resolveType(remaining) + "> " + nameStr + dims + ";");
+        } else {
+          emitLine("std::vector<" + resolveType(remaining) + "> " + nameStr + ";");
+        }
+        return;
+      }
+      // Find first bracket pair in remaining
+      let bi = 0;
+      let blen = len(remaining);
+      let bStart = -1;
+      let bEnd = -1;
+      while bi < blen {
+        if substr(remaining, bi, 1) == "[" and bStart < 0 { bStart = bi; }
+        if substr(remaining, bi, 1) == "]" and bStart >= 0 and bEnd < 0 { bEnd = bi; }
+        bi = bi + 1;
+      }
+      if bStart >= 0 and bEnd > bStart {
+        let boundsStr = substr(remaining, bStart + 1, bEnd - bStart - 1);
+        if len(boundsStr) > 0 and contains(boundsStr, "..") {
+          // Parse low..high
+          let dotPos = -1;
+          let di = 0;
+          while di < len(boundsStr) - 1 {
+            if substr(boundsStr, di, 2) == ".." { dotPos = di; }
+            di = di + 1;
+          }
+          if dotPos >= 0 {
+            let lowStr = trim(substr(boundsStr, 0, dotPos));
+            let highStr = trim(substr(boundsStr, dotPos + 2, len(boundsStr) - dotPos - 2));
+            let sz = strToInt(highStr) - strToInt(lowStr) + 1;
+            dims = dims + "[" + intToStr(sz) + "]";
+          }
+        } else {
+          // Empty or no range brackets -> dynamic
+          // Find " of " after the bracket to get element type
+          let oi3 = bEnd + 1;
+          let olen3 = len(remaining);
+          let oPos3 = -1;
+          while oi3 < olen3 - 3 {
+            if substr(remaining, oi3, 4) == " of " {
+              oPos3 = oi3;
+              oi3 = olen3;
+            }
+            oi3 = oi3 + 1;
+          }
+          if oPos3 >= 0 {
+            remaining = substr(remaining, oPos3 + 4, len(remaining) - oPos3 - 4);
+          }
+          emitLine("std::vector<" + resolveType(remaining) + "> " + nameStr + ";");
+          return;
+        }
+      }
+      // Advance past " of " after the bracket to get next layer
+      let oi2 = bEnd + 1;
+      let olen2 = len(remaining);
+      let oPos2 = -1;
+      while oi2 < olen2 - 3 {
+        if substr(remaining, oi2, 4) == " of " {
+          oPos2 = oi2;
+          oi2 = olen2;
+        }
+        oi2 = oi2 + 1;
+      }
+      if oPos2 >= 0 {
+        remaining = substr(remaining, oPos2 + 4, len(remaining) - oPos2 - 4);
+      } else {
+        done = true;
+      }
+    }
+  }
+
+  // remaining is the base element type, dims has all collected dimensions
+  emitLine(resolveType(remaining) + " " + nameStr + dims + ";");
+}
+
+// Emit pointer variable declaration
+routine emitPointerVarDecl(nameStr: string, typeStr: string) {
+  // pointer to [const] T
+  if contains(typeStr, " to ") {
+    let toPos = -1;
+    let ti = 0;
+    let tlen = len(typeStr);
+    while ti < tlen - 3 {
+      if substr(typeStr, ti, 4) == " to " { toPos = ti; }
+      ti = ti + 1;
+    }
+    if toPos >= 0 {
+      let rest = substr(typeStr, toPos + 4, tlen - toPos - 4);
+      if startsWith(rest, "const ") {
+        let innerType = trim(substr(rest, 6, len(rest) - 6));
+        emitLine("const " + resolveType(innerType) + "* " + nameStr + ";");
+      } else {
+        emitLine(resolveType(rest) + "* " + nameStr + ";");
+      }
+    } else {
+      emitLine("void* " + nameStr + ";");
+    }
+  } else {
+    emitLine("void* " + nameStr + ";");
+  }
+}
+
+// Collect full type text from parser token stream
+// Handles: array[..] of T, pointer to [const] T, set of T, set of N..M,
+//          routine ["C"] ([params]) [: T], qualified C++ types (::, <>, *)
+// Recursive: nested types (array of pointer to T) fully consumed.
+routine collectTypeText() -> string {
+  let typeRaw = "";
+
+  if checkToken("keyword.array") {
+    typeRaw = "array";
+    advance();
+    if matchToken("delimiter.lbracket") {
+      if not checkToken("delimiter.rbracket") {
+        typeRaw = typeRaw + "[" + currentText();
+        advance();
+        requireToken("op.range");
+        typeRaw = typeRaw + ".." + currentText() + "]";
+        advance();
+      } else {
+        typeRaw = typeRaw + "[]";
+      }
+      requireToken("delimiter.rbracket");
+    }
+    requireToken("keyword.of");
+    typeRaw = typeRaw + " of " + collectTypeText();
+    return typeRaw;
+  }
+
+  if checkToken("keyword.pointer") {
+    typeRaw = "pointer";
+    advance();
+    if matchToken("keyword.to") {
+      if matchToken("keyword.const") {
+        typeRaw = typeRaw + " to const " + collectTypeText();
+      } else {
+        typeRaw = typeRaw + " to " + collectTypeText();
+      }
+    }
+    return typeRaw;
+  }
+
+  if checkToken("keyword.set") {
+    typeRaw = "set";
+    advance();
+    if matchToken("keyword.of") {
+      // Could be range form (integer..integer) or type
+      typeRaw = typeRaw + " of " + currentText();
+      advance();
+      if matchToken("op.range") {
+        typeRaw = typeRaw + ".." + currentText();
+        advance();
+      }
+    }
+    return typeRaw;
+  }
+
+  if checkToken("keyword.routine") {
+    typeRaw = "routine";
+    advance();
+    // Optional linkage spec: "C"
+    if checkToken("string.cstring") {
+      typeRaw = typeRaw + " " + currentText();
+      advance();
+    }
+    // Parameter list
+    if matchToken("delimiter.lparen") {
+      typeRaw = typeRaw + "(";
+      if not checkToken("delimiter.rparen") {
+        let depth = 1;
+        while depth > 0 and not checkToken("eof") {
+          if checkToken("delimiter.rparen") {
+            depth = depth - 1;
+            if depth > 0 {
+              typeRaw = typeRaw + ")";
+              advance();
+            }
+          } else if checkToken("delimiter.lparen") {
+            depth = depth + 1;
+            typeRaw = typeRaw + "(";
+            advance();
+          } else {
+            typeRaw = typeRaw + currentText();
+            advance();
+          }
+        }
+      }
+      typeRaw = typeRaw + ")";
+      requireToken("delimiter.rparen");
+    }
+    // Optional return type
+    if matchToken("delimiter.colon") {
+      typeRaw = typeRaw + ": " + collectTypeText();
+    }
+    return typeRaw;
+  }
+
+  // Simple identifier or type keyword
+  typeRaw = currentText();
+  advance();
+
+  // Follow :: chains (C++ qualified types like std::string)
+  while checkToken("cpp.op.scope") {
+    typeRaw = typeRaw + "::";
+    advance();
+    typeRaw = typeRaw + currentText();
+    advance();
+  }
+
+  // Follow template <...> with depth tracking
+  if checkToken("op.lt") {
+    typeRaw = typeRaw + "<";
+    advance();
+    let angleDepth = 1;
+    while angleDepth > 0 and not checkToken("eof") {
+      if checkToken("op.gt") {
+        angleDepth = angleDepth - 1;
+        if angleDepth > 0 {
+          typeRaw = typeRaw + ">";
+          advance();
+        }
+      } else {
+        if checkToken("op.lt") {
+          angleDepth = angleDepth + 1;
+        }
+        typeRaw = typeRaw + currentText();
+        advance();
+      }
+    }
+    typeRaw = typeRaw + ">";
+    advance();
+  }
+
+  // Follow trailing * for C++ pointer types
+  while checkToken("op.multiply") {
+    typeRaw = typeRaw + "*";
+    advance();
+  }
+
+  return typeRaw;
+}
+
+// Emit forward declaration for an exported routine to header
+routine emitRoutineForwardDecl(ch: node) {
+  let rname = getAttr(ch, "decl.name");
+  let retType = getAttr(ch, "decl.return_type");
+  let linkage = getAttr(ch, "decl.linkage");
+  let isCLink = (linkage == "\"C\"");
+
+  if isCLink { emitLine("extern \"C\" {", "header"); }
+
+  let sig = buildRoutineSig(ch, rname, retType);
+  emitLine(sig + ";", "header");
+
+  if isCLink { emitLine("}", "header"); }
+}
+
+// Emit extern declarations for exported variables to header
+routine emitExportedVarForwardDecls(varBlock: node) {
+  let vi = 0;
+  while vi < childCount(varBlock) {
+    let vch = getChild(varBlock, vi);
+    if nodeKind(vch) == "stmt.var_decl" {
+      let vname = getAttr(vch, "var.name");
+      let vtype = getAttr(vch, "var.type_text");
+      emitLine("extern " + resolveType(vtype) + " " + vname + ";", "header");
+    }
+    vi = vi + 1;
+  }
+}

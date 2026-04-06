@@ -1,0 +1,314 @@
+// ===========================================================================
+//  Myra_tokens.mor -- Token declarations and type system for Myra
+//
+//  Tokens declared:
+//    Keywords       module, import, exported, external, begin, end, if, then,
+//                   else, while, do, for, to, downto, repeat, until, return,
+//                   match, var, const, type, routine, method, record, object,
+//                   overlay, choices, packed, align, array, of, set, pointer,
+//                   and, or, not, xor, div, mod, shl, shr, in, is, true,
+//                   false, nil, address, self, parent, guard, except, finally,
+//                   raiseexception, raiseexceptioncode, getexceptioncode,
+//                   getexceptionmessage, create, destroy, getmem, freemem,
+//                   resizemem, setlength, write, writeln, len, size, utf8,
+//                   paramcount, paramstr, varargs, exe, dll, lib
+//    Operators      :=, +=, -=, *=, /=, <>, <=, >=, ..., .., =, <, >, +,
+//                   -, *, /, ^, |, &
+//    Delimiters     ( ) [ ] , : ; .
+//    Comments       // (line), /* */ (block)
+//    Strings        " (C-style), w" (wide)
+//    Directives     @ prefix with define/undef/ifdef/ifndef/elseif/else/endif,
+//                   exeicon, copydll, linklibrary, librarypath, modulepath,
+//                   includepath, subsystem, target, optimize, addverinfo,
+//                   vimajor..vicopyright, breakpoint, message
+//
+//  Type system:
+//    16 type keywords mapped to C++ types
+//    Literal type mappings for expr.integer, expr.float, etc.
+//    Full compatibility matrix (widening, promotion)
+//    Declaration and call kind configuration
+// ===========================================================================
+
+tokens {
+  casesensitive = true;
+
+  // Module structure
+  token keyword.module    = "module";
+  token keyword.import    = "import";
+  token keyword.exported  = "exported";
+  token keyword.external  = "external";
+
+  // Control flow
+  token keyword.begin     = "begin";
+  token keyword.end       = "end";
+  token keyword.if        = "if";
+  token keyword.then      = "then";
+  token keyword.else      = "else";
+  token keyword.while     = "while";
+  token keyword.do        = "do";
+  token keyword.for       = "for";
+  token keyword.to        = "to";
+  token keyword.downto    = "downto";
+  token keyword.repeat    = "repeat";
+  token keyword.until     = "until";
+  token keyword.return    = "return";
+  token keyword.match     = "match";
+
+  // Declarations
+  token keyword.var       = "var";
+  token keyword.const     = "const";
+  token keyword.type      = "type";
+  token keyword.routine   = "routine";
+  token keyword.method    = "method";
+
+  // Type definitions
+  token keyword.record    = "record";
+  token keyword.object    = "object";
+  token keyword.overlay   = "overlay";
+  token keyword.choices   = "choices";
+  token keyword.packed    = "packed";
+  token keyword.align     = "align";
+  token keyword.array     = "array";
+  token keyword.of        = "of";
+  token keyword.set       = "set";
+  token keyword.pointer   = "pointer";
+
+  // Logical / bitwise operators
+  token keyword.and       = "and";
+  token keyword.or        = "or";
+  token keyword.not       = "not";
+  token keyword.xor       = "xor";
+  token keyword.div       = "div";
+  token keyword.mod       = "mod";
+  token keyword.shl       = "shl";
+  token keyword.shr       = "shr";
+  token keyword.in        = "in";
+  token keyword.is        = "is";
+
+  // Literals
+  token keyword.true      = "true";
+  token keyword.false     = "false";
+  token keyword.nil       = "nil";
+
+  // Pointer / address
+  token keyword.address   = "address";
+
+  // Self / parent
+  token keyword.self      = "self";
+  token keyword.parent    = "parent";
+
+  // Exception handling
+  token keyword.guard              = "guard";
+  token keyword.except             = "except";
+  token keyword.finally            = "finally";
+  token keyword.raiseexception     = "raiseexception";
+  token keyword.raiseexceptioncode = "raiseexceptioncode";
+  token keyword.getexceptioncode     = "getexceptioncode";
+  token keyword.getexceptionmessage  = "getexceptionmessage";
+
+  // Memory management
+  token keyword.create    = "create";
+  token keyword.destroy   = "destroy";
+  token keyword.getmem    = "getmem";
+  token keyword.freemem   = "freemem";
+  token keyword.resizemem = "resizemem";
+  token keyword.setlength = "setlength";
+
+  // I/O
+  token keyword.write     = "write";
+  token keyword.writeln   = "writeln";
+
+  // Intrinsics
+  token keyword.len        = "len";
+  token keyword.size       = "size";
+  token keyword.utf8       = "utf8";
+  token keyword.paramcount = "paramcount";
+  token keyword.paramstr   = "paramstr";
+
+  // Variadic
+  token keyword.varargs   = "varargs";
+
+  // Contextual keywords (module kind)
+  token keyword.exe       = "exe";
+  token keyword.dll       = "dll";
+  token keyword.lib       = "lib";
+
+  // Multi-char operators (longest-match order)
+  token op.assign         = ":=";
+  token op.plus_assign    = "+=";
+  token op.minus_assign   = "-=";
+  token op.mul_assign     = "*=";
+  token op.div_assign     = "/=";
+  token op.neq            = "<>";
+  token op.lte            = "<=";
+  token op.gte            = ">=";
+  token op.ellipsis       = "...";
+  token op.range          = "..";
+
+  // Single-char operators
+  token op.eq             = "=";
+  token op.lt             = "<";
+  token op.gt             = ">";
+  token op.plus           = "+";
+  token op.minus          = "-";
+  token op.multiply       = "*";
+  token op.divide         = "/";
+  token op.deref          = "^";
+  token op.pipe           = "|";
+  token op.ampersand      = "&";
+
+  // Delimiters
+  token delimiter.lparen    = "(";
+  token delimiter.rparen    = ")";
+  token delimiter.lbracket  = "[";
+  token delimiter.rbracket  = "]";
+  token delimiter.comma     = ",";
+  token delimiter.colon     = ":";
+  token delimiter.semicolon = ";";
+  token delimiter.dot       = ".";
+
+  // Comments
+  token comment.line        = "//";
+  token comment.block_open  = "/*";
+  token comment.block_close = "*/";
+
+  // String styles
+  // C-string: "..." with escape sequences
+  token string.cstring    = "\"";
+  // Wide string: w"..." with escape sequences, closes on "
+  token string.wstring    = "w\"" [close "\""];
+
+  // Directive prefix and conditional compilation directives
+  directive_prefix = "@";
+  token directive.define   = "define"  [define];
+  token directive.undef    = "undef"   [undef];
+  token directive.ifdef    = "ifdef"   [ifdef];
+  token directive.ifndef   = "ifndef"  [ifndef];
+  token directive.elseif   = "elseif"  [elseif];
+  token directive.else     = "else"    [else];
+  token directive.endif    = "endif"   [endif];
+
+  // Regular directives (passed to parser as tokens)
+  token directive.exeicon       = "exeicon";
+  token directive.copydll       = "copydll";
+  token directive.linklibrary   = "linklibrary";
+  token directive.librarypath   = "librarypath";
+  token directive.modulepath    = "modulepath";
+  token directive.includepath   = "includepath";
+  token directive.subsystem     = "subsystem";
+  token directive.target        = "target";
+  token directive.optimize      = "optimize";
+  token directive.addverinfo    = "addverinfo";
+  token directive.vimajor       = "vimajor";
+  token directive.viminor       = "viminor";
+  token directive.vipatch       = "vipatch";
+  token directive.viproductname = "viproductname";
+  token directive.videscription = "videscription";
+  token directive.vifilename    = "vifilename";
+  token directive.vicompanyname = "vicompanyname";
+  token directive.vicopyright   = "vicopyright";
+  token directive.breakpoint    = "breakpoint";
+  token directive.message       = "message";
+
+  // Structural configuration
+  terminator  = delimiter.semicolon;
+  block_open  = keyword.begin;
+  block_close = keyword.end;
+  hex_prefix  = "0x";
+  hex_prefix  = "0X";
+}
+
+types {
+  // Type keywords: source text -> internal kind
+  type int8     = "type.int8";
+  type int16    = "type.int16";
+  type int32    = "type.int32";
+  type int64    = "type.int64";
+  type uint8    = "type.uint8";
+  type uint16   = "type.uint16";
+  type uint32   = "type.uint32";
+  type uint64   = "type.uint64";
+  type float32  = "type.float32";
+  type float64  = "type.float64";
+  type boolean  = "type.boolean";
+  type char     = "type.char";
+  type wchar    = "type.wchar";
+  type string   = "type.string";
+  type wstring  = "type.wstring";
+  type pointer  = "type.pointer";
+
+  // Type mappings: internal kind -> C++ output type
+  map "type.int8"    -> "int8_t";
+  map "type.int16"   -> "int16_t";
+  map "type.int32"   -> "int32_t";
+  map "type.int64"   -> "int64_t";
+  map "type.uint8"   -> "uint8_t";
+  map "type.uint16"  -> "uint16_t";
+  map "type.uint32"  -> "uint32_t";
+  map "type.uint64"  -> "uint64_t";
+  map "type.float32" -> "float";
+  map "type.float64" -> "double";
+  map "type.boolean" -> "bool";
+  map "type.char"    -> "char";
+  map "type.wchar"   -> "wchar_t";
+  map "type.string"  -> "std::string";
+  map "type.wstring" -> "std::wstring";
+  map "type.pointer" -> "void*";
+
+  // Literal type mappings: AST node kind -> type kind
+  literal "expr.integer" = "type.int32";
+  literal "expr.float"   = "type.float64";
+  literal "expr.cstring" = "type.cstring";
+  literal "expr.cchar"   = "type.char";
+  literal "expr.wstring" = "type.wstring";
+  literal "expr.bool"    = "type.boolean";
+
+  // Type compatibility: integer widening
+  compatible "type.int8",  "type.int16" -> "type.int16";
+  compatible "type.int8",  "type.int32" -> "type.int32";
+  compatible "type.int8",  "type.int64" -> "type.int64";
+  compatible "type.int16", "type.int32" -> "type.int32";
+  compatible "type.int16", "type.int64" -> "type.int64";
+  compatible "type.int32", "type.int64" -> "type.int64";
+
+  // Unsigned integer widening
+  compatible "type.uint8",  "type.uint16" -> "type.uint16";
+  compatible "type.uint8",  "type.uint32" -> "type.uint32";
+  compatible "type.uint8",  "type.uint64" -> "type.uint64";
+  compatible "type.uint16", "type.uint32" -> "type.uint32";
+  compatible "type.uint16", "type.uint64" -> "type.uint64";
+  compatible "type.uint32", "type.uint64" -> "type.uint64";
+
+  // Float widening
+  compatible "type.float32", "type.float64" -> "type.float64";
+
+  // Integer to float promotion
+  compatible "type.int8",   "type.float32" -> "type.float32";
+  compatible "type.int8",   "type.float64" -> "type.float64";
+  compatible "type.int16",  "type.float32" -> "type.float32";
+  compatible "type.int16",  "type.float64" -> "type.float64";
+  compatible "type.int32",  "type.float32" -> "type.float32";
+  compatible "type.int32",  "type.float64" -> "type.float64";
+  compatible "type.int64",  "type.float32" -> "type.float32";
+  compatible "type.int64",  "type.float64" -> "type.float64";
+  compatible "type.uint8",  "type.float32" -> "type.float32";
+  compatible "type.uint8",  "type.float64" -> "type.float64";
+  compatible "type.uint16", "type.float32" -> "type.float32";
+  compatible "type.uint16", "type.float64" -> "type.float64";
+  compatible "type.uint32", "type.float32" -> "type.float32";
+  compatible "type.uint32", "type.float64" -> "type.float64";
+  compatible "type.uint64", "type.float32" -> "type.float32";
+  compatible "type.uint64", "type.float64" -> "type.float64";
+
+  // Nil to pointer
+  compatible "type.nil", "type.pointer";
+
+  // Char to string promotion
+  compatible "type.char",  "type.string"  -> "type.string";
+  compatible "type.wchar", "type.wstring" -> "type.wstring";
+
+  // Declaration and call kinds
+  decl_kind "stmt.var_decl";
+  call_kind "expr.call";
+  call_name_attr = "call.name";
+}

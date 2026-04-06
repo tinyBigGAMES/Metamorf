@@ -1,0 +1,80 @@
+/* EXPECT: STATIC_BUILD=yes
+FEATURE_A=yes
+FEATURE_B=no
+NESTED=inner_true
+IFNDEF_TEST=undefined_symbol
+UNDEF_TEST=was_undefined
+Done */
+
+module exe test_exe_conditional;
+
+// Test 1: Simple @ifdef with defined symbol
+@define STATIC_BUILD
+
+// Test 2: @ifdef/@else with defined symbol
+@define FEATURE_A
+
+@ifdef FEATURE_A
+const
+  FeatureAEnabled = "yes";
+@else
+const
+  FeatureAEnabled = "no";
+@endif
+
+// Test 3: @ifdef/@else with undefined symbol
+@ifdef FEATURE_B
+const
+  FeatureBEnabled = "yes";
+@else
+const
+  FeatureBEnabled = "no";
+@endif
+
+// Test 4: Nested conditionals
+@define OUTER
+@define INNER
+
+@ifdef OUTER
+  @ifdef INNER
+const
+    NestedResult = "inner_true";
+  @else
+const
+    NestedResult = "inner_false";
+  @endif
+@else
+const
+  NestedResult = "outer_false";
+@endif
+
+// Test 5: @ifndef
+@ifndef UNDEFINED_SYMBOL
+const
+  IfndefResult = "undefined_symbol";
+@else
+const
+  IfndefResult = "was_defined";
+@endif
+
+// Test 6: @undef
+@define TEMP_SYMBOL
+@undef TEMP_SYMBOL
+
+@ifdef TEMP_SYMBOL
+const
+  UndefResult = "still_defined";
+@else
+const
+  UndefResult = "was_undefined";
+@endif
+
+begin
+  writeln("STATIC_BUILD=yes");
+  writeln("FEATURE_A={}", FeatureAEnabled);
+  writeln("FEATURE_B={}", FeatureBEnabled);
+  writeln("NESTED={}", NestedResult);
+  writeln("IFNDEF_TEST={}", IfndefResult);
+  writeln("UNDEF_TEST={}", UndefResult);
+  writeln("Done");
+end.

@@ -1,0 +1,33 @@
+# Myra Test Configuration
+#
+# Place this file in your test folder as "tests.toml", or specify a custom
+# path with the --config flag:
+#
+#   Myra test all                          (loads tests.toml from test folder)
+#   Myra test all -c path/to/custom.toml   (loads from custom path)
+#
+# Each [[test]] entry registers a test in execution order.
+#
+# Fields:
+#   name  (string, required)   - Test filename without extension
+#   deps  (string[], optional) - Dependencies built first, in order
+#   run   (boolean, optional)  - true (default) = build and run, false = build only
+#
+# Examples:
+#
+# Simple test (build and run):
+#
+#   [[test]]
+#   name = "my_test"
+#
+# Test with dependencies (deps are built first, in order):
+#
+#   [[test]]
+#   name = "test_exe_consumer"
+#   deps = ["test_dll_provider"]
+#
+# Build-only test (compile but skip execution):
+#
+#   [[test]]
+#   name = "test_lib_utils"
+#   run = false

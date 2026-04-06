@@ -1,0 +1,54 @@
+/* EXPECT:
+13
+7
+30
+3
+1
+16
+26
+false
+true
+true
+true
+true
+true
+false
+true
+true
+*/
+
+// test_exe_math — Arithmetic and operator precedence
+module exe test_exe_math;
+
+var
+  a: int32;
+  b: int32;
+  c: int32;
+
+begin
+  a := 10;
+  b := 3;
+
+  writeln("{}", a + b);
+  writeln("{}", a - b);
+  writeln("{}", a * b);
+  writeln("{}", a div b);
+  writeln("{}", a mod b);
+
+  c := a + b * 2;
+  writeln("{}", c);
+
+  c := (a + b) * 2;
+  writeln("{}", c);
+
+  writeln("{}", true and false);
+  writeln("{}", true or false);
+  writeln("{}", not false);
+
+  writeln("{}", a = 10);
+  writeln("{}", a <> b);
+  writeln("{}", a > b);
+  writeln("{}", a < b);
+  writeln("{}", a >= 10);
+  writeln("{}", b <= 3);
+end.

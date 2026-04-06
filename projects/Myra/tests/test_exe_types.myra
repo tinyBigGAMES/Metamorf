@@ -1,0 +1,108 @@
+/* EXPECT:
+Point: 10, 20
+Color Green = 1
+ErrorCode NotFound = 404
+ErrorCode Internal = 500
+nums: 42, 99, -1
+buf: 1.5, 2.7, 3.9
+IntArray len = 10
+SmallBuf len = 3
+count = 99
+offset = 3.14
+dyn: 100, 200, 300
+dyn len = 3
+opn: 1.11, 2.22
+opn len = 2
+*/
+
+// test_exe_types — Records, choices, arrays, type aliases
+module exe test_exe_types;
+
+type
+  Color = choices(Red, Green, Blue);
+
+  ErrorCode = choices(None = 0, NotFound = 404, Internal = 500);
+
+  Point = record
+    x: int32;
+    y: int32;
+  end;
+
+  IntArray = array[0..9] of int32;
+
+  SmallBuf = array[0..2] of float64;
+
+  DynInts = array of int32;
+
+  OpenFloats = array[] of float64;
+
+  Counter = int32;
+
+  Offset = float64;
+
+var
+  p: Point;
+  c: Color;
+  ec: ErrorCode;
+  nums: IntArray;
+  buf: SmallBuf;
+  dyn: DynInts;
+  opn: OpenFloats;
+  count: Counter;
+  off: Offset;
+
+begin
+  // Record — field assignment and access
+  p.x := 10;
+  p.y := 20;
+  writeln("Point: {}, {}", p.x, p.y);
+
+  // Choices — assignment, cast to int for printing
+  c := Green;
+  writeln("Color Green = {}", int32(c));
+
+  ec := NotFound;
+  writeln("ErrorCode NotFound = {}", int32(ec));
+
+  ec := Internal;
+  writeln("ErrorCode Internal = {}", int32(ec));
+
+  // Static array — assignment and indexing
+  nums[0] := 42;
+  nums[1] := 99;
+  nums[9] := -1;
+  writeln("nums: {}, {}, {}", nums[0], nums[1], nums[9]);
+
+  // Float static array
+  buf[0] := 1.5;
+  buf[1] := 2.7;
+  buf[2] := 3.9;
+  writeln("buf: {}, {}, {}", buf[0], buf[1], buf[2]);
+
+  // Static array length via len
+  writeln("IntArray len = {}", len(nums));
+  writeln("SmallBuf len = {}", len(buf));
+
+  // Type alias — int
+  count := 99;
+  writeln("count = {}", count);
+
+  // Type alias — float
+  off := 3.14;
+  writeln("offset = {}", off);
+
+  // Dynamic array — setlength, assign, index, len
+  setlength(dyn, 3);
+  dyn[0] := 100;
+  dyn[1] := 200;
+  dyn[2] := 300;
+  writeln("dyn: {}, {}, {}", dyn[0], dyn[1], dyn[2]);
+  writeln("dyn len = {}", len(dyn));
+
+  // Open array (same as dynamic) — setlength, assign, index, len
+  setlength(opn, 2);
+  opn[0] := 1.11;
+  opn[1] := 2.22;
+  writeln("opn: {}, {}", opn[0], opn[1]);
+  writeln("opn len = {}", len(opn));
+end.

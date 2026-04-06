@@ -1,0 +1,32 @@
+// ===========================================================================
+//  Myra.mor -- Myra language definition for Metamorf
+//
+//  Defines the Myra systems programming language that compiles to C++23.
+//  Pascal/Oberon-inspired syntax with seamless C++ interop.
+//
+//  C++ passthrough (keywords, operators, preprocessor, blocks) is provided
+//  automatically by the Metamorf engine via ConfigCpp -- this file only
+//  defines Myra's own grammar.
+//
+//  Modular split:
+//    Myra_tokens.mor      Token declarations and type system
+//    Myra_helpers.mor     Shared routines and fragments
+//    Myra_grammar.mor     All grammar rules (prefix, infix, statement)
+//    Myra_semantics.mor   Semantic analysis with overload detection
+//    Myra_emitters.mor    Code generation with multi-pass output
+//
+//  Test source files: projects/Myra/tests/*.myra
+// ===========================================================================
+
+language Myra version "1.0";
+
+const {
+  ENABLE_OVERLOADS = true;
+  ENABLE_FORWARD_REFS = true;
+}
+
+import "myra_tokens.mor";
+import "myra_helpers.mor";
+import "myra_grammar.mor";
+import "myra_semantics.mor";
+import "myra_emitters.mor";

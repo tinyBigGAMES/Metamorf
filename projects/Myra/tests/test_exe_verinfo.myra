@@ -1,0 +1,71 @@
+﻿/*===============================================================================
+  Myra Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myra.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXITCODE: 0 */
+
+/* EXPECT: === Version Info Test ===
+
+This executable should have embedded version info.
+Right-click the .exe file and select Properties,
+then check the Details tab to verify:
+
+  Product name:     Myra Version Info Test
+  File description: Test executable for version info directives
+  File version:     1.2.3.0
+  Product version:  1.2.3.0
+  Company:          tinyBigGAMES LLC
+  Copyright:        Copyright (c) 2025 tinyBigGAMES LLC
+
+The executable should also have an embedded manifest
+enabling modern Windows visual styles and DPI awareness.
+
+Test completed successfully! */
+
+module exe test_exe_verinfo;
+
+#include <windows.h>
+
+// Version info directives - these inject metadata into the built EXE
+@addverinfo on
+@vimajor 1
+@viminor 2
+@vipatch 3
+@viproductname "Myra Version Info Test"
+@videscription "Test executable for version info directives"
+@vifilename "test_exe_verinfo.exe"
+@vicompanyname "tinyBigGAMES LLC"
+@vicopyright "Copyright © 2025 tinyBigGAMES LLC"
+
+// Icon embedding
+@exeicon "res/assets/icons/pax.ico"
+
+begin
+  writeln("=== Version Info Test ===");
+  writeln("");
+  writeln("This executable should have embedded version info.");
+  writeln("Right-click the .exe file and select Properties,");
+  writeln("then check the Details tab to verify:");
+  writeln("");
+  writeln("  Product name:     Myra Version Info Test");
+  writeln("  File description: Test executable for version info directives");
+  writeln("  File version:     1.2.3.0");
+  writeln("  Product version:  1.2.3.0");
+  writeln("  Company:          tinyBigGAMES LLC");
+  writeln("  Copyright:        Copyright (c) 2025 tinyBigGAMES LLC");
+  writeln("");
+  writeln("The executable should also have an embedded manifest");
+  writeln("enabling modern Windows visual styles and DPI awareness.");
+  writeln("");
+  
+  MessageBoxW(0, w"🎉 Success! 🚀\n\nIf this dialog has modern styled buttons, the manifest is working correctly!\n\n✅ Version info embedded\n✅ Manifest applied\n✅ UTF-16 emojis working 🎨🔥💯", w"🎮 Manifest Test ✨", MB_OK + MB_ICONINFORMATION);
+  
+  writeln("Test completed successfully!");
+end.

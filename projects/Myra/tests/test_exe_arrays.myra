@@ -1,0 +1,299 @@
+/* EXPECT: Testing arrays...
+Basic: 10 20 30 40 50
+Sum: 150
+OneBased: 1 2 3
+Inline: 100 200 300
+LenStatic: 5
+LenOneBased: 3
+Sizeof5: 20
+Sizeof3: 12
+Array2D: 0 1 2 10 11 12
+Array2DAccess: 12
+ArrayInRec: 10 20 30
+ArrayOfRec: 1 2 3 4
+CharArr: Hello
+Modify: 99 20 30 40 50
+NestedRead: 77
+ArrayCopy: 99 20 30 40 50
+Compound: 109
+AddrOfElem: 30
+RecLiteral: 20 30
+StringArr: Alice Bob Charlie
+StringArrLen: 5 3 7
+WStringArr: Wide1 Wide2 Wide3
+WStringArrLen: 5 5 5
+PersonRec: John 30
+WPersonRec: Jane 25
+PeopleArr: Alice 20 Bob 30
+WPeopleArr: Eva 40 Max 50
+MixedRec: Hello World 42
+StringReassign: NewValue
+WStringReassign: NewWide
+SumArray(nums) = 50
+Done */
+
+module exe test_exe_arrays;
+
+type
+  // Named array types
+  IntArr5 = array[0..4] of int32;
+  IntArr3OneBased = array[1..3] of int32;
+  
+  // Record containing array
+  RecWithArr = record
+    values: array[0..2] of int32;
+    tag: int32;
+  end;
+  
+  // Simple record for array of records
+  Point = record
+    x: int32;
+    y: int32;
+  end;
+  
+  // Record with string field
+  Person = record
+    personName: string;
+    age: int32;
+  end;
+  
+  // Record with wstring field
+  WPerson = record
+    personName: wstring;
+    age: int32;
+  end;
+  
+  // Record with both string and wstring
+  MixedRec = record
+    str: string;
+    wstr: wstring;
+    val: int32;
+  end;
+
+var
+  arr: IntArr5;
+  arr2: IntArr5;
+  arr1: IntArr3OneBased;
+  arrInline: array[0..2] of int32;
+  arr2d: array[0..1] of array[0..2] of int32;
+  rec: RecWithArr;
+  points: array[0..1] of Point;
+  chars: array[0..4] of char;
+  i: int32;
+  j: int32;
+  sum: int32;
+  p: pointer to int32;
+  pt: Point;
+  names: array[0..2] of string;
+  wnames: array[0..2] of wstring;
+  person: Person;
+  wperson: WPerson;
+  people: array[0..1] of Person;
+  wpeople: array[0..1] of WPerson;
+  mixed: MixedRec;
+  nums: array of int32;
+
+routine SumArray(const arr: array of int32): int32;
+var
+  i: int32;
+  total: int32;
+begin
+  total := 0;
+  for i := 0 to len(arr) - 1 do
+    total := total + arr[i];
+  end;
+  return total;
+end;
+
+// Var array parameter (can modify)
+routine FillArray(var arr: array of int32; const value: int32);
+var
+  i: int32;
+begin
+  for i := 0 to len(arr) - 1 do
+    arr[i] := value;
+  end;
+end;
+
+begin
+  writeln("Testing arrays...");
+  
+  // 1. Basic 0-based array - write and read
+  arr[0] := 10;
+  arr[1] := 20;
+  arr[2] := 30;
+  arr[3] := 40;
+  arr[4] := 50;
+  write("Basic:");
+  for i := 0 to 4 do
+    write(" {}", arr[i]);
+  end;
+  writeln("");
+  
+  // 2. Sum array elements
+  sum := 0;
+  for i := 0 to 4 do
+    sum := sum + arr[i];
+  end;
+  writeln("Sum: {}", sum);
+  
+  // 3. One-based array [1..3]
+  arr1[1] := 1;
+  arr1[2] := 2;
+  arr1[3] := 3;
+  write("OneBased:");
+  for i := 1 to 3 do
+    write(" {}", arr1[i]);
+  end;
+  writeln("");
+  
+  // 4. Inline array type
+  arrInline[0] := 100;
+  arrInline[1] := 200;
+  arrInline[2] := 300;
+  write("Inline:");
+  for i := 0 to 2 do
+    write(" {}", arrInline[i]);
+  end;
+  writeln("");
+  
+  // 5. len() intrinsic for static arrays
+  writeln("LenStatic: {}", len(arr));
+  writeln("LenOneBased: {}", len(arr1));
+  
+  // 6. size() for arrays (5 * 4 = 20, 3 * 4 = 12)
+  writeln("Sizeof5: {}", size(IntArr5));
+  writeln("Sizeof3: {}", size(IntArr3OneBased));
+  
+  // 7. Two-dimensional array
+  for i := 0 to 1 do
+    for j := 0 to 2 do
+      arr2d[i][j] := i * 10 + j;
+    end;
+  end;
+  write("Array2D:");
+  for i := 0 to 1 do
+    for j := 0 to 2 do
+      write(" {}", arr2d[i][j]);
+    end;
+  end;
+  writeln("");
+  writeln("Array2DAccess: {}", arr2d[1][2]);
+  
+  // 8. Array inside record
+  rec.values[0] := 10;
+  rec.values[1] := 20;
+  rec.values[2] := 30;
+  rec.tag := 99;
+  write("ArrayInRec:");
+  for i := 0 to 2 do
+    write(" {}", rec.values[i]);
+  end;
+  writeln("");
+  
+  // 9. Array of records
+  points[0].x := 1;
+  points[0].y := 2;
+  points[1].x := 3;
+  points[1].y := 4;
+  writeln("ArrayOfRec: {} {} {} {}", points[0].x, points[0].y, points[1].x, points[1].y);
+  
+  // 10. Char array
+  chars[0] := "H";
+  chars[1] := "e";
+  chars[2] := "l";
+  chars[3] := "l";
+  chars[4] := "o";
+  writeln("CharArr: {}{}{}{}{}", chars[0], chars[1], chars[2], chars[3], chars[4]);
+  
+  // 11. Modify existing element
+  arr[0] := 99;
+  write("Modify:");
+  for i := 0 to 4 do
+    write(" {}", arr[i]);
+  end;
+  writeln("");
+  
+  // 12. Nested access patterns (array in record, then read)
+  rec.values[1] := 77;
+  writeln("NestedRead: {}", rec.values[1]);
+  
+  // 13. Whole array copy
+  arr2 := arr;
+  write("ArrayCopy:");
+  for i := 0 to 4 do
+    write(" {}", arr2[i]);
+  end;
+  writeln("");
+  
+  // 14. Compound assignment on array element
+  arr[0] += 10;
+  writeln("Compound: {}", arr[0]);
+  
+  // 15. Address of array element
+  p := address of arr[2];
+  writeln("AddrOfElem: {}", p^);
+  
+  // 16. Array elements in record literal
+  pt := Point(arr[1], arr[2]);
+  writeln("RecLiteral: {} {}", pt.x, pt.y);
+  
+  // 17. Array of string
+  names[0] := "Alice";
+  names[1] := "Bob";
+  names[2] := "Charlie";
+  writeln("StringArr: {} {} {}", names[0], names[1], names[2]);
+  writeln("StringArrLen: {} {} {}", len(names[0]), len(names[1]), len(names[2]));
+  
+  // 18. Array of wstring
+  wnames[0] := w"Wide1";
+  wnames[1] := w"Wide2";
+  wnames[2] := w"Wide3";
+  writeln("WStringArr: {} {} {}", utf8(wnames[0]), utf8(wnames[1]), utf8(wnames[2]));
+  writeln("WStringArrLen: {} {} {}", len(wnames[0]), len(wnames[1]), len(wnames[2]));
+  
+  // 19. Record with string field
+  person.personName := "John";
+  person.age := 30;
+  writeln("PersonRec: {} {}", person.personName, person.age);
+  
+  // 20. Record with wstring field
+  wperson.personName := w"Jane";
+  wperson.age := 25;
+  writeln("WPersonRec: {} {}", utf8(wperson.personName), wperson.age);
+  
+  // 21. Array of records with string
+  people[0].personName := "Alice";
+  people[0].age := 20;
+  people[1].personName := "Bob";
+  people[1].age := 30;
+  writeln("PeopleArr: {} {} {} {}", people[0].personName, people[0].age, people[1].personName, people[1].age);
+  
+  // 22. Array of records with wstring
+  wpeople[0].personName := w"Eva";
+  wpeople[0].age := 40;
+  wpeople[1].personName := w"Max";
+  wpeople[1].age := 50;
+  writeln("WPeopleArr: {} {} {} {}", utf8(wpeople[0].personName), wpeople[0].age, utf8(wpeople[1].personName), wpeople[1].age);
+  
+  // 23. Record with both string and wstring
+  mixed.str := "Hello";
+  mixed.wstr := w"World";
+  mixed.val := 42;
+  writeln("MixedRec: {} {} {}", mixed.str, utf8(mixed.wstr), mixed.val);
+  
+  // 24. String reassignment (tests freeing old value)
+  names[0] := "NewValue";
+  writeln("StringReassign: {}", names[0]);
+  
+  // 25. WString reassignment (tests freeing old value)
+  wnames[0] := w"NewWide";
+  writeln("WStringReassign: {}", utf8(wnames[0]));
+  
+  setlength(nums, 5);
+  FillArray(nums, 10);      // Fill with 10s
+  sum := SumArray(nums);    // sum = 50
+  writeln("SumArray(nums) = {}", sum);
+  
+  writeln("Done");
+end.

@@ -1,0 +1,425 @@
+﻿/* EXPECT:
+=== Mixed Mode: Myra + C++ Interop ===
+--- C++ Functions in Myra Expressions ---
+std::abs(-42) = 42
+std::max(10, 20) = 20
+std::min(10, 20) = 10
+strlen("hello") = 5
+--- C++ Types as Myra Variables ---
+std::string s = hello world
+s.length() = 11
+s.empty() = false
+After clear: s.empty() = true
+--- C++ Methods in Myra Expressions ---
+Char at 0: h
+Char at 4: o
+Substring: ell
+--- Myra Control Flow with C++ Expressions ---
+String is not empty
+Found 'world' at position 6
+--- Mixed Arithmetic ---
+abs(-5) + abs(-3) = 8
+sqrt(16) * 2 = 8
+--- C++ in Myra Loops ---
+Counting: 2 1 0 1 2
+--- Myra Variables to C++ Functions ---
+pow(2, 8) = 256
+floor(3.7) = 3
+ceil(3.2) = 4
+--- Chained C++ Calls ---
+toupper('a') = A
+tolower('Z') = z
+--- C++ new/delete ---
+C++ new int32: allocated value = 42
+C++ new int32[]: array allocated, first = 1, second = 2
+C++ new std::string: hello from C++
+C++ new std::vector: size=3, first=1
+--- Myra Keywords in C++ Namespaces ---
+std::ios::end seek works
+std::ios::in mode works
+std::ios::beg seek works
+--- C++ Cast Patterns ---
+(char*) cast works: H
+reinterpret_cast works
+static_cast works: 42
+--- Keywords After C++ Expressions ---
+then after C++ expr: passed
+do after C++ expr: passed
+to/downto with C++ bounds: 3 2 1 0
+of after C++ expr: matched 4
+--- Block Terminators in Mixed Context ---
+Nested C++ in Myra blocks: inner done, outer done
+C++ before end: works
+=== DONE ===
+*/
+
+/*
+  Mixed Mode Test - Seamless Myra/C++ Interoperability
+
+  Demonstrates the core Myra philosophy:
+  "If it's not Myra, it's C++ — pass through verbatim"
+
+  - C++ #include and direct function calls (no external declarations needed)
+  - C++ types as Myra variables (std::string, etc.)
+  - C++ method calls in Myra expressions
+  - Myra control flow with C++ expressions
+  - Mixed arithmetic with C++ function results
+  - C++ templates in expressions
+  - Myra variables passed to C++ functions
+
+  BOUNDARY TESTS:
+  - Myra 'create/destroy' vs C++ 'new/delete'
+  - Myra keywords inside C++ namespaces (::end, ::in)
+  - C++ cast patterns
+  - Keywords after C++ expressions (then, do, to)
+  - Block terminators in mixed context
+*/
+
+/* ALLOW_WARNINGS */
+
+/* PLATFORMS: win64 */
+
+module exe test_exe_mixedmode;
+
+//@addverinfo on|off — Enables/disables version information embedding
+@addverinfo on;
+
+//@vimajor number — Major version number
+@vimajor 0;
+
+//@viminor number — Minor version number
+@viminor 1;
+
+//@vipatch number — Patch version number
+@vipatch 0;
+
+//@viproductname "name" — Product name in version info
+@viproductname "Myra Demo";
+
+//@videscription "text" — File description in version info
+@videscription "Myra Demo";
+
+//@vifilename "name" — Original filename in version info
+@vifilename "test_exe_mixedmode.exe";
+
+//@vicompanyname "name" — Company name in version info
+@vicompanyname "tinyBigGAMES LLC";
+
+//@vicopyright "text" — Copyright string in version info
+@vicopyright "Copyright (c) 2026, tinyBigGAMES LLC";
+
+//@exeicon "path" 
+@exeicon "res/assets/icons/pax.ico"; 
+
+#include <cmath>
+#include <cstring>
+#include <cctype>
+#include <string>
+#include <algorithm>
+#include <fstream>
+#include <vector>
+
+// Custom Myra record type for testing
+type
+  TPoint = record
+    LX: int32;
+    LY: int32;
+  end;
+
+  TRect = record
+    LLeft: int32;
+    LTop: int32;
+    LWidth: int32;
+    LHeight: int32;
+  end;
+
+var
+  LX: int32;
+  LY: int32;
+  LD: float64;
+  LS: std::string;
+  LPos: size_t;
+  LC: char;
+  LI: int32;
+
+  // For new/delete tests
+  LPCppInt: int32_t*;
+  LPCppArr: int32_t*;
+  LPCppString: std::string*;
+  LPCppVec: std::vector<int32_t>*;
+
+  // For iostream tests
+  LSeekDir: std::ios_base::seekdir;
+  LOpenMode: std::ios_base::openmode;
+
+  // For cast tests
+  LBuffer: array[0..15] of char;
+  LPChar: char*;
+  LPVoid: pointer;
+
+begin
+  writeln("=== Mixed Mode: Myra + C++ Interop ===");
+
+  // ================================================
+  // C++ Functions Directly in Myra Expressions
+  // ================================================
+  writeln("--- C++ Functions in Myra Expressions ---");
+
+  // Direct C++ stdlib calls
+  LX := std::abs(-42);
+  writeln("std::abs(-42) = {}", LX);
+
+  LX := std::max(10, 20);
+  writeln("std::max(10, 20) = {}", LX);
+
+  LX := std::min(10, 20);
+  writeln("std::min(10, 20) = {}", LX);
+
+  // C library function via C++ header
+  LX := int32(strlen("hello"));
+  writeln("strlen(\"hello\") = {}", LX);
+
+  // ================================================
+  // C++ Types as Myra Variables
+  // ================================================
+  writeln("--- C++ Types as Myra Variables ---");
+
+  // std::string as an Myra variable
+  LS := "hello world";
+  writeln("std::string s = {}", LS);
+
+  // C++ method calls on Myra variable
+  writeln("s.length() = {}", LS.length());
+
+  if LS.empty() then
+    writeln("s.empty() = true")
+  else
+    writeln("s.empty() = false")
+  end;
+
+  LS.clear();
+  if LS.empty() then
+    writeln("After clear: s.empty() = true")
+  else
+    writeln("After clear: s.empty() = false")
+  end;
+
+  // ================================================
+  // C++ Methods in Myra Expressions
+  // ================================================
+  writeln("--- C++ Methods in Myra Expressions ---");
+
+  LS := "hello";
+
+  // Indexing C++ string
+  LC := LS[0];
+  writeln("Char at 0: {}", LC);
+
+  LC := LS[4];
+  writeln("Char at 4: {}", LC);
+
+  // C++ method with arguments
+  writeln("Substring: {}", LS.substr(1, 3));
+
+  // ================================================
+  // Myra Control Flow with C++ Expressions
+  // ================================================
+  writeln("--- Myra Control Flow with C++ Expressions ---");
+
+  LS := "hello world";
+
+  // Myra if with C++ method call
+  if not (LS.empty()) then
+    writeln("String is not empty")
+  end;
+
+  // C++ find in Myra condition
+  LPos := LS.find("world");
+  if LPos <> std::string::npos then
+    writeln("Found 'world' at position {}", LPos)
+  else
+    writeln("'world' not found")
+  end;
+
+  // ================================================
+  // Mixed Arithmetic - Myra ops with C++ results
+  // ================================================
+  writeln("--- Mixed Arithmetic ---");
+
+  // Myra + operator with C++ function results
+  LX := std::abs(-5) + std::abs(-3);
+  writeln("abs(-5) + abs(-3) = {}", LX);
+
+  // C++ math combined with Myra arithmetic
+  LD := std::sqrt(16.0) * 2.0;
+  writeln("sqrt(16) * 2 = {}", int32(LD));
+
+  // ================================================
+  // C++ in Myra Loops
+  // ================================================
+  writeln("--- C++ in Myra Loops ---");
+
+  write("Counting: ");
+  for LI := 0 to 4 do
+    write("{} ", std::abs(LI - 2))
+  end;
+  writeln("");
+
+  // ================================================
+  // Myra Variables Passed to C++ Functions
+  // ================================================
+  writeln("--- Myra Variables to C++ Functions ---");
+
+  LX := 2;
+  LY := 8;
+  LD := std::pow((double)LX, (double)LY);
+  writeln("pow(2, 8) = {}", int32(LD));
+
+  LD := 3.7;
+  writeln("floor(3.7) = {}", int32(std::floor(LD)));
+
+  LD := 3.2;
+  writeln("ceil(3.2) = {}", int32(std::ceil(LD)));
+
+  // ================================================
+  // Chained C++ Calls
+  // ================================================
+  writeln("--- Chained C++ Calls ---");
+
+  LC := char(std::toupper((int)'a'));
+  writeln("toupper('a') = {}", LC);
+
+  LC := char(std::tolower((int)'Z'));
+  writeln("tolower('Z') = {}", LC);
+
+  // ================================================
+  // BOUNDARY: C++ new/delete (passthrough)
+  // ================================================
+  writeln("--- C++ new/delete ---");
+
+  LPCppInt := new int32_t(42);
+  writeln("C++ new int32: allocated value = {}", *LPCppInt);
+  delete LPCppInt;
+
+  LPCppArr := new int32_t[5];
+  LPCppArr[0] := 1;
+  LPCppArr[1] := 2;
+  writeln("C++ new int32[]: array allocated, first = {}, second = {}", LPCppArr[0], LPCppArr[1]);
+  delete[] LPCppArr;
+
+  LPCppString := new std::string("hello from C++");
+  writeln("C++ new std::string: {}", *LPCppString);
+  delete LPCppString;
+
+  LPCppVec := new std::vector<int32_t>();
+  LPCppVec->push_back(1);
+  LPCppVec->push_back(2);
+  LPCppVec->push_back(3);
+  writeln("C++ new std::vector: size={}, first={}", LPCppVec->size(), (*LPCppVec)[0]);
+  delete LPCppVec;
+
+  // ================================================
+  // BOUNDARY: Myra Keywords in C++ Namespaces
+  // ================================================
+  writeln("--- Myra Keywords in C++ Namespaces ---");
+
+  // 'end' is an Myra keyword, but std::ios::end is C++
+  LSeekDir := std::ios::end;
+  if LSeekDir = std::ios::end then
+    writeln("std::ios::end seek works")
+  end;
+
+  // 'in' is an Myra keyword (set membership), but std::ios::in is C++
+  LOpenMode := std::ios::in;
+  if LOpenMode = std::ios::in then
+    writeln("std::ios::in mode works")
+  end;
+
+  // 'beg' is not a keyword but tests namespace passthrough
+  LSeekDir := std::ios::beg;
+  if LSeekDir = std::ios::beg then
+    writeln("std::ios::beg seek works")
+  end;
+
+  // ================================================
+  // BOUNDARY: C++ Cast Patterns
+  // ================================================
+  writeln("--- C++ Cast Patterns ---");
+
+  // C-style cast
+  LBuffer[0] := 'H';
+  LBuffer[1] := 'i';
+  LBuffer[2] := char(0);
+  LPChar := (char*)(&LBuffer[0]);
+  writeln("(char*) cast works: {}", LPChar[0]);
+
+  // reinterpret_cast
+  LPVoid := address of LX;
+  LPCppInt := reinterpret_cast<int32_t*>(LPVoid);
+  *LPCppInt := 99;
+  writeln("reinterpret_cast works");
+
+  // static_cast
+  LD := 42.7;
+  LX := static_cast<int32_t>(LD);
+  writeln("static_cast works: {}", LX);
+
+  // ================================================
+  // BOUNDARY: Keywords After C++ Expressions
+  // ================================================
+  writeln("--- Keywords After C++ Expressions ---");
+
+  // 'then' after C++ expression - must recognize 'then' as Myra
+  LS := "test";
+  if LS.length() > 0 then
+    writeln("then after C++ expr: passed")
+  end;
+
+  // 'do' after C++ expression
+  LX := 0;
+  while std::abs(LX) < 1 do
+    LX := 1
+  end;
+  writeln("do after C++ expr: passed");
+
+  // 'to' and 'downto' with C++ bounds
+  write("to/downto with C++ bounds: ");
+  for LI := std::abs(-3) downto 0 do
+    write("{} ", LI)
+  end;
+  writeln("");
+
+  // 'of' after C++ expression in match
+  LX := int32(LS.length());
+  match LX of
+    1: writeln("of after C++ expr: matched 1")
+    4: writeln("of after C++ expr: matched 4")
+    5..10: writeln("of after C++ expr: matched 5..10")
+  else
+    writeln("of after C++ expr: matched else")
+  end;
+
+  // ================================================
+  // BOUNDARY: Block Terminators in Mixed Context
+  // ================================================
+  writeln("--- Block Terminators in Mixed Context ---");
+
+  // Nested Myra blocks with C++ inside
+  if true then
+    LS := "outer";
+    if true then
+      LS.append(" inner");
+      write("Nested C++ in Myra blocks: inner done, ")
+    end;
+    writeln("outer done")
+  end;
+
+  // C++ expression right before 'end'
+  LS := "test";
+  if true then
+    LS.clear();
+    writeln("C++ before end: works")
+  end;
+
+  writeln("=== DONE ===");
+end.

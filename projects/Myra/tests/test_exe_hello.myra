@@ -1,0 +1,7 @@
+﻿/* EXPECT: Hello from Myra! */
+
+module exe test_exe_hello;
+
+begin
+  writeln("Hello from Myra!");
+end.

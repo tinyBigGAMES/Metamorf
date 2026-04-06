@@ -1,0 +1,909 @@
+// ===========================================================================
+//  Myra_emitters.mor -- Code generation for Myra
+//
+//  Emits C++23 code from the Myra AST.
+//
+//  Module emitters:     stmt.module, stmt.module_body, stmt.import_clause
+//  Declaration emitters: stmt.var_decl, stmt.const_decl, stmt.type_decl,
+//                        stmt.field_decl, stmt.exported
+//  Routine emitters:    stmt.routine_decl, stmt.param_decl
+//  Statement emitters:  if, while, for, repeat, match, return, guard,
+//                        exceptions, memory management, I/O, directives
+//  Expression emitters: binary, assign, unary, call, field_access,
+//                        array_index, deref, grouped, shl, shr, in,
+//                        literals, identifiers
+// ===========================================================================
+
+emitters {
+
+  // -----------------------------------------------------------------------
+  // ROOT EMITTER
+  // -----------------------------------------------------------------------
+
+  on program.root {
+    emitChildren(node);
+  }
+
+  // -----------------------------------------------------------------------
+  // MODULE EMITTERS
+  // -----------------------------------------------------------------------
+
+  on stmt.module {
+    // Stamp module kind for child emitters
+    let kind = getAttr(node, "module.kind");
+
+    emitLine("#include <cstdint>");
+    emitLine("#include <string>");
+    emitLine("#include <array>");
+    emitLine("#include <vector>");
+    emitLine("#include <set>");
+    emitLine("#include <bitset>");
+    emitLine("#include <print>");
+    emitLine("#include \"mor_runtime.h\"");
+    emitLine("");
+
+    // Find module_body and stamp kind on it before emitting
+    let ci = 0;
+    let cn = child_count();
+    while ci < cn {
+      let ch = getChild(node, ci);
+      if nodeKind(ch) == "stmt.module_body" {
+        setAttr(ch, "module.kind", kind);
+      }
+      ci = ci + 1;
+    }
+
+    emitChildren(node);
+  }
+
+  on stmt.module_body {
+    let kind = getAttr(node, "module.kind");
+    if kind == "exe" {
+      emitLine("int main(int argc, char** argv) {");
+      indentIn();
+      emitLine("mor_initconsole();");
+      emitLine("mor_init_args(argc, argv);");
+      emitChildren(node);
+      emitLine("return 0;");
+      indentOut();
+      emitLine("}");
+    } else {
+      emitChildren(node);
+    }
+  }
+
+  on stmt.import_clause {
+    let i = 0;
+    let n = child_count();
+    while i < n {
+      let ch = getChild(node, i);
+      let uname = getAttr(ch, "import.name");
+      emitLine("#include \"" + uname + ".h\"");
+      i = i + 1;
+    }
+  }
+
+  on stmt.import_item { }
+
+  // -----------------------------------------------------------------------
+  // DECLARATION EMITTERS
+  // -----------------------------------------------------------------------
+
+  on stmt.var_block { emitChildren(node); }
+
+  on stmt.var_decl {
+    let typeStr = getAttr(node, "var.type_text");
+    let nameStr = getAttr(node, "var.name");
+    let isExternal = getAttr(node, "var.external");
+
+    // External import
+    if isExternal == "true" {
+      emitLine("extern " + resolveType(typeStr) + " " + nameStr + ";");
+      return;
+    }
+
+    // DLL export prefix
+    let exportAttr = getAttr(node, "var.export_attr");
+    if exportAttr != "" {
+      emitLine(exportAttr + " ");
+    }
+    // Handle array types
+    if startsWith(typeStr, "array") {
+      emitArrayVarDecl(nameStr, typeStr);
+    } else if startsWith(typeStr, "pointer") {
+      emitPointerVarDecl(nameStr, typeStr);
+    } else {
+      // Normal type with optional initializer
+      if child_count() > 0 {
+        let init = exprToString(getChild(node, 0));
+        emitLine(resolveType(typeStr) + " " + nameStr + " = " + init + ";");
+      } else {
+        emitLine(resolveType(typeStr) + " " + nameStr + ";");
+      }
+    }
+  }
+
+  on stmt.const_block { emitChildren(node); }
+
+  on stmt.const_decl {
+    let cname = getAttr(node, "const.name");
+    let ctype = getAttr(node, "const.type_text");
+    let prefix = "constexpr auto ";
+    if ctype != "" {
+      prefix = "constexpr " + resolveType(ctype) + " ";
+    }
+    if child_count() > 0 {
+      emitLine(prefix + cname + " = " + exprToString(getChild(node, 0)) + ";");
+    } else {
+      emitLine(prefix + cname + ";");
+    }
+  }
+
+  on stmt.type_block { emitChildren(node); }
+
+  on stmt.type_decl {
+    let tname = getAttr(node, "decl.name");
+    let tkind = getAttr(node, "type.kind");
+
+    if tkind == "record" or tkind == "overlay" {
+      let parentType = getAttr(node, "type.parent");
+      let isPacked = getAttr(node, "type.packed");
+      let alignVal = getAttr(node, "type.align");
+      if isPacked == "true" {
+        emitLine("#pragma pack(push, 1)");
+      }
+      let structLine = "";
+      if tkind == "overlay" {
+        structLine = "union ";
+      } else {
+        structLine = "struct ";
+      }
+      if alignVal != "" {
+        structLine = structLine + "alignas(" + alignVal + ") ";
+      }
+      structLine = structLine + tname;
+      if parentType != "" {
+        structLine = structLine + " : public " + parentType;
+      }
+      emitLine(structLine + " {");
+      indentIn();
+      if parentType != "" {
+        emitLine("using Super = " + parentType + ";");
+      }
+      emitChildren(node);
+      indentOut();
+      emitLine("};");
+      if isPacked == "true" {
+        emitLine("#pragma pack(pop)");
+      }
+      emitLine("");
+    } else if tkind == "alias" {
+      let aliasText = getAttr(node, "type.alias_text");
+      emitLine("using " + tname + " = " + resolveType(aliasText) + ";");
+    } else if tkind == "choices" {
+      let line = "enum " + tname + " \{ ";
+      let ci = 0;
+      let cn = child_count();
+      while ci < cn {
+        let cv = getChild(node, ci);
+        if ci > 0 { line = line + ", "; }
+        let cvname = getAttr(cv, "choice.name");
+        line = line + cvname;
+        if childCount(cv) > 0 {
+          line = line + " = " + exprToString(getChild(cv, 0));
+        }
+        ci = ci + 1;
+      }
+      emitLine(line + " };");
+    } else if tkind == "array" {
+      let elemType = getAttr(node, "type.elem_type");
+      let arrLow = getAttr(node, "type.array_low");
+      let arrHigh = getAttr(node, "type.array_high");
+      if arrLow != "" and arrHigh != "" {
+        let sz = strToInt(arrHigh) - strToInt(arrLow) + 1;
+        emitLine("using " + tname + " = std::array<" + resolveType(elemType) + ", " + intToStr(sz) + ">;");
+      } else {
+        emitLine("using " + tname + " = std::vector<" + resolveType(elemType) + ">;");
+      }
+    } else if tkind == "pointer" {
+      let pointee = getAttr(node, "type.pointee");
+      let isConst = getAttr(node, "type.pointer_const");
+      if pointee != "" {
+        if isConst == "true" {
+          emitLine("using " + tname + " = const " + resolveType(pointee) + "*;");
+        } else {
+          emitLine("using " + tname + " = " + resolveType(pointee) + "*;");
+        }
+      } else {
+        emitLine("using " + tname + " = void*;");
+      }
+    } else if tkind == "set" {
+      let rangeLow = getAttr(node, "type.set_range_low");
+      let rangeHigh = getAttr(node, "type.set_range_high");
+      let elemType = getAttr(node, "type.elem_type");
+      if rangeLow != "" and rangeHigh != "" {
+        // set of 0..255 -> std::bitset<256>
+        let sz = strToInt(rangeHigh) - strToInt(rangeLow) + 1;
+        emitLine("using " + tname + " = std::bitset<" + intToStr(sz) + ">;");
+      } else if elemType != "" {
+        // set of T -> std::set<T>
+        emitLine("using " + tname + " = std::set<" + resolveType(elemType) + ">;");
+      } else {
+        // bare set -> std::set<int32_t>
+        emitLine("using " + tname + " = std::set<int32_t>;");
+      }
+    } else if tkind == "routine_type" {
+      // RoutineType: emit as C++ function pointer typedef
+      let retType = getAttr(node, "type.return_type");
+      let linkage = getAttr(node, "type.linkage");
+      let retStr = "void";
+      if retType != "" { retStr = resolveType(retType); }
+      // Build parameter list
+      let params = "";
+      let first = true;
+      let pi = 0;
+      while pi < child_count() {
+        let pch = getChild(node, pi);
+        if nodeKind(pch) == "stmt.param_decl" {
+          if not first { params = params + ", "; }
+          params = params + resolveType(getAttr(pch, "param.type_text"));
+          first = false;
+        }
+        pi = pi + 1;
+      }
+      if linkage == "\"C\"" {
+        emitLine("extern \"C\" {");
+        emitLine("using " + tname + " = " + retStr + " (*)(" + params + ");");
+        emitLine("}");
+      } else {
+        emitLine("using " + tname + " = " + retStr + " (*)(" + params + ");");
+      }
+    } else if tkind == "object" {
+      let parentType = getAttr(node, "type.parent");
+      if parentType != "" {
+        emitLine("struct " + tname + " : public " + parentType + " {");
+        indentIn();
+        emitLine("using Super = " + parentType + ";");
+      } else {
+        emitLine("struct " + tname + " {");
+        indentIn();
+      }
+      emitChildren(node);
+      indentOut();
+      emitLine("};");
+      emitLine("");
+    } else {
+      emitChildren(node);
+    }
+  }
+
+  on stmt.field_decl {
+    let fname = getAttr(node, "field.name");
+    let ftype = getAttr(node, "field.type_text");
+    let bitwidth = getAttr(node, "field.bitwidth");
+    if startsWith(ftype, "array") {
+      emitArrayVarDecl(fname, ftype);
+    } else if startsWith(ftype, "pointer") {
+      emitPointerVarDecl(fname, ftype);
+    } else if bitwidth != "" {
+      emitLine(resolveType(ftype) + " " + fname + " : " + bitwidth + ";");
+    } else {
+      emitLine(resolveType(ftype) + " " + fname + ";");
+    }
+  }
+
+  // Anonymous overlay inside record -> C++ anonymous union
+  on stmt.anon_overlay {
+    emitLine("union {");
+    indentIn();
+    emitChildren(node);
+    indentOut();
+    emitLine("};");
+  }
+
+  // Anonymous record inside overlay -> C++ anonymous struct
+  on stmt.anon_record {
+    let isPacked = getAttr(node, "type.packed");
+    if isPacked == "true" {
+      emitLine("#pragma pack(push, 1)");
+    }
+    emitLine("struct {");
+    indentIn();
+    emitChildren(node);
+    indentOut();
+    emitLine("};");
+    if isPacked == "true" {
+      emitLine("#pragma pack(pop)");
+    }
+  }
+
+  on stmt.choices_value { }
+
+  // Exported: emit header forward declarations for lib, then emit child
+  on stmt.exported {
+    let n = child_count();
+    if n > 0 {
+      let ch = getChild(node, 0);
+      let chKind = nodeKind(ch);
+      // For lib modules, emit forward declarations to header
+      if chKind == "stmt.routine_decl" and not has_attr("decl.export_attr") {
+        emitRoutineForwardDecl(ch);
+      } else if chKind == "stmt.var_block" {
+        emitExportedVarForwardDecls(ch);
+      }
+    }
+    emitChildren(node);
+  }
+
+  // -----------------------------------------------------------------------
+  // ROUTINE EMITTERS
+  // -----------------------------------------------------------------------
+
+  on stmt.routine_decl {
+    let rname = getAttr(node, "decl.name");
+    let retType = getAttr(node, "decl.return_type");
+    let linkage = getAttr(node, "decl.linkage");
+    let isExported = getAttr(node, "decl.exported");
+    let isExternal = getAttr(node, "decl.external");
+    let isCLink = (linkage == "\"C\"");
+    let exportAttr = getAttr(node, "decl.export_attr");
+
+    // External import: forward declaration only
+    if isExternal == "true" {
+      if isCLink { emitLine("extern \"C\" {"); }
+      let sig = buildRoutineSig(node, rname, retType);
+      emitLine(sig + ";");
+      if isCLink { emitLine("}"); }
+      emitLine("");
+      return;
+    }
+
+    // Open extern "C" block if C linkage
+    if isCLink { emitLine("extern \"C\" {"); }
+
+    // DLL export prefix or static for non-exported
+    if exportAttr != "" {
+      emitLine(exportAttr + " ");
+    } else if isExported != "true" {
+      emitLine("static ");
+    }
+
+    // Function signature
+    let sig = buildRoutineSig(node, rname, retType);
+    emitLine(sig + " {");
+    indentIn();
+
+    // Variadic preamble
+    if getAttr(node, "decl.variadic") == "true" {
+      emitLine("mor_varargs __mor_va;");
+      emitLine("mor_varargs_start(__mor_va, __mor_vararg_count);");
+    }
+
+    // Body: emit non-param children
+    let bi = 0;
+    while bi < child_count() {
+      let bch = getChild(node, bi);
+      if nodeKind(bch) != "stmt.param_decl" {
+        emitNode(bch);
+      }
+      bi = bi + 1;
+    }
+
+    indentOut();
+    emitLine("}");
+    if isCLink { emitLine("}"); }
+    emitLine("");
+  }
+
+  on stmt.param_decl { }
+
+  on stmt.method_decl {
+    let rname = getAttr(node, "decl.name");
+    let retType = getAttr(node, "decl.return_type");
+    let sig = buildRoutineSig(node, rname, retType);
+    emitLine(sig + " {");
+    indentIn();
+    let bi = 0;
+    while bi < child_count() {
+      let bch = getChild(node, bi);
+      if nodeKind(bch) != "stmt.param_decl" {
+        emitNode(bch);
+      }
+      bi = bi + 1;
+    }
+    indentOut();
+    emitLine("}");
+  }
+
+  // -----------------------------------------------------------------------
+  // STATEMENT EMITTERS
+  // -----------------------------------------------------------------------
+
+  // Directive emitters: wire to pipeline builtins
+  on stmt.directive_optimize    { setOptimize(getAttr(node, "value")); }
+  on stmt.directive_subsystem   { setSubsystem(getAttr(node, "value")); }
+  on stmt.directive_target      { setPlatform(getAttr(node, "value")); }
+  on stmt.directive_addverinfo  { setAddVerInfo(getAttr(node, "value")); }
+  on stmt.directive_vimajor     { setVersionMajor(getAttr(node, "value")); }
+  on stmt.directive_viminor     { setVersionMinor(getAttr(node, "value")); }
+  on stmt.directive_vipatch     { setVersionPatch(getAttr(node, "value")); }
+  on stmt.directive_viproductname { setProductName(getAttr(node, "value")); }
+  on stmt.directive_videscription { setDescription(getAttr(node, "value")); }
+  on stmt.directive_vifilename  { setFilename(getAttr(node, "value")); }
+  on stmt.directive_vicompanyname { setCompanyName(getAttr(node, "value")); }
+  on stmt.directive_vicopyright { setCopyright(getAttr(node, "value")); }
+  on stmt.directive_exeicon     { setExeIcon(getAttr(node, "value")); }
+  on stmt.directive_copydll     { addCopyDLL(getAttr(node, "value")); }
+  on stmt.directive_linklibrary { addLinkLibrary(getAttr(node, "value")); }
+  on stmt.directive_librarypath { addLibraryPath(getAttr(node, "value")); }
+  on stmt.directive_modulepath  { addIncludePath(getAttr(node, "value")); }
+  on stmt.directive_includepath { addIncludePath(getAttr(node, "value")); }
+  on stmt.directive_breakpoint  { }
+  on stmt.directive_message     {
+    // BNF: @message hint|warn|error|fatal "text"
+    // severity in @severity attr, text in @value attr
+    // No C++ output needed; handled at parse time
+  }
+
+  on stmt.begin_block  { emitChildren(node); }
+  on stmt.then_branch  { emitChildren(node); }
+  on stmt.else_branch  { emitChildren(node); }
+
+  // Expression-statement (identifier-led: assignment or call)
+  on stmt.expr {
+    emitLine(exprToString(getChild(node, 0)) + ";");
+  }
+
+  on stmt.if {
+    let cond = exprToString(getChild(node, 0));
+    emitLine("if (" + cond + ") {");
+    indentIn();
+    emitNode(getChild(node, 1));
+    indentOut();
+    if child_count() > 2 {
+      emitLine("} else {");
+      indentIn();
+      emitNode(getChild(node, 2));
+      indentOut();
+    }
+    emitLine("}");
+  }
+
+  on stmt.while {
+    let cond = exprToString(getChild(node, 0));
+    emitLine("while (" + cond + ") {");
+    indentIn();
+    let wi = 1;
+    while wi < child_count() {
+      emitNode(getChild(node, wi));
+      wi = wi + 1;
+    }
+    indentOut();
+    emitLine("}");
+  }
+
+  on stmt.for {
+    let varName = getAttr(node, "for.var");
+    let startExpr = exprToString(getChild(node, 0));
+    let finishExpr = exprToString(getChild(node, 1));
+    let dir = getAttr(node, "for.dir");
+    if dir == "to" {
+      emitLine("for (auto " + varName + " = " + startExpr + "; " + varName + " <= " + finishExpr + "; ++" + varName + ") {");
+    } else {
+      emitLine("for (auto " + varName + " = " + startExpr + "; " + varName + " >= " + finishExpr + "; --" + varName + ") {");
+    }
+    indentIn();
+    let fi = 2;
+    while fi < child_count() {
+      emitNode(getChild(node, fi));
+      fi = fi + 1;
+    }
+    indentOut();
+    emitLine("}");
+  }
+
+  on stmt.repeat {
+    emitLine("do {");
+    indentIn();
+    let ri = 0;
+    while ri < child_count() - 1 {
+      emitNode(getChild(node, ri));
+      ri = ri + 1;
+    }
+    indentOut();
+    let cond = exprToString(getChild(node, child_count() - 1));
+    emitLine("} while (!(" + cond + "));");
+  }
+
+  on stmt.match {
+    emitLine("{");
+    indentIn();
+    let selector = exprToString(getChild(node, 0));
+    emitLine("auto __match_val = " + selector + ";");
+    let first = true;
+    let mi = 1;
+    while mi < child_count() {
+      let arm = getChild(node, mi);
+      let armKind = nodeKind(arm);
+      if armKind == "stmt.match_else" {
+        emitLine("} else {");
+        indentIn();
+        emitBlock(arm);
+        indentOut();
+      } else {
+        // match arm
+        if first {
+          let line = "if (";
+        } else {
+          let line = "} else if (";
+        }
+        let firstLbl = true;
+        let lj = 0;
+        while lj < childCount(arm) {
+          let lbl = getChild(arm, lj);
+          if nodeKind(lbl) == "stmt.match_label" {
+            if not firstLbl { line = line + " || "; }
+            if childCount(lbl) == 2 {
+              // Range label: low..high
+              let lo = exprToString(getChild(lbl, 0));
+              let hi = exprToString(getChild(lbl, 1));
+              line = line + "(__match_val >= " + lo + " && __match_val <= " + hi + ")";
+            } else {
+              // Single value label
+              let val = exprToString(getChild(lbl, 0));
+              line = line + "__match_val == " + val;
+            }
+            firstLbl = false;
+          }
+          lj = lj + 1;
+        }
+        emitLine(line + ") {");
+        indentIn();
+        // Emit non-label children as body
+        let bj = 0;
+        while bj < childCount(arm) {
+          let bch = getChild(arm, bj);
+          if nodeKind(bch) != "stmt.match_label" {
+            emitNode(bch);
+          }
+          bj = bj + 1;
+        }
+        indentOut();
+        first = false;
+      }
+      mi = mi + 1;
+    }
+    emitLine("}");
+    indentOut();
+    emitLine("}");
+  }
+
+  on stmt.match_arm   { }
+  on stmt.match_else  { }
+  on stmt.match_label { }
+
+  on stmt.return {
+    if child_count() > 0 {
+      emitLine("return " + exprToString(getChild(node, 0)) + ";");
+    } else {
+      emitLine("return;");
+    }
+  }
+
+  on stmt.guard {
+    emitLine("try {");
+    indentIn();
+    if child_count() > 0 {
+      emitNode(getChild(node, 0));
+    }
+    indentOut();
+    let gi = 1;
+    while gi < child_count() {
+      emitNode(getChild(node, gi));
+      gi = gi + 1;
+    }
+  }
+
+  on stmt.guard_body  { emitChildren(node); }
+
+  on stmt.except_block {
+    emitLine("} catch (const std::exception& __mor_ex) {");
+    indentIn();
+    emitChildren(node);
+    indentOut();
+  }
+
+  on stmt.finally_block {
+    emitLine("} // finally");
+    emitLine("{");
+    indentIn();
+    emitChildren(node);
+    indentOut();
+    emitLine("}");
+  }
+
+  // Memory management
+  on stmt.create {
+    emitLine("mor_create(" + exprToString(getChild(node, 0)) + ");");
+  }
+  on stmt.destroy {
+    emitLine("mor_destroy(" + exprToString(getChild(node, 0)) + ");");
+  }
+  on stmt.getmem {
+    emitLine("mor_getmem(" + exprToString(getChild(node, 0)) + ");");
+  }
+  on stmt.freemem {
+    emitLine("mor_freemem(" + exprToString(getChild(node, 0)) + ");");
+  }
+  on stmt.resizemem {
+    emitLine("mor_resizemem(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ");");
+  }
+  on stmt.setlength {
+    emitLine(exprToString(getChild(node, 0)) + ".resize(" + exprToString(getChild(node, 1)) + ");");
+  }
+
+  on stmt.raiseexception {
+    emitLine("throw std::runtime_error(" + exprToString(getChild(node, 0)) + ");");
+  }
+  on stmt.raiseexceptioncode {
+    emitLine("mor_throw(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ");");
+  }
+
+  on stmt.writeln {
+    let args = "";
+    let wi = 0;
+    let wn = child_count();
+    while wi < wn {
+      if wi > 0 { args = args + ", "; }
+      args = args + exprToString(getChild(node, wi));
+      wi = wi + 1;
+    }
+    emitLine("std::println(" + args + ");");
+  }
+
+  on stmt.write {
+    let args = "";
+    let wi = 0;
+    let wn = child_count();
+    while wi < wn {
+      if wi > 0 { args = args + ", "; }
+      args = args + exprToString(getChild(node, wi));
+      wi = wi + 1;
+    }
+    emitLine("std::print(" + args + ");");
+  }
+
+  // -----------------------------------------------------------------------
+  // EXPRESSION EMITTERS
+  // -----------------------------------------------------------------------
+
+  on expr.binary {
+    let lhs = exprToString(getChild(node, 0));
+    let rhs = exprToString(getChild(node, 1));
+    let op = getAttr(node, "operator");
+    // Map Myra operators to C++
+    if op == "=" { op = "=="; }
+    else if op == "<>" { op = "!="; }
+    else if op == "div" { op = "/"; }
+    else if op == "mod" { op = "%"; }
+    else if op == "and" { op = "&&"; }
+    else if op == "or" { op = "||"; }
+    else if op == "xor" { op = "^"; }
+    emit "(" + lhs + " " + op + " " + rhs + ")";
+  }
+
+  on expr.assign {
+    let lhsNode = getChild(node, 0);
+    let lhs = exprToString(lhsNode);
+    let rhsNode = getChild(node, 1);
+    let rhs = exprToString(rhsNode);
+    // Single-char string assigned to a char-typed target -> emit as char literal
+    if nodeKind(rhsNode) == "expr.cstring" and len(getAttr(rhsNode, "value")) == 1 {
+      let varName = "";
+      let lhsKind = nodeKind(lhsNode);
+      if lhsKind == "expr.array_index" {
+        let arrNode = getChild(lhsNode, 0);
+        if nodeKind(arrNode) == "expr.ident" { varName = getAttr(arrNode, "name"); }
+      } else if lhsKind == "expr.ident" {
+        varName = getAttr(lhsNode, "name");
+      }
+      if varName != "" {
+        let varType = lookupSymbolType(varName);
+        if varType == "char" or contains(varType, "of char") {
+          rhs = "'" + getAttr(rhsNode, "value") + "'";
+        }
+      }
+    }
+    let op = getAttr(node, "operator");
+    // Map := to =
+    if op == ":=" { op = "="; }
+    emit lhs + " " + op + " " + rhs;
+  }
+
+  on expr.not {
+    emit "(!(" + exprToString(getChild(node, 0)) + "))";
+  }
+
+  on expr.negate {
+    emit "(-" + exprToString(getChild(node, 0)) + ")";
+  }
+
+  on expr.unary_plus {
+    emit "(+" + exprToString(getChild(node, 0)) + ")";
+  }
+
+  on expr.address_of {
+    emit "&(" + exprToString(getChild(node, 0)) + ")";
+  }
+
+  on expr.call {
+    let rawName = getAttr(node, "call.name");
+    let callName = resolveType(rawName);
+
+    // sizeof(type) -- type stored as attribute, not child node
+    let sizeofType = getAttr(node, "call.sizeof_type");
+    if sizeofType != "" {
+      emit "sizeof(" + resolveType(sizeofType) + ")";
+      return;
+    }
+
+    let args = "";
+    let ai = 0;
+    let an = child_count();
+    // For infix calls, child 0 is the callee -- skip it
+    if an > 0 {
+      let ch0 = getChild(node, 0);
+      let ch0Kind = nodeKind(ch0);
+      if ch0Kind == "expr.ident" and getAttr(ch0, "name") == rawName {
+        ai = 1;
+      } else if ch0Kind == "expr.cpp_qualified" and getAttr(ch0, "qualified.name") == rawName {
+        ai = 1;
+      }
+    }
+    let first = true;
+    let argStart = ai;
+    while ai < an {
+      if not first { args = args + ", "; }
+      args = args + exprToString(getChild(node, ai));
+      first = false;
+      ai = ai + 1;
+    }
+    // Variadic call: prepend arg count
+    if getAttr(node, "call.variadic") == "true" {
+      let argCount = intToStr(an - argStart);
+      if args != "" {
+        args = argCount + ", " + args;
+      } else {
+        args = argCount;
+      }
+    }
+    emit callName + "(" + args + ")";
+  }
+
+  // Method call: obj.method(args) or obj->method(args)
+  on expr.method_call {
+    let fieldNode = getChild(node, 0);
+    let fieldName = getAttr(fieldNode, "field.name");
+    let obj = exprToString(getChild(fieldNode, 0));
+    let sep = ".";
+    if nodeKind(fieldNode) == "expr.cpp_arrow" { sep = "->"; }
+    let args = "";
+    let ai = 1;
+    while ai < child_count() {
+      if ai > 1 { args = args + ", "; }
+      args = args + exprToString(getChild(node, ai));
+      ai = ai + 1;
+    }
+    emit obj + sep + fieldName + "(" + args + ")";
+  }
+
+  on expr.field_access {
+    let fieldName = getAttr(node, "field.name");
+    emit exprToString(getChild(node, 0)) + "." + fieldName;
+  }
+
+  on expr.array_index {
+    emit exprToString(getChild(node, 0)) + "[" + exprToString(getChild(node, 1)) + "]";
+  }
+
+  on expr.deref {
+    emit "(*" + exprToString(getChild(node, 0)) + ")";
+  }
+
+  on expr.grouped {
+    emit "(" + exprToString(getChild(node, 0)) + ")";
+  }
+
+  on expr.shl {
+    emit "(" + exprToString(getChild(node, 0)) + " << " + exprToString(getChild(node, 1)) + ")";
+  }
+
+  on expr.shr {
+    emit "(" + exprToString(getChild(node, 0)) + " >> " + exprToString(getChild(node, 1)) + ")";
+  }
+
+  on expr.in {
+    emit "mor_contains(" + exprToString(getChild(node, 1)) + ", " + exprToString(getChild(node, 0)) + ")";
+  }
+
+  // Literal emitters
+  on expr.integer {
+    emit @value;
+  }
+
+  on expr.float {
+    emit @value;
+  }
+
+  on expr.ident {
+    emit @name;
+  }
+
+  on expr.cstring {
+    emit "\"" + @value + "\"";
+  }
+
+  // Char literal: '...'
+  on expr.cchar {
+    emit "'" + @value + "'";
+  }
+
+  // expr.wstring: prepend L prefix for C++ wide string
+  on expr.wstring {
+    emit "L\"" + @value + "\"";
+  }
+
+  on expr.nil {
+    emit "nullptr";
+  }
+
+  on expr.bool {
+    let val = getAttr(node, "value");
+    if val == "true" { emit "true"; }
+    else { emit "false"; }
+  }
+
+  on expr.self {
+    emit "this";
+  }
+
+  on expr.parent {
+    emit "Super";
+  }
+
+  // Set literal: [elem, elem..elem, ...]
+  on expr.set_literal {
+    let result = "mor_set({";
+    let si = 0;
+    let sn = child_count();
+    while si < sn {
+      let elem = getChild(node, si);
+      if si > 0 { result = result + ", "; }
+      if childCount(elem) == 2 {
+        // Range element: expand via helper
+        result = result + "mor_range(" + exprToString(getChild(elem, 0)) + ", " + exprToString(getChild(elem, 1)) + ")";
+      } else {
+        result = result + exprToString(getChild(elem, 0));
+      }
+      si = si + 1;
+    }
+    emit result + "})";
+  }
+
+  on expr.type_ref {
+    emit resolveType(getAttr(node, "type.name"));
+  }
+
+  on expr.varargs {
+    let access = getAttr(node, "varargs.access");
+    if access == "count" {
+      emit "__mor_va.count";
+    } else if access == "next" {
+      let t = resolveType(getAttr(node, "varargs.type"));
+      emit "__mor_va.next<" + t + ">()";
+    } else {
+      emit "__mor_va";
+    }
+  }
+
+} // end emitters

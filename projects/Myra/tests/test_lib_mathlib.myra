@@ -1,0 +1,73 @@
+// test_lib_mathlib.myra - Tests: exported, linkage, static, overloads, W200 warning
+//
+// Visibility x Linkage matrix coverage:
+//   routine Foo()                  -> static void Foo()             (private, C++)
+//   routine "C" Foo()              -> extern "C" { static void Foo() } (private, C)
+//   exported routine Foo()         -> void Foo() + header fwd-decl  (public, C++)
+//   exported routine "C" Foo()     -> extern "C" { void Foo() } + header (public, C)
+//
+// Overload coverage:
+//   Add(i32,i32) + Add(f32,f32)   -> overload OK, C++ linkage
+//   "C" Max(i32,i32) + Max(f32,f32) -> W200: demote first "C" to C++
+
+/* ALLOW_WARNINGS */
+
+module lib test_lib_mathlib;
+
+// ----- Private routine (no exported) — should emit: static void Helper(...) -----
+routine Helper(const A: int32; const B: int32): int32;
+begin
+  return A + B;
+end;
+
+// ----- Private + "C" linkage — should emit: extern "C" { static void CHelper(...) } -----
+routine "C" CHelper(const A: int32): int32;
+begin
+  return A * 2;
+end;
+
+// ----- Exported, C++ linkage — should emit: void Add(...) + header fwd-decl -----
+// Also first overload of Add — calls private Helper to validate internal visibility
+exported routine Add(const A: int32; const B: int32): int32;
+begin
+  return Helper(A, B);
+end;
+
+// ----- Second overload of Add — different param types, C++ linkage -----
+exported routine Add(const A: float32; const B: float32): float32;
+begin
+  return A + B;
+end;
+
+// ----- Third overload of Add — float64, C++ linkage -----
+exported routine Add(const A: float64; const B: float64): float64;
+begin
+  return A + B;
+end;
+
+// ----- Exported + "C" linkage — should emit: extern "C" { void Multiply(...) } + header -----
+exported routine "C" Multiply(const A: int32; const B: int32): int32;
+begin
+  return A * B;
+end;
+
+// ----- Overload with "C" linkage — should trigger W200 warning -----
+// First: "C" linkage on Max(int32) — will be retroactively demoted when second overload arrives
+exported routine "C" Max(const A: int32; const B: int32): int32;
+begin
+  if A > B then
+    return A;
+  end;
+  return B;
+end;
+
+// Second overload of Max — triggers overload detection, demotes both to C++
+exported routine Max(const A: float32; const B: float32): float32;
+begin
+  if A > B then
+    return A;
+  end;
+  return B;
+end;
+
+end.

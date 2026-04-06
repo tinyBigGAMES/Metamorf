@@ -1,0 +1,21 @@
+/* EXPECT:
+two
+*/
+
+// test_exe_match — Match statement
+module exe test_exe_match;
+
+var
+  x: int32;
+
+begin
+  x := 2;
+
+  match x of
+    1: writeln("one");
+    2: writeln("two");
+    3: writeln("three");
+  else
+    writeln("other");
+  end;
+end.

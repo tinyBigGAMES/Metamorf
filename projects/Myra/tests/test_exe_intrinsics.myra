@@ -1,0 +1,65 @@
+/* EXPECT: === size(type) ===
+size(int8) = 1
+size(int16) = 2
+size(int32) = 4
+size(int64) = 8
+size(uint8) = 1
+size(uint16) = 2
+size(uint32) = 4
+size(uint64) = 8
+size(float32) = 4
+size(float64) = 8
+size(boolean) = 1
+size(char) = 1
+size(wchar) = 2
+=== size(expr) ===
+size(x) = 4
+size(y) = 8
+=== paramcount/paramstr ===
+paramcount = 0
+=== Done === */
+
+module exe test_exe_intrinsics;
+
+var
+  x: int32;
+  y: float64;
+  i: int32;
+  n: int32;
+
+begin
+  writeln("=== size(type) ===");
+  writeln("size(int8) = {}", size(int8));
+  writeln("size(int16) = {}", size(int16));
+  writeln("size(int32) = {}", size(int32));
+  writeln("size(int64) = {}", size(int64));
+  writeln("size(uint8) = {}", size(uint8));
+  writeln("size(uint16) = {}", size(uint16));
+  writeln("size(uint32) = {}", size(uint32));
+  writeln("size(uint64) = {}", size(uint64));
+  writeln("size(float32) = {}", size(float32));
+  writeln("size(float64) = {}", size(float64));
+  writeln("size(boolean) = {}", size(boolean));
+  writeln("size(char) = {}", size(char));
+  writeln("size(wchar) = {}", size(wchar));
+
+  writeln("=== size(expr) ===");
+  x := 42;
+  y := 3.14;
+  writeln("size(x) = {}", size(x));
+  writeln("size(y) = {}", size(y));
+
+  writeln("=== paramcount/paramstr ===");
+  n := paramcount();
+  writeln("paramcount = {}", n);
+  
+  /* paramstr(0) = full path to exe, varies by machine so not in EXPECT */
+  /* Loop from 1 to n prints user args only */
+  i := 0;
+  while i <= n do
+    writeln("paramstr({}) = {}", i, paramstr(i));
+    i := i + 1;
+  end;
+
+  writeln("=== Done ===");
+end.

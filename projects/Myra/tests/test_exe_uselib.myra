@@ -1,0 +1,57 @@
+/* EXPECT:
+Add(3, 4) = 7
+Add(1.5, 2.3) [f32] = 3.8
+Add(1.5f, 2.3f) = 3.8
+Add(1.5, 2.3) [f64] = 3.8
+Multiply(5, 6) = 30
+Max(10, 7) = 10
+Max(3.14, 2.71) = 3.14
+*/
+
+/* ALLOW_WARNINGS */
+
+// test_exe_uselib.myra - Myra exe module that imports a lib
+// Tests: module exe, import clause, calling exported routines from test_lib_mathlib.
+// Exercises: overloaded Add (int32 vs float32 vs float64), float literal type resolution,
+//   explicit f suffix, "C" linkage Multiply, demoted Max overloads.
+// Note: Helper and CHelper are private — NOT callable from here.
+
+module exe test_exe_uselib;
+
+import test_lib_mathlib;
+
+var
+  LIntResult: int32;
+  LFloatResult: float32;
+  LDoubleResult: float64;
+
+begin
+  // int32 overload — integer literals, no ambiguity
+  LIntResult := Add(3, 4);
+  writeln("Add(3, 4) = {}", LIntResult);
+
+  // float32 overload — UNSUFFIXED literals, context resolves to float32 → emits 1.5f, 2.3f
+  LFloatResult := Add(1.5, 2.3);
+  writeln("Add(1.5, 2.3) [f32] = {}", LFloatResult);
+
+  // float32 overload — EXPLICIT f suffix, codegen passes through as-is
+  LFloatResult := Add(1.5f, 2.3f);
+  writeln("Add(1.5f, 2.3f) = {}", LFloatResult);
+
+  // float64 overload — UNSUFFIXED literals, context resolves to float64 → emits 1.5, 2.3 (no suffix)
+  LDoubleResult := Add(1.5, 2.3);
+  writeln("Add(1.5, 2.3) [f64] = {}", LDoubleResult);
+
+  // "C" linkage, no overload
+  LIntResult := Multiply(5, 6);
+  writeln("Multiply(5, 6) = {}", LIntResult);
+
+  // Max int32 — was "C" but demoted (W200)
+  LIntResult := Max(10, 7);
+  writeln("Max(10, 7) = {}", LIntResult);
+
+  // Max float32 — unsuffixed literals, context resolves → emits 3.14f, 2.71f
+  LFloatResult := Max(3.14, 2.71);
+  writeln("Max(3.14, 2.71) = {}", LFloatResult);
+
+end.

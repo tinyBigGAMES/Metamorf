@@ -1,0 +1,51 @@
+/* EXPECT: === Record with string ===
+Label: test
+Value: 42
+=== Record with string and dynamic array ===
+Title: items
+Item 0: first
+Item 1: second
+Done
+*/
+
+module exe test_exe_new_dispose_managed;
+
+type
+  TSimple = record
+    Label: string;
+    Value: int32;
+  end;
+  
+  TComplex = record
+    Title: string;
+    Items: array of string;
+    Count: int32;
+  end;
+
+var
+  p1: pointer to TSimple;
+  p2: pointer to TComplex;
+
+begin
+  writeln("=== Record with string ===");
+  create(p1);
+  p1^.Label := "test";
+  p1^.Value := 42;
+  writeln("Label: {}", p1^.Label);
+  writeln("Value: {}", p1^.Value);
+  destroy(p1);
+  
+  writeln("=== Record with string and dynamic array ===");
+  create(p2);
+  p2^.Title := "items";
+  setlength(p2^.Items, 2);
+  p2^.Items[0] := "first";
+  p2^.Items[1] := "second";
+  p2^.Count := 2;
+  writeln("Title: {}", p2^.Title);
+  writeln("Item 0: {}", p2^.Items[0]);
+  writeln("Item 1: {}", p2^.Items[1]);
+  destroy(p2);
+  
+  writeln("Done");
+end.
