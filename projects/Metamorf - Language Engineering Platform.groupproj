@@ -15,6 +15,9 @@
         <Projects Include="MorTestbed\MorTestbed.dproj">
             <Dependencies>MorLSP\MorLSP.dproj;Mor\Mor.dproj;Metamorf\Metamorf.dproj</Dependencies>
         </Projects>
+        <Projects Include="Myra\MyraTester.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -59,14 +62,23 @@
     <Target Name="MorTestbed:Make" DependsOnTargets="MorLSP:Make;Mor:Make;Metamorf:Make">
         <MSBuild Projects="MorTestbed\MorTestbed.dproj" Targets="Make"/>
     </Target>
+    <Target Name="MyraTester">
+        <MSBuild Projects="Myra\MyraTester.dproj"/>
+    </Target>
+    <Target Name="MyraTester:Clean">
+        <MSBuild Projects="Myra\MyraTester.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="MyraTester:Make">
+        <MSBuild Projects="Myra\MyraTester.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="Metamorf;MorLSP;Mor;MorTestbed"/>
+        <CallTarget Targets="Metamorf;MorLSP;Mor;MorTestbed;MyraTester"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="Metamorf:Clean;MorLSP:Clean;Mor:Clean;MorTestbed:Clean"/>
+        <CallTarget Targets="Metamorf:Clean;MorLSP:Clean;Mor:Clean;MorTestbed:Clean;MyraTester:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="Metamorf:Make;MorLSP:Make;Mor:Make;MorTestbed:Make"/>
+        <CallTarget Targets="Metamorf:Make;MorLSP:Make;Mor:Make;MorTestbed:Make;MyraTester:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
