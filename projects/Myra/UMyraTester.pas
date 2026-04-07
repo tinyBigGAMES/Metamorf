@@ -1,11 +1,12 @@
 ﻿{===============================================================================
-  Myra Language — Test Harness
-
-  Standalone entry point that creates a TMyraTester, registers all Myra
-  test files, configures build settings, and runs the suite.
+  Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
 ===============================================================================}
 
 unit UMyraTester;
@@ -103,7 +104,8 @@ begin
       LTester.RegisterTest(0453, 'test_exe_raylib', False);
 
       //LTester.RunAllTests();
-      LTester.RunTestByIndex(159);
+      //LTester.RunTestByIndex(159);
+      LTester.RunTestByIndex(0);
     finally
       LTester.Free();
     end;
@@ -111,13 +113,13 @@ begin
   except
     on E: Exception do
     begin
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + 'EXCEPTION: %s', [E.Message]);
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn(COLOR_RED + 'EXCEPTION: %s', [E.Message]);
     end;
   end;
 
-  if TUtils.RunFromIDE() then
-    TUtils.Pause();
+  if TMorUtils.RunFromIDE() then
+    TMorUtils.Pause();
 
 end;
 

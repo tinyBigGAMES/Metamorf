@@ -1,4 +1,15 @@
-﻿library Metamorf;
+﻿{===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+===============================================================================}
+
+library Metamorf;
 
 { Important note about DLL memory management: ShareMem must be the
   first unit in your library's USES clause AND your project's (select

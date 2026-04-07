@@ -1,3 +1,14 @@
+{===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+===============================================================================}
+
 unit UTest.Debug;
 
 {$I Metamorf.Defines.inc}
@@ -18,12 +29,12 @@ procedure Test01();
 var
   LBasePath: string;
   LExePath: string;
-  LREPL: TMetamorfDebugREPL;
+  LREPL: TMorDebugREPL;
 begin
-  TUtils.PrintLn('========================================');
-  TUtils.PrintLn('Test01: PDB DAP Debugger (REPL)');
-  TUtils.PrintLn('========================================');
-  TUtils.PrintLn('');
+  TMorUtils.PrintLn('========================================');
+  TMorUtils.PrintLn('Test01: PDB DAP Debugger (REPL)');
+  TMorUtils.PrintLn('========================================');
+  TMorUtils.PrintLn('');
 
   LBasePath := ExtractFilePath(ParamStr(0));
   LExePath := TPath.Combine(LBasePath,
@@ -31,14 +42,14 @@ begin
 
   if not TFile.Exists(LExePath) then
   begin
-    TUtils.PrintLn(COLOR_RED +
+    TMorUtils.PrintLn(COLOR_RED +
       'ERROR: Executable not found: ' + LExePath);
-    TUtils.PrintLn(COLOR_YELLOW +
+    TMorUtils.PrintLn(COLOR_YELLOW +
       'Compile hello_debug.pas first.');
     Exit;
   end;
 
-  LREPL := TMetamorfDebugREPL.Create();
+  LREPL := TMorDebugREPL.Create();
   try
     LREPL.Run(LExePath);
   finally

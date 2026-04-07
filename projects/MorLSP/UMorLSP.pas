@@ -31,7 +31,7 @@ begin
   try
     if ParamCount() < 1 then
     begin
-      TUtils.PrintLn('Usage: MorLSP <lang.mor>');
+      TMorUtils.PrintLn('Usage: MorLSP <lang.mor>');
       Exit;
     end;
 
@@ -46,8 +46,8 @@ begin
   except
     on E: Exception do
     begin
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + 'EXCEPTION: ' + E.Message + COLOR_RESET);
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn(COLOR_RED + 'EXCEPTION: ' + E.Message + COLOR_RESET);
     end;
   end;
 end;

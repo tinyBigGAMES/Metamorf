@@ -1,11 +1,12 @@
 ﻿{===============================================================================
-  Myra Language — Test Runner
-
-  Compiles and runs .myra test files via TMorEngine, checking exit codes
-  and expected output.
+  Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
 ===============================================================================}
 
 unit Myra.Tester;
@@ -64,14 +65,14 @@ type
   end;
 
   { TMyraTester }
-  TMyraTester = class(TOutputObject)
+  TMyraTester = class(TMorOutputObject)
   private
     FLangFile:        string;
     FTestFolder:      string;
     FOutputPath:      string;
-    FTarget:          TTargetPlatform;
-    FOptimizeLevel:   TOptimizeLevel;
-    FSubsystem:       TSubsystemType;
+    FTarget:          TMorTargetPlatform;
+    FOptimizeLevel:   TMorOptimizeLevel;
+    FSubsystem:       TMorSubsystemType;
     FVerbose:         Boolean;
     FPassCount:       Integer;
     FFailCount:       Integer;
@@ -133,9 +134,9 @@ type
     property LangFile:        string          read FLangFile        write FLangFile;
     property TestFolder:      string          read FTestFolder      write FTestFolder;
     property OutputPath:      string          read FOutputPath      write FOutputPath;
-    property Target:          TTargetPlatform read FTarget          write FTarget;
-    property OptimizeLevel:   TOptimizeLevel  read FOptimizeLevel   write FOptimizeLevel;
-    property Subsystem:       TSubsystemType  read FSubsystem       write FSubsystem;
+    property Target:          TMorTargetPlatform read FTarget          write FTarget;
+    property OptimizeLevel:   TMorOptimizeLevel  read FOptimizeLevel   write FOptimizeLevel;
+    property Subsystem:       TMorSubsystemType  read FSubsystem       write FSubsystem;
     property Verbose:         Boolean         read FVerbose         write FVerbose;
     property OutputCallback:  TProc<string>   read FOutputCallback  write FOutputCallback;
     property PassCount:       Integer         read FPassCount;
@@ -266,7 +267,7 @@ begin
   if Assigned(FOutputCallback) then
     FOutputCallback(AText)
   else
-    TUtils.PrintLn(AText);
+    TMorUtils.PrintLn(AText);
 end;
 
 procedure TMyraTester.Print(const AFormat: string;
@@ -345,8 +346,8 @@ var
   LAllowWarnings:    Boolean;
   LExitCode:         DWORD;
   LTestName:         string;
-  LErrors:           TErrors;
-  LItems:            TList<TError>;
+  LErrors:           TMorErrors;
+  LItems:            TList<TMorError>;
   LI:                Integer;
   LOutputShown:      Boolean;
 begin
@@ -393,7 +394,7 @@ begin
           if Assigned(FOutputCallback) then
             FOutputCallback(AText)
           else
-            TUtils.PrintLn(AText);
+            TMorUtils.PrintLn(AText);
         end);
 
     LEngine.SetOutputCallback(
@@ -407,7 +408,7 @@ begin
         if Assigned(FOutputCallback) then
           FOutputCallback(ALine)
         else
-          TUtils.Print(ALine);
+          TMorUtils.Print(ALine);
       end);
 
     // Compile (and optionally run)

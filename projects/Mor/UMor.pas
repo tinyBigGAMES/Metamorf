@@ -42,8 +42,8 @@ begin
   except
     on E: Exception do
     begin
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + 'EXCEPTION: ' + E.Message + COLOR_RESET);
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn(COLOR_RED + 'EXCEPTION: ' + E.Message + COLOR_RESET);
     end;
   end;
 end;

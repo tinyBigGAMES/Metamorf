@@ -1,6 +1,6 @@
 ﻿{===============================================================================
-
   Metamorf™ - Language Engineering Platform
+
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
 
@@ -44,8 +44,8 @@ procedure BeginSection(const ATitle: string);
 begin
   GSectionPass := 0;
   GSectionTotal := 0;
-  TUtils.PrintLn('');
-  TUtils.PrintLn(COLOR_CYAN + '  ' + ATitle);
+  TMorUtils.PrintLn('');
+  TMorUtils.PrintLn(COLOR_CYAN + '  ' + ATitle);
 end;
 
 procedure Check(const ACondition: Boolean; const APassMsg: string;
@@ -56,26 +56,26 @@ begin
 
   if ACondition then
   begin
-    TUtils.PrintLn(COLOR_GREEN + '    [PASS] ' + APassMsg);
+    TMorUtils.PrintLn(COLOR_GREEN + '    [PASS] ' + APassMsg);
     Inc(GPass);
     Inc(GSectionPass);
   end
   else
-    TUtils.PrintLn(COLOR_RED + '    [FAIL] ' + AFailMsg);
+    TMorUtils.PrintLn(COLOR_RED + '    [FAIL] ' + AFailMsg);
 end;
 
 procedure Detail(const AMsg: string);
 begin
-  TUtils.PrintLn(COLOR_YELLOW + '           ' + AMsg);
+  TMorUtils.PrintLn(COLOR_YELLOW + '           ' + AMsg);
 end;
 
 procedure SectionSummary();
 begin
   if GSectionPass = GSectionTotal then
-    TUtils.PrintLn(COLOR_GREEN + Format('    %d/%d passed',
+    TMorUtils.PrintLn(COLOR_GREEN + Format('    %d/%d passed',
       [GSectionPass, GSectionTotal]))
   else
-    TUtils.PrintLn(COLOR_RED + Format('    %d/%d passed',
+    TMorUtils.PrintLn(COLOR_RED + Format('    %d/%d passed',
       [GSectionPass, GSectionTotal]));
 end;
 
@@ -113,20 +113,20 @@ begin
   GPass := 0;
   GTotal := 0;
 
-  TUtils.PrintLn('');
-  TUtils.PrintLn(COLOR_CYAN +
+  TMorUtils.PrintLn('');
+  TMorUtils.PrintLn(COLOR_CYAN +
     '  ============================================================');
-  TUtils.PrintLn(COLOR_CYAN + '  Metamorf LSP  -  In-Process Feature Showcase');
-  TUtils.PrintLn(COLOR_CYAN + '  Language Definition: pascal.mor');
-  TUtils.PrintLn(COLOR_CYAN + '  Test Source: hello.pas');
-  TUtils.PrintLn(COLOR_CYAN +
+  TMorUtils.PrintLn(COLOR_CYAN + '  Metamorf LSP  -  In-Process Feature Showcase');
+  TMorUtils.PrintLn(COLOR_CYAN + '  Language Definition: pascal.mor');
+  TMorUtils.PrintLn(COLOR_CYAN + '  Test Source: hello.pas');
+  TMorUtils.PrintLn(COLOR_CYAN +
     '  ============================================================');
 
   LEngine := TMorEngineAPI.Create();
   try
     if not LEngine.LoadMor('..\tests\pascal.mor') then
     begin
-      TUtils.PrintLn(COLOR_RED + '  FATAL: Could not load pascal.mor');
+      TMorUtils.PrintLn(COLOR_RED + '  FATAL: Could not load pascal.mor');
       Exit;
     end;
 
@@ -521,30 +521,30 @@ begin
       SectionSummary();
 
       // ---- Grand Summary ----
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_CYAN +
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn(COLOR_CYAN +
         '  ============================================================');
 
       if GPass = GTotal then
       begin
-        TUtils.PrintLn(COLOR_GREEN + Format(
+        TMorUtils.PrintLn(COLOR_GREEN + Format(
           '  RESULT: %d/%d features verified  --  ALL PASS', [GPass, GTotal]));
-        TUtils.PrintLn(COLOR_GREEN + '  Metamorf LSP: fully operational');
+        TMorUtils.PrintLn(COLOR_GREEN + '  Metamorf LSP: fully operational');
       end
       else
       begin
-        TUtils.PrintLn(COLOR_RED + Format(
+        TMorUtils.PrintLn(COLOR_RED + Format(
           '  RESULT: %d/%d features verified  --  SOME FAILURES',
           [GPass, GTotal]));
 
-        TUtils.PrintLn(COLOR_RED + Format('  %d feature(s) need attention',
+        TMorUtils.PrintLn(COLOR_RED + Format('  %d feature(s) need attention',
           [GTotal - GPass]));
       end;
 
-      TUtils.PrintLn(COLOR_CYAN +
+      TMorUtils.PrintLn(COLOR_CYAN +
         '  ============================================================');
 
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
 
       LService.CloseDocument(LUri);
 
@@ -714,20 +714,20 @@ begin
   GPass := 0;
   GTotal := 0;
 
-  TUtils.PrintLn('');
-  TUtils.PrintLn(COLOR_CYAN +
+  TMorUtils.PrintLn('');
+  TMorUtils.PrintLn(COLOR_CYAN +
     '  ============================================================');
-  TUtils.PrintLn(COLOR_CYAN +
+  TMorUtils.PrintLn(COLOR_CYAN +
     '  Metamorf LSP  -  Out-of-Process Feature Showcase');
-  TUtils.PrintLn(COLOR_CYAN +
+  TMorUtils.PrintLn(COLOR_CYAN +
     '  Binary: MorLSP.exe  |  Transport: JSON-RPC 2.0 over pipes');
-  TUtils.PrintLn(COLOR_CYAN +
+  TMorUtils.PrintLn(COLOR_CYAN +
     '  ============================================================');
 
   // ---- 1. Process Launch ----
   BeginSection('1. Process Launch');
 
-  if not TUtils.CreateProcessWithPipes(
+  if not TMorUtils.CreateProcessWithPipes(
     'MorLSP.exe',
     '..\tests\pascal.mor',
     '',
@@ -1484,34 +1484,34 @@ begin
     SectionSummary();
 
     // ---- Grand Summary ----
-     TUtils.PrintLn('');
+     TMorUtils.PrintLn('');
 
-    TUtils.PrintLn(COLOR_CYAN +
+    TMorUtils.PrintLn(COLOR_CYAN +
       '  ============================================================');
 
     if GPass = GTotal then
      begin
-       TUtils.PrintLn(COLOR_GREEN + Format(
+       TMorUtils.PrintLn(COLOR_GREEN + Format(
          '  RESULT: %d/%d protocol steps verified  --  ALL PASS',
         [GPass, GTotal]));
 
-      TUtils.PrintLn(COLOR_GREEN +
+      TMorUtils.PrintLn(COLOR_GREEN +
         '  Metamorf LSP: fully operational over JSON-RPC');
      end
    else
      begin
-       TUtils.PrintLn(COLOR_RED + Format(
+       TMorUtils.PrintLn(COLOR_RED + Format(
          '  RESULT: %d/%d protocol steps verified  --  SOME FAILURES',
         [GPass, GTotal]));
 
-      TUtils.PrintLn(COLOR_RED + Format('  %d step(s) need attention',
+      TMorUtils.PrintLn(COLOR_RED + Format('  %d step(s) need attention',
          [GTotal - GPass]));
      end;
 
-    TUtils.PrintLn(COLOR_CYAN +
+    TMorUtils.PrintLn(COLOR_CYAN +
       '  ============================================================');
 
-    TUtils.PrintLn('');
+    TMorUtils.PrintLn('');
 
   finally
     CloseHandle(LStdinWrite);

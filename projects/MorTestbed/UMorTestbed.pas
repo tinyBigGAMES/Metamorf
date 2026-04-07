@@ -42,14 +42,14 @@ begin
     LEngine.SetStatusCallback(
       procedure(const AMsg: string; const AUserData: Pointer)
       begin
-        TUtils.PrintLn(AMsg);
+        TMorUtils.PrintLn(AMsg);
       end);
 
     // Print program output (no newline - output drives its own line endings)
     LEngine.SetOutputCallback(
       procedure(const ALine: string; const AUserData: Pointer)
       begin
-        TUtils.Print(ALine);
+        TMorUtils.Print(ALine);
       end);
 
     LLangFile := TPath.Combine('..\tests',
@@ -66,7 +66,7 @@ begin
     Result := not LEngine.GetErrors().HasErrors();
 
     if LEngine.GetErrors().HasErrors() then
-      TUtils.PrintLn(LEngine.GetErrors().Dump());
+      TMorUtils.PrintLn(LEngine.GetErrors().Dump());
   finally
     LEngine.Free();
   end;
@@ -125,13 +125,13 @@ begin
   except
     on E: Exception do
     begin
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + 'EXCEPTION: %s', [E.Message]);
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn(COLOR_RED + 'EXCEPTION: %s', [E.Message]);
     end;
   end;
 
-  if TUtils.RunFromIDE() then
-    TUtils.Pause();
+  if TMorUtils.RunFromIDE() then
+    TMorUtils.Pause();
 end;
 
 
