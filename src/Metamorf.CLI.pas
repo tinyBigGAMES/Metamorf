@@ -93,34 +93,34 @@ end;
 
 procedure TMorCLI.ShowBanner();
 var
-  LVersion: TVersionInfo;
+  LVersion: TMorVersionInfo;
 begin
   if FBakedMode then
   begin
     // Baked mode: read all branding from self's VERSIONINFO
-    if TUtils.GetVersionInfo(LVersion, '') then
+    if TMorUtils.GetVersionInfo(LVersion, '') then
     begin
-      TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
+      TMorUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
         LVersion.ProductName + ' v' + LVersion.VersionString);
-      TUtils.PrintLn(COLOR_WHITE + LVersion.Copyright);
+      TMorUtils.PrintLn(COLOR_WHITE + LVersion.Copyright);
       if LVersion.URL <> '' then
-        TUtils.PrintLn(COLOR_YELLOW + LVersion.URL);
+        TMorUtils.PrintLn(COLOR_YELLOW + LVersion.URL);
     end;
   end
   else
   begin
     // Normal mode: hardcoded branding, version from Metamorf.dll
-    if TUtils.GetVersionInfo(LVersion, 'Metamorf.dll') then
-      TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
+    if TMorUtils.GetVersionInfo(LVersion, 'Metamorf.dll') then
+      TMorUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
         'Metamorf™ Compiler v' + LVersion.VersionString)
     else
-      TUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
+      TMorUtils.PrintLn(COLOR_WHITE + COLOR_BOLD +
         'Metamorf™ Compiler v0.0.0');
-    TUtils.PrintLn(COLOR_WHITE +
+    TMorUtils.PrintLn(COLOR_WHITE +
       'Copyright © 2025-present tinyBigGAMES™ LLC, All Rights Reserved.');
-    TUtils.PrintLn(COLOR_YELLOW + 'https://metamorf.dev');
+    TMorUtils.PrintLn(COLOR_YELLOW + 'https://metamorf.dev');
   end;
-  TUtils.PrintLn('');
+  TMorUtils.PrintLn('');
 end;
 
 procedure TMorCLI.ShowHelp();
@@ -132,99 +132,99 @@ begin
   if FBakedMode then
   begin
     // Baked mode: stripped CLI surface
-    TUtils.PrintLn(COLOR_WHITE +
+    TMorUtils.PrintLn(COLOR_WHITE +
       'Syntax: ' + LExeName + ' -s <file> [options]');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'USAGE:');
-    TUtils.PrintLn('  ' + LExeName + ' ' + COLOR_CYAN +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'USAGE:');
+    TMorUtils.PrintLn('  ' + LExeName + ' ' + COLOR_CYAN +
       '-s <file>' + COLOR_RESET + ' [OPTIONS]');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'REQUIRED:');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-s, --source  <file>' + COLOR_RESET +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'REQUIRED:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-s, --source  <file>' + COLOR_RESET +
       '   Source file to compile');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'OPTIONS:');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-o, --output  <path>' + COLOR_RESET +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'OPTIONS:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-o, --output  <path>' + COLOR_RESET +
       '   Output path (default: output)');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-r, --autorun       ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-r, --autorun       ' + COLOR_RESET +
       '   Build and run the compiled binary');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-d, --debug         ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-d, --debug         ' + COLOR_RESET +
       '   Build and debug the compiled binary');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-h, --help          ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-h, --help          ' + COLOR_RESET +
       '   Display this help message');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'EXAMPLES:');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'EXAMPLES:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       LExeName + ' -s hello.src');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       LExeName + ' -s hello.src -o build');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       LExeName + ' -s hello.src -r');
-    TUtils.PrintLn('');
+    TMorUtils.PrintLn('');
   end
   else
   begin
     // Normal mode: full CLI surface
-    TUtils.PrintLn(COLOR_WHITE +
+    TMorUtils.PrintLn(COLOR_WHITE +
       'Syntax: Mor [options] -l <file> -s <file> [options]');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'USAGE:');
-    TUtils.PrintLn('  Mor ' + COLOR_CYAN +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'USAGE:');
+    TMorUtils.PrintLn('  Mor ' + COLOR_CYAN +
       '-l <file> -s <file>' + COLOR_RESET + ' [OPTIONS]');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'REQUIRED:');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-l, --lang    <file>' + COLOR_RESET +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'REQUIRED:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-l, --lang    <file>' + COLOR_RESET +
       '   Language definition file (.mor)');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-s, --source  <file>' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-s, --source  <file>' + COLOR_RESET +
       '   Source file to compile');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'OPTIONS:');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-o, --output  <path>' + COLOR_RESET +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'OPTIONS:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-o, --output  <path>' + COLOR_RESET +
       '   Output path (default: output)');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-r, --autorun       ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-r, --autorun       ' + COLOR_RESET +
       '   Build and run the compiled binary');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-d, --debug         ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-d, --debug         ' + COLOR_RESET +
       '   Build and debug the compiled binary');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-h, --help          ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-h, --help          ' + COLOR_RESET +
       '   Display this help message');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'BAKE:');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--bake <file.mor>' + COLOR_RESET +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'BAKE:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--bake <file.mor>' + COLOR_RESET +
       '       Bake a standalone compiler from a .mor definition');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '-o <output.exe>   ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '-o <output.exe>   ' + COLOR_RESET +
       '       Output path (required with --bake)');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--product <name>  ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--product <name>  ' + COLOR_RESET +
       '       Product name for VERSIONINFO');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--company <name>  ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--company <name>  ' + COLOR_RESET +
       '       Company name for VERSIONINFO');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--copyright <text>' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--copyright <text>' + COLOR_RESET +
       '       Copyright string for VERSIONINFO');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--description <text>' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--description <text>' + COLOR_RESET +
       '     File description for VERSIONINFO');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--version <M.N.P> ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--version <M.N.P> ' + COLOR_RESET +
       '       Version for VERSIONINFO (default: 1.0.0)');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--icon <file.ico> ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--icon <file.ico> ' + COLOR_RESET +
       '       Custom icon for baked exe');
-    TUtils.PrintLn('  ' + COLOR_CYAN + '--url <url>       ' + COLOR_RESET +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN + '--url <url>       ' + COLOR_RESET +
       '       URL for banner display');
-    TUtils.PrintLn('');
-    TUtils.PrintLn(COLOR_BOLD + 'EXAMPLES:');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('');
+    TMorUtils.PrintLn(COLOR_BOLD + 'EXAMPLES:');
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       'Mor -l mylang.mor -s hello.src');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       'Mor -l mylang.mor -s hello.src -o build');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       'Mor -l mylang.mor -s hello.src -r');
-    TUtils.PrintLn('  ' + COLOR_CYAN +
+    TMorUtils.PrintLn('  ' + COLOR_CYAN +
       'Mor --bake mylang.mor -o mylang.exe --product "MyLang"');
-    TUtils.PrintLn('');
+    TMorUtils.PrintLn('');
   end;
 end;
 
 procedure TMorCLI.ShowErrors();
 var
-  LErrors: TErrors;
-  LError:  TError;
+  LErrors: TMorErrors;
+  LError:  TMorError;
   LColor:  string;
   LI:      Integer;
 begin
@@ -232,8 +232,8 @@ begin
   if not LErrors.HasErrors() then
     Exit;
 
-  TUtils.PrintLn('');
-  TUtils.PrintLn(COLOR_WHITE +
+  TMorUtils.PrintLn('');
+  TMorUtils.PrintLn(COLOR_WHITE +
     Format('Errors (%d):', [LErrors.Count()]));
 
   for LI := 0 to LErrors.GetItems().Count - 1 do
@@ -251,7 +251,7 @@ begin
     else
       LColor := COLOR_WHITE;
 
-    TUtils.PrintLn(LColor + '  ' + LError.ToFullString());
+    TMorUtils.PrintLn(LColor + '  ' + LError.ToFullString());
   end;
 end;
 
@@ -260,13 +260,13 @@ begin
   FEngine.SetStatusCallback(
     procedure(const AText: string; const AUserData: Pointer)
     begin
-      TUtils.PrintLn(AText);
+      TMorUtils.PrintLn(AText);
     end);
 
   FEngine.SetOutputCallback(
     procedure(const ALine: string; const AUserData: Pointer)
     begin
-      TUtils.Print(ALine);
+      TMorUtils.Print(ALine);
     end);
 end;
 
@@ -301,9 +301,9 @@ begin
       (LFlag = '--copyright') or (LFlag = '--version') or
       (LFlag = '--icon') or (LFlag = '--url')) then
     begin
-      TUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
+      TMorUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
         ' is not available in this compiler');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -313,9 +313,9 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
+        TMorUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
           ' requires a file argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -327,9 +327,9 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
+        TMorUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
           ' requires a file argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -341,9 +341,9 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
+        TMorUtils.PrintLn(COLOR_RED + 'Error: ' + LFlag +
           ' requires a path argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -363,8 +363,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --bake requires a .mor file argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --bake requires a .mor file argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -376,8 +376,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --company requires an argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --company requires an argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -389,8 +389,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --product requires an argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --product requires an argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -402,8 +402,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --description requires an argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --description requires an argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -415,8 +415,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --copyright requires an argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --copyright requires an argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -428,8 +428,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --version requires an argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --version requires an argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -441,8 +441,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --icon requires a file argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --icon requires a file argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -454,8 +454,8 @@ begin
       Inc(LI);
       if LI > ParamCount() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Error: --url requires an argument');
-        TUtils.PrintLn('');
+        TMorUtils.PrintLn(COLOR_RED + 'Error: --url requires an argument');
+        TMorUtils.PrintLn('');
         ExitCode := 2;
         Result := False;
         Exit;
@@ -464,12 +464,12 @@ begin
     end
     else
     begin
-      TUtils.PrintLn(COLOR_RED + 'Error: Unknown flag: ' +
+      TMorUtils.PrintLn(COLOR_RED + 'Error: Unknown flag: ' +
         COLOR_YELLOW + LFlag);
-      TUtils.PrintLn('');
-      TUtils.PrintLn('Run ' + COLOR_CYAN + 'Metamorf -h' +
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn('Run ' + COLOR_CYAN + 'Metamorf -h' +
         COLOR_RESET + ' to see available options');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -484,9 +484,9 @@ begin
     // Baked mode: only -s is required
     if FSourceFile = '' then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: Source file is required (-s <file>)');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -494,9 +494,9 @@ begin
 
     if FAutoRun and FDebug then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: -r and -d cannot be used together');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -507,9 +507,9 @@ begin
     // Bake mode validation
     if FAutoRun or FDebug then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: -r and -d cannot be used with --bake');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -517,9 +517,9 @@ begin
 
     if FOutputPath = 'output' then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: -o <path> is required with --bake');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -530,12 +530,12 @@ begin
     // Normal mode validation
     if FLangFile = '' then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: Language file is required (-l <file>)');
-      TUtils.PrintLn('');
-      TUtils.PrintLn('Run ' + COLOR_CYAN + 'Metamorf -h' +
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn('Run ' + COLOR_CYAN + 'Metamorf -h' +
         COLOR_RESET + ' to see available options');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -543,12 +543,12 @@ begin
 
     if FSourceFile = '' then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: Source file is required (-s <file>)');
-      TUtils.PrintLn('');
-      TUtils.PrintLn('Run ' + COLOR_CYAN + 'Metamorf -h' +
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn('Run ' + COLOR_CYAN + 'Metamorf -h' +
         COLOR_RESET + ' to see available options');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -556,9 +556,9 @@ begin
 
     if FAutoRun and FDebug then
     begin
-      TUtils.PrintLn(COLOR_RED +
+      TMorUtils.PrintLn(COLOR_RED +
         'Error: -r and -d cannot be used together');
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 2;
       Result := False;
       Exit;
@@ -577,24 +577,24 @@ begin
 
   if FEngine.GetErrors().HasErrors() then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Build failed.');
+    TMorUtils.PrintLn(COLOR_RED + 'Build failed.');
     ExitCode := 1;
   end
   else
   begin
-    TUtils.PrintLn(COLOR_GREEN + 'Build OK');
+    TMorUtils.PrintLn(COLOR_GREEN + 'Build OK');
   end;
 end;
 
 procedure TMorCLI.RunDebug();
 var
   LExePath: string;
-  LREPL: TMetamorfDebugREPL;
+  LREPL: TMorDebugREPL;
 begin
   // Debug requires Win64 target
   if FEngine.GetTarget() <> tpWin64 then
   begin
-    TUtils.PrintLn(COLOR_RED +
+    TMorUtils.PrintLn(COLOR_RED +
       'Error: Debugging is only supported for Win64 targets');
     ExitCode := 1;
     Exit;
@@ -608,12 +608,12 @@ begin
 
   if not FileExists(LExePath) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Executable not found: ' + LExePath);
+    TMorUtils.PrintLn(COLOR_RED + 'Executable not found: ' + LExePath);
     ExitCode := 1;
     Exit;
   end;
 
-  LREPL := TMetamorfDebugREPL.Create();
+  LREPL := TMorDebugREPL.Create();
   try
     LREPL.Run(LExePath);
   finally
@@ -640,7 +640,7 @@ begin
   if not FEngine.SetupLanguage(FBakeFile) then
   begin
     ShowErrors();
-    TUtils.PrintLn(COLOR_RED + 'Bake failed: language setup error.');
+    TMorUtils.PrintLn(COLOR_RED + 'Bake failed: language setup error.');
     ExitCode := 1;
     Exit;
   end;
@@ -648,7 +648,7 @@ begin
   // Phase 2: Serialize the master AST
   LASTStream := TMemoryStream.Create();
   try
-    TASTNode.SaveASTToStream(FEngine.GetMorMasterRoot(), LASTStream);
+    TMorASTNode.SaveASTToStream(FEngine.GetMorMasterRoot(), LASTStream);
 
     // Phase 3: Copy mor.exe to output path
     LSourceExe := ParamStr(0);
@@ -659,19 +659,19 @@ begin
       LOutputExe := LOutputExe + '.exe';
 
     // Ensure output directory exists
-    TUtils.CreateDirInPath(LOutputExe);
+    TMorUtils.CreateDirInPath(LOutputExe);
 
     TFile.Copy(LSourceExe, LOutputExe, True);
 
     // Phase 4: Apply resources in correct order (matching TBuild.ApplyPostBuildResources)
 
     // 4a. Manifest
-    if TUtils.ResourceExist('EXE_MANIFEST') then
-      TUtils.AddResManifestFromResource('EXE_MANIFEST', LOutputExe);
+    if TMorUtils.ResourceExist('EXE_MANIFEST') then
+      TMorUtils.AddResManifestFromResource('EXE_MANIFEST', LOutputExe);
 
     // 4b. Icon (if provided and file exists)
     if (FBakeIcon <> '') and TFile.Exists(FBakeIcon) then
-      TUtils.UpdateIconResource(LOutputExe, FBakeIcon);
+      TMorUtils.UpdateIconResource(LOutputExe, FBakeIcon);
 
     // 4c. Version info
     LVersionParts := FBakeVersion.Split(['.']);
@@ -695,16 +695,16 @@ begin
 
     LFilename := TPath.GetFileName(LOutputExe);
 
-    TUtils.UpdateVersionInfoResource(LOutputExe,
+    TMorUtils.UpdateVersionInfoResource(LOutputExe,
       LMajor, LMinor, LPatch,
       LProductName, LDescription, LFilename,
       FBakeCompany, FBakeCopyright, FBakeURL);
 
     // 4d. AST payload
-    TUtils.UpdateRCDataResource(LOutputExe, MOR_BAKED_AST_RES, LASTStream);
+    TMorUtils.UpdateRCDataResource(LOutputExe, MOR_BAKED_AST_RES, LASTStream);
 
-    TUtils.PrintLn(COLOR_GREEN + 'Bake OK: ' + COLOR_WHITE +
-      TUtils.DisplayPath(LOutputExe));
+    TMorUtils.PrintLn(COLOR_GREEN + 'Bake OK: ' + COLOR_WHITE +
+      TMorUtils.DisplayPath(LOutputExe));
   finally
     LASTStream.Free();
   end;
@@ -713,7 +713,7 @@ end;
 procedure TMorCLI.Execute();
 begin
   // Detect baked mode before anything else
-  FBakedMode := TUtils.ResourceExist(MOR_BAKED_AST_RES);
+  FBakedMode := TMorUtils.ResourceExist(MOR_BAKED_AST_RES);
 
   ShowBanner();
 
@@ -733,12 +733,12 @@ begin
 
       if FEngine.GetErrors().HasErrors() then
       begin
-        TUtils.PrintLn(COLOR_RED + 'Build failed.');
+        TMorUtils.PrintLn(COLOR_RED + 'Build failed.');
         ExitCode := 1;
       end
       else
       begin
-        TUtils.PrintLn(COLOR_GREEN + 'Build OK');
+        TMorUtils.PrintLn(COLOR_GREEN + 'Build OK');
 
         // Launch debug REPL if -d flag and build succeeded
         if FDebug then
@@ -756,10 +756,10 @@ begin
   except
     on E: Exception do
     begin
-      TUtils.PrintLn('');
-      TUtils.PrintLn(COLOR_RED + COLOR_BOLD + 'Fatal Error: ' +
+      TMorUtils.PrintLn('');
+      TMorUtils.PrintLn(COLOR_RED + COLOR_BOLD + 'Fatal Error: ' +
         E.Message + COLOR_RESET);
-      TUtils.PrintLn('');
+      TMorUtils.PrintLn('');
       ExitCode := 1;
     end;
   end;

@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -21,6 +21,63 @@ uses
   System.SyncObjs,
   System.Generics.Collections,
   Metamorf.Utils;
+
+type
+  { TMorDebugVariable }
+  TMorDebugVariable = record
+    VarName: string;
+    VarValue: string;        // Formatted value string
+    VarType: string;         // Type name (v2: from PDB type info)
+    IsParameter: Boolean;    // True = parameter, False = local
+    Address: UInt64;         // Stack address or register
+    Size: DWORD;             // Size in bytes
+  end;
+
+  { TMorPDBSourceMap }
+  TMorPDBSourceMap = class(TMorBaseObject)
+  private
+    FProcessHandle: THandle;
+    FModuleBase: UInt64;
+    FInitialized: Boolean;
+    FPDBPath: string;
+    FLock: TCriticalSection;
+
+  public
+    constructor Create(); override;
+    destructor Destroy(); override;
+
+    // Initialization (called after process created, before breakpoints set)
+    function Initialize(const AProcessHandle: THandle;
+      const AExePath: string;
+      const APDBPath: string;
+      const ABaseAddress: UInt64 = 0): Boolean;
+    procedure Cleanup();
+
+    // Address <-> source line mapping
+    function AddressToSourceLine(const AAddress: UInt64;
+      out AFile: string; out ALine: Integer): Boolean;
+    function SourceLineToAddress(const AFile: string;
+      const ALine: Integer; out AAddress: UInt64): Boolean;
+
+    // Function info at address
+    function GetFunctionAtAddress(const AAddress: UInt64;
+      out AFuncName: string; out AFuncStart: UInt64;
+      out AFuncSize: DWORD): Boolean;
+
+    // Variable enumeration at address
+    function GetVariablesAtAddress(const AAddress: UInt64): TArray<TMorDebugVariable>;
+
+    // Stack unwinding via StackWalk64 (works with -fomit-frame-pointer)
+    function GetCallerReturnAddress(const AThreadHandle: THandle;
+      const AContext: TContext; out AReturnAddr: UInt64): Boolean;
+
+    // State
+    function IsInitialized(): Boolean;
+    function GetModuleBase(): UInt64;
+    function GetProcessHandle(): THandle;
+  end;
+
+implementation
 
 const
   DbgHelpDLL = 'dbghelp.dll';
@@ -223,86 +280,14 @@ function SymGetModuleBase64(
   AAddr: UInt64
 ): UInt64; stdcall; external DbgHelpDLL;
 
-type
-  //============================================================================
-  // TDebugVariable - Information about a local variable or parameter
-  //============================================================================
-  TDebugVariable = record
-    VarName: string;
-    VarValue: string;        // Formatted value string
-    VarType: string;         // Type name (v2: from PDB type info)
-    IsParameter: Boolean;    // True = parameter, False = local
-    Address: UInt64;         // Stack address or register
-    Size: DWORD;             // Size in bytes
-  end;
-
-  //============================================================================
-  // TPDBSourceMap - Reads PDB debug info via DbgHelp.dll
-  //
-  // Provides the same query interface as Viper's TSourceMap but backed by
-  // PDB files produced by Zig/Clang. All queries are lazy on-demand calls
-  // to DbgHelp. Thread safety is enforced via a critical section since
-  // DbgHelp.dll is NOT thread-safe.
-  //============================================================================
-
-  { TPDBSourceMap }
-  TPDBSourceMap = class(TBaseObject)
-  private
-    FProcessHandle: THandle;
-    FModuleBase: UInt64;
-    FInitialized: Boolean;
-    FPDBPath: string;
-    FLock: TCriticalSection;
-
-  public
-    constructor Create(); override;
-    destructor Destroy(); override;
-
-    // Initialization (called after process created, before breakpoints set)
-    function Initialize(const AProcessHandle: THandle;
-      const AExePath: string;
-      const APDBPath: string;
-      const ABaseAddress: UInt64 = 0): Boolean;
-    procedure Cleanup();
-
-    // Address <-> source line mapping
-    function AddressToSourceLine(const AAddress: UInt64;
-      out AFile: string; out ALine: Integer): Boolean;
-    function SourceLineToAddress(const AFile: string;
-      const ALine: Integer; out AAddress: UInt64): Boolean;
-
-    // Function info at address
-    function GetFunctionAtAddress(const AAddress: UInt64;
-      out AFuncName: string; out AFuncStart: UInt64;
-      out AFuncSize: DWORD): Boolean;
-
-    // Variable enumeration at address
-    function GetVariablesAtAddress(const AAddress: UInt64): TArray<TDebugVariable>;
-
-    // Stack unwinding via StackWalk64 (works with -fomit-frame-pointer)
-    function GetCallerReturnAddress(const AThreadHandle: THandle;
-      const AContext: TContext; out AReturnAddr: UInt64): Boolean;
-
-    // State
-    function IsInitialized(): Boolean;
-    function GetModuleBase(): UInt64;
-    function GetProcessHandle(): THandle;
-  end;
-
-implementation
-
-//==============================================================================
-// SymEnumSymbols callback - collects variables into a TList
-//==============================================================================
-
 function EnumSymbolsCallback(
   const ASymInfo: PSYMBOL_INFO;
   const ASymbolSize: ULONG;
   const AUserContext: Pointer
 ): BOOL; stdcall;
 var
-  LList: TList<TDebugVariable>;
-  LVar: TDebugVariable;
+  LList: TList<TMorDebugVariable>;
+  LVar: TMorDebugVariable;
   LNameLen: Integer;
 begin
   Result := True;  // Continue enumeration
@@ -310,13 +295,13 @@ begin
   if AUserContext = nil then
     Exit;
 
-  LList := TList<TDebugVariable>(AUserContext);
+  LList := TList<TMorDebugVariable>(AUserContext);
 
   LNameLen := ASymInfo.NameLen;
   if LNameLen > MAX_SYM_NAME then
     LNameLen := MAX_SYM_NAME;
 
-  LVar := Default(TDebugVariable);
+  LVar := Default(TMorDebugVariable);
   SetString(LVar.VarName, PAnsiChar(@ASymInfo.SymName[0]), LNameLen);
   LVar.IsParameter := (ASymInfo.Flags and SYMFLAG_PARAMETER) <> 0;
   LVar.Address := ASymInfo.Address;
@@ -327,11 +312,7 @@ begin
   LList.Add(LVar);
 end;
 
-//==============================================================================
-// TPDBSourceMap
-//==============================================================================
-
-constructor TPDBSourceMap.Create();
+constructor TMorPDBSourceMap.Create();
 begin
   inherited Create();
   FProcessHandle := 0;
@@ -341,18 +322,14 @@ begin
   FLock := TCriticalSection.Create();
 end;
 
-destructor TPDBSourceMap.Destroy();
+destructor TMorPDBSourceMap.Destroy();
 begin
   Cleanup();
   FreeAndNil(FLock);
   inherited Destroy();
 end;
 
-//------------------------------------------------------------------------------
-// Initialize - Load PDB via DbgHelp
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.Initialize(const AProcessHandle: THandle;
+function TMorPDBSourceMap.Initialize(const AProcessHandle: THandle;
   const AExePath: string; const APDBPath: string;
   const ABaseAddress: UInt64): Boolean;
 var
@@ -404,11 +381,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Cleanup - Release DbgHelp resources
-//------------------------------------------------------------------------------
-
-procedure TPDBSourceMap.Cleanup();
+procedure TMorPDBSourceMap.Cleanup();
 begin
   if not FInitialized then
     Exit;
@@ -424,11 +397,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// AddressToSourceLine - Map instruction address to source file + line
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.AddressToSourceLine(const AAddress: UInt64;
+function TMorPDBSourceMap.AddressToSourceLine(const AAddress: UInt64;
   out AFile: string; out ALine: Integer): Boolean;
 var
   LLineInfo: IMAGEHLP_LINE64;
@@ -459,11 +428,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// SourceLineToAddress - Map source file + line to instruction address
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.SourceLineToAddress(const AFile: string;
+function TMorPDBSourceMap.SourceLineToAddress(const AFile: string;
   const ALine: Integer; out AAddress: UInt64): Boolean;
 var
   LLineInfo: IMAGEHLP_LINE64;
@@ -495,11 +460,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// GetFunctionAtAddress - Get function name and bounds at address
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.GetFunctionAtAddress(const AAddress: UInt64;
+function TMorPDBSourceMap.GetFunctionAtAddress(const AAddress: UInt64;
   out AFuncName: string; out AFuncStart: UInt64;
   out AFuncSize: DWORD): Boolean;
 var
@@ -535,22 +496,18 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// GetVariablesAtAddress - Enumerate locals and params at address
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.GetVariablesAtAddress(
-  const AAddress: UInt64): TArray<TDebugVariable>;
+function TMorPDBSourceMap.GetVariablesAtAddress(
+  const AAddress: UInt64): TArray<TMorDebugVariable>;
 var
   LStackFrame: IMAGEHLP_STACK_FRAME;
-  LList: TList<TDebugVariable>;
+  LList: TList<TMorDebugVariable>;
 begin
   Result := nil;
 
   if not FInitialized then
     Exit;
 
-  LList := TList<TDebugVariable>.Create();
+  LList := TList<TMorDebugVariable>.Create();
   try
     FLock.Enter();
     try
@@ -580,32 +537,22 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// State accessors
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.IsInitialized(): Boolean;
+function TMorPDBSourceMap.IsInitialized(): Boolean;
 begin
   Result := FInitialized;
 end;
 
-function TPDBSourceMap.GetModuleBase(): UInt64;
+function TMorPDBSourceMap.GetModuleBase(): UInt64;
 begin
   Result := FModuleBase;
 end;
 
-function TPDBSourceMap.GetProcessHandle(): THandle;
+function TMorPDBSourceMap.GetProcessHandle(): THandle;
 begin
   Result := FProcessHandle;
 end;
 
-//------------------------------------------------------------------------------
-// GetCallerReturnAddress - Use StackWalk64 to find the caller's return address.
-// Works correctly even when frame pointers are omitted (-fomit-frame-pointer)
-// because StackWalk64 uses PE .pdata unwind info.
-//------------------------------------------------------------------------------
-
-function TPDBSourceMap.GetCallerReturnAddress(const AThreadHandle: THandle;
+function TMorPDBSourceMap.GetCallerReturnAddress(const AThreadHandle: THandle;
   const AContext: TContext; out AReturnAddr: UInt64): Boolean;
 var
   LLocalContext: TContext;

@@ -24,34 +24,34 @@ uses
 
 const
   // .mor Parser Error Codes (MP001-MP099)
-  ERR_MORPARSER_EXPECTED_TOKEN   = 'MP001';
-  ERR_MORPARSER_UNEXPECTED_TOP   = 'MP002';
-  ERR_MORPARSER_EXPECTED_IDENT   = 'MP003';
-  ERR_MORPARSER_EXPECTED_LBRACE  = 'MP004';
-  ERR_MORPARSER_EXPECTED_RBRACE  = 'MP005';
-  ERR_MORPARSER_EXPECTED_SEMI    = 'MP006';
-  ERR_MORPARSER_UNEXPECTED_EXPR  = 'MP007';
+  MOR_ERR_MORPARSER_EXPECTED_TOKEN   = 'MP001';
+  MOR_ERR_MORPARSER_UNEXPECTED_TOP   = 'MP002';
+  MOR_ERR_MORPARSER_EXPECTED_IDENT   = 'MP003';
+  MOR_ERR_MORPARSER_EXPECTED_LBRACE  = 'MP004';
+  MOR_ERR_MORPARSER_EXPECTED_RBRACE  = 'MP005';
+  MOR_ERR_MORPARSER_EXPECTED_SEMI    = 'MP006';
+  MOR_ERR_MORPARSER_UNEXPECTED_EXPR  = 'MP007';
 
 type
 
-  { TInfixInfo }
-  TInfixInfo = record
+  { TMorInfixInfo }
+  TMorInfixInfo = record
     Power: Integer;
     RightAssoc: Boolean;
     IsValid: Boolean;
   end;
 
   { TMorParser }
-  TMorParser = class(TErrorsObject)
+  TMorParser = class(TMorErrorsObject)
   private
-    FTokens: TList<TToken>;
+    FTokens: TList<TMorToken>;
     FPos: Integer;
     FFilename: string;
 
     // Token navigation
-    function Current(): TToken;
+    function Current(): TMorToken;
     {$HINTS OFF}
-    function Peek(): TToken;
+    function Peek(): TMorToken;
     {$HINTS ON}
     function AtEnd(): Boolean;
     function Check(const AKind: string): Boolean;
@@ -70,70 +70,70 @@ type
     function ConsumeInteger(): string;
 
     // Node creation
-    function CreateNode(const AKind: string): TASTNode;
+    function CreateNode(const AKind: string): TMorASTNode;
 
     // Infix power lookup
-    function GetInfixInfo(const AKind: string): TInfixInfo;
+    function GetInfixInfo(const AKind: string): TMorInfixInfo;
 
     // Expression parsing (Pratt)
-    function ParseExpr(const AMinPower: Integer): TASTNode;
-    function ParsePrefix(): TASTNode;
-    function ParseCallArgs(const ACallee: TASTNode): TASTNode;
+    function ParseExpr(const AMinPower: Integer): TMorASTNode;
+    function ParsePrefix(): TMorASTNode;
+    function ParseCallArgs(const ACallee: TMorASTNode): TMorASTNode;
 
     // Block helper
-    function ParseBlock(): TASTNode;
+    function ParseBlock(): TMorASTNode;
 
     // Statement parsing
-    function ParseStmt(): TASTNode;
-    function ParseLanguageDecl(): TASTNode;
-    function ParseTokensBlock(): TASTNode;
-    function ParseTokenDecl(): TASTNode;
-    function ParseTokenFlags(const ANode: TASTNode): TASTNode;
-    function ParseConfigEntry(): TASTNode;
-    function ParseTypesBlock(): TASTNode;
-    function ParseGrammarBlock(): TASTNode;
-    function ParseRule(): TASTNode;
-    function ParseSemanticsBlock(): TASTNode;
-    function ParsePassDecl(): TASTNode;
-    function ParseOnHandler(): TASTNode;
-    function ParseEmittersBlock(): TASTNode;
-    function ParseRoutineDecl(): TASTNode;
-    function ParseConstBlock(): TASTNode;
-    function ParseEnumDecl(): TASTNode;
-    function ParseFragmentDecl(): TASTNode;
-    function ParseImport(): TASTNode;
-    function ParseInclude(): TASTNode;
-    function ParseLet(): TASTNode;
-    function ParseSet(): TASTNode;
-    function ParseIf(): TASTNode;
-    function ParseWhile(): TASTNode;
-    function ParseFor(): TASTNode;
-    function ParseMatch(): TASTNode;
-    function ParseGuard(): TASTNode;
-    function ParseReturn(): TASTNode;
-    function ParseTryRecover(): TASTNode;
-    function ParseExpectStmt(): TASTNode;
-    function ParseConsumeStmt(): TASTNode;
-    function ParseParseDirective(): TASTNode;
-    function ParseOptional(): TASTNode;
-    function ParseSync(): TASTNode;
-    function ParseScope(): TASTNode;
-    function ParseDeclare(): TASTNode;
-    function ParseVisit(): TASTNode;
-    function ParseLookup(): TASTNode;
-    function ParseEmit(): TASTNode;
-    function ParseSection(): TASTNode;
-    function ParseIndentBlock(): TASTNode;
-    function ParseBefore(): TASTNode;
-    function ParseAfter(): TASTNode;
+    function ParseStmt(): TMorASTNode;
+    function ParseLanguageDecl(): TMorASTNode;
+    function ParseTokensBlock(): TMorASTNode;
+    function ParseTokenDecl(): TMorASTNode;
+    function ParseTokenFlags(const ANode: TMorASTNode): TMorASTNode;
+    function ParseConfigEntry(): TMorASTNode;
+    function ParseTypesBlock(): TMorASTNode;
+    function ParseGrammarBlock(): TMorASTNode;
+    function ParseRule(): TMorASTNode;
+    function ParseSemanticsBlock(): TMorASTNode;
+    function ParsePassDecl(): TMorASTNode;
+    function ParseOnHandler(): TMorASTNode;
+    function ParseEmittersBlock(): TMorASTNode;
+    function ParseRoutineDecl(): TMorASTNode;
+    function ParseConstBlock(): TMorASTNode;
+    function ParseEnumDecl(): TMorASTNode;
+    function ParseFragmentDecl(): TMorASTNode;
+    function ParseImport(): TMorASTNode;
+    function ParseInclude(): TMorASTNode;
+    function ParseLet(): TMorASTNode;
+    function ParseSet(): TMorASTNode;
+    function ParseIf(): TMorASTNode;
+    function ParseWhile(): TMorASTNode;
+    function ParseFor(): TMorASTNode;
+    function ParseMatch(): TMorASTNode;
+    function ParseGuard(): TMorASTNode;
+    function ParseReturn(): TMorASTNode;
+    function ParseTryRecover(): TMorASTNode;
+    function ParseExpectStmt(): TMorASTNode;
+    function ParseConsumeStmt(): TMorASTNode;
+    function ParseParseDirective(): TMorASTNode;
+    function ParseOptional(): TMorASTNode;
+    function ParseSync(): TMorASTNode;
+    function ParseScope(): TMorASTNode;
+    function ParseDeclare(): TMorASTNode;
+    function ParseVisit(): TMorASTNode;
+    function ParseLookup(): TMorASTNode;
+    function ParseEmit(): TMorASTNode;
+    function ParseSection(): TMorASTNode;
+    function ParseIndentBlock(): TMorASTNode;
+    function ParseBefore(): TMorASTNode;
+    function ParseAfter(): TMorASTNode;
 
   public
     constructor Create(); override;
     destructor Destroy(); override;
 
-    function Parse(const ATokens: TList<TToken>;
-      const AFilename: string = ''): TASTNode;
-    function ParseSingleExpr(const ATokens: TList<TToken>): TASTNode;
+    function Parse(const ATokens: TList<TMorToken>;
+      const AFilename: string = ''): TMorASTNode;
+    function ParseSingleExpr(const ATokens: TList<TMorToken>): TMorASTNode;
   end;
 
 implementation
@@ -153,7 +153,7 @@ begin
   inherited;
 end;
 
-function TMorParser.Current(): TToken;
+function TMorParser.Current(): TMorToken;
 begin
   if (FPos >= 0) and (FPos < FTokens.Count) then
     Result := FTokens[FPos]
@@ -166,7 +166,7 @@ begin
   end;
 end;
 
-function TMorParser.Peek(): TToken;
+function TMorParser.Peek(): TMorToken;
 begin
   if (FPos + 1 >= 0) and (FPos + 1 < FTokens.Count) then
     Result := FTokens[FPos + 1]
@@ -217,7 +217,7 @@ begin
     DoAdvance()
   else if Assigned(FErrors) then
     FErrors.Add(FFilename, Current().Line, Current().Col,
-      esError, ERR_MORPARSER_EXPECTED_TOKEN,
+      esError, MOR_ERR_MORPARSER_EXPECTED_TOKEN,
       RSMorParserExpectedToken, [AKind, Current().Text]);
 end;
 
@@ -238,7 +238,7 @@ begin
     Result := '';
     if Assigned(FErrors) then
       FErrors.Add(FFilename, Current().Line, Current().Col,
-        esError, ERR_MORPARSER_EXPECTED_IDENT,
+        esError, MOR_ERR_MORPARSER_EXPECTED_IDENT,
         RSMorParserExpectedIdentifier, [Current().Text]);
   end;
 end;
@@ -257,7 +257,7 @@ begin
     Result := '';
     if Assigned(FErrors) then
       FErrors.Add(FFilename, Current().Line, Current().Col,
-        esError, ERR_MORPARSER_EXPECTED_IDENT,
+        esError, MOR_ERR_MORPARSER_EXPECTED_IDENT,
         RSMorParserExpectedIdentifier, [Current().Text]);
     Exit;
   end;
@@ -288,7 +288,7 @@ begin
     Result := '';
     if Assigned(FErrors) then
       FErrors.Add(FFilename, Current().Line, Current().Col,
-        esError, ERR_MORPARSER_EXPECTED_TOKEN,
+        esError, MOR_ERR_MORPARSER_EXPECTED_TOKEN,
         RSMorParserExpectedToken, ['string literal', Current().Text]);
   end;
 end;
@@ -305,19 +305,19 @@ begin
     Result := '';
     if Assigned(FErrors) then
       FErrors.Add(FFilename, Current().Line, Current().Col,
-        esError, ERR_MORPARSER_EXPECTED_TOKEN,
+        esError, MOR_ERR_MORPARSER_EXPECTED_TOKEN,
         RSMorParserExpectedToken, ['integer literal', Current().Text]);
   end;
 end;
 
-function TMorParser.CreateNode(const AKind: string): TASTNode;
+function TMorParser.CreateNode(const AKind: string): TMorASTNode;
 begin
-  Result := TASTNode.Create();
+  Result := TMorASTNode.Create();
   Result.SetKind(AKind);
   Result.SetToken(Current());
 end;
 
-function TMorParser.GetInfixInfo(const AKind: string): TInfixInfo;
+function TMorParser.GetInfixInfo(const AKind: string): TMorInfixInfo;
 begin
   Result.IsValid := True;
   Result.RightAssoc := False;
@@ -345,13 +345,13 @@ begin
   end;
 end;
 
-function TMorParser.ParseExpr(const AMinPower: Integer): TASTNode;
+function TMorParser.ParseExpr(const AMinPower: Integer): TMorASTNode;
 var
-  LLeft: TASTNode;
-  LInfo: TInfixInfo;
+  LLeft: TMorASTNode;
+  LInfo: TMorInfixInfo;
   LOp: string;
-  LToken: TToken;
-  LNode: TASTNode;
+  LToken: TMorToken;
+  LNode: TMorASTNode;
 begin
   // Prefix dispatch
   LLeft := ParsePrefix();
@@ -423,10 +423,10 @@ begin
   Result := LLeft;
 end;
 
-function TMorParser.ParsePrefix(): TASTNode;
+function TMorParser.ParsePrefix(): TMorASTNode;
 var
-  LNode: TASTNode;
-  LToken: TToken;
+  LNode: TMorASTNode;
+  LToken: TMorToken;
   LKind: string;
 begin
   LKind := Current().Kind;
@@ -547,7 +547,7 @@ begin
     // Unexpected token in expression
     if Assigned(FErrors) then
       FErrors.Add(FFilename, Current().Line, Current().Col,
-        esError, ERR_MORPARSER_UNEXPECTED_EXPR,
+        esError, MOR_ERR_MORPARSER_UNEXPECTED_EXPR,
         RSMorParserUnexpectedExpr, [Current().Text]);
     LNode := CreateNode('expr.error');
     DoAdvance();
@@ -555,9 +555,9 @@ begin
   end;
 end;
 
-function TMorParser.ParseCallArgs(const ACallee: TASTNode): TASTNode;
+function TMorParser.ParseCallArgs(const ACallee: TMorASTNode): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('expr.call');
   LNode.AddChild(ACallee);
@@ -572,9 +572,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseBlock(): TASTNode;
+function TMorParser.ParseBlock(): TMorASTNode;
 var
-  LBlock: TASTNode;
+  LBlock: TMorASTNode;
 begin
   LBlock := CreateNode('meta.block');
   Expect('delimiter.lbrace');
@@ -584,11 +584,11 @@ begin
   Result := LBlock;
 end;
 
-function TMorParser.ParseStmt(): TASTNode;
+function TMorParser.ParseStmt(): TMorASTNode;
 var
   LKind: string;
-  LExpr: TASTNode;
-  LNode: TASTNode;
+  LExpr: TMorASTNode;
+  LNode: TMorASTNode;
 begin
   LKind := Current().Kind;
 
@@ -649,9 +649,9 @@ begin
   end;
 end;
 
-function TMorParser.ParseLanguageDecl(): TASTNode;
+function TMorParser.ParseLanguageDecl(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.language_decl');
   DoAdvance(); // skip 'language'
@@ -662,9 +662,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseTokensBlock(): TASTNode;
+function TMorParser.ParseTokensBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.tokens_block');
   DoAdvance(); // skip 'tokens'
@@ -682,9 +682,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseTokenDecl(): TASTNode;
+function TMorParser.ParseTokenDecl(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.token_decl');
   DoAdvance(); // skip 'token'
@@ -697,7 +697,7 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseTokenFlags(const ANode: TASTNode): TASTNode;
+function TMorParser.ParseTokenFlags(const ANode: TMorASTNode): TMorASTNode;
 var
   LFlags: string;
 begin
@@ -726,9 +726,9 @@ begin
   ANode.SetAttr('flags', LFlags);
 end;
 
-function TMorParser.ParseConfigEntry(): TASTNode;
+function TMorParser.ParseConfigEntry(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LKey: string;
 begin
   LNode := CreateNode('meta.config_entry');
@@ -767,10 +767,10 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseTypesBlock(): TASTNode;
+function TMorParser.ParseTypesBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
-  LChild: TASTNode;
+  LNode: TMorASTNode;
+  LChild: TMorASTNode;
 begin
   LNode := CreateNode('meta.types_block');
   DoAdvance(); // skip 'types'
@@ -867,9 +867,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseGrammarBlock(): TASTNode;
+function TMorParser.ParseGrammarBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.grammar_block');
   DoAdvance(); // skip 'grammar'
@@ -885,9 +885,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseRule(): TASTNode;
+function TMorParser.ParseRule(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.rule');
   Expect('kw.rule');
@@ -918,9 +918,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseSemanticsBlock(): TASTNode;
+function TMorParser.ParseSemanticsBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.semantics_block');
   DoAdvance(); // skip 'semantics'
@@ -940,9 +940,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParsePassDecl(): TASTNode;
+function TMorParser.ParsePassDecl(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.pass');
   DoAdvance(); // skip 'pass'
@@ -961,9 +961,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseOnHandler(): TASTNode;
+function TMorParser.ParseOnHandler(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.on_handler');
   DoAdvance(); // skip 'on'
@@ -975,9 +975,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseEmittersBlock(): TASTNode;
+function TMorParser.ParseEmittersBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.emitters_block');
   DoAdvance(); // skip 'emitters'
@@ -1001,9 +1001,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseRoutineDecl(): TASTNode;
+function TMorParser.ParseRoutineDecl(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LPName: string;
   LPType: string;
   LParamIdx: Integer;
@@ -1046,10 +1046,10 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseConstBlock(): TASTNode;
+function TMorParser.ParseConstBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
-  LEntry: TASTNode;
+  LNode: TMorASTNode;
+  LEntry: TMorASTNode;
 begin
   LNode := CreateNode('meta.const_block');
   DoAdvance(); // skip 'const'
@@ -1067,9 +1067,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseEnumDecl(): TASTNode;
+function TMorParser.ParseEnumDecl(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LIdx: Integer;
 begin
   LNode := CreateNode('meta.enum');
@@ -1088,9 +1088,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseFragmentDecl(): TASTNode;
+function TMorParser.ParseFragmentDecl(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.fragment');
   DoAdvance(); // skip 'fragment'
@@ -1099,9 +1099,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseImport(): TASTNode;
+function TMorParser.ParseImport(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.import');
   DoAdvance(); // skip 'import'
@@ -1110,9 +1110,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseInclude(): TASTNode;
+function TMorParser.ParseInclude(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.include');
   DoAdvance(); // skip 'include'
@@ -1121,9 +1121,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseLet(): TASTNode;
+function TMorParser.ParseLet(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.let');
   DoAdvance(); // skip 'let'
@@ -1134,9 +1134,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseSet(): TASTNode;
+function TMorParser.ParseSet(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.set');
   DoAdvance(); // skip 'set'
@@ -1147,9 +1147,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseIf(): TASTNode;
+function TMorParser.ParseIf(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.if');
   DoAdvance(); // skip 'if'
@@ -1175,9 +1175,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseWhile(): TASTNode;
+function TMorParser.ParseWhile(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.while');
   DoAdvance(); // skip 'while'
@@ -1186,9 +1186,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseFor(): TASTNode;
+function TMorParser.ParseFor(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.for_in');
   DoAdvance(); // skip 'for'
@@ -1199,10 +1199,10 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseMatch(): TASTNode;
+function TMorParser.ParseMatch(): TMorASTNode;
 var
-  LNode: TASTNode;
-  LArm: TASTNode;
+  LNode: TMorASTNode;
+  LArm: TMorASTNode;
 begin
   LNode := CreateNode('meta.match');
   DoAdvance(); // skip 'match'
@@ -1237,9 +1237,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseGuard(): TASTNode;
+function TMorParser.ParseGuard(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.guard');
   DoAdvance(); // skip 'guard'
@@ -1248,9 +1248,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseReturn(): TASTNode;
+function TMorParser.ParseReturn(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.return');
   DoAdvance(); // skip 'return'
@@ -1260,9 +1260,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseTryRecover(): TASTNode;
+function TMorParser.ParseTryRecover(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.try_recover');
   DoAdvance(); // skip 'try'
@@ -1272,9 +1272,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseExpectStmt(): TASTNode;
+function TMorParser.ParseExpectStmt(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.expect');
   DoAdvance(); // skip 'expect'
@@ -1283,9 +1283,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseConsumeStmt(): TASTNode;
+function TMorParser.ParseConsumeStmt(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LKinds: string;
 begin
   LNode := CreateNode('meta.consume');
@@ -1311,9 +1311,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseParseDirective(): TASTNode;
+function TMorParser.ParseParseDirective(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LUntil: string;
 begin
   LNode := CreateNode('meta.parse_directive');
@@ -1361,9 +1361,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseOptional(): TASTNode;
+function TMorParser.ParseOptional(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.optional');
   DoAdvance(); // skip 'optional'
@@ -1371,9 +1371,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseSync(): TASTNode;
+function TMorParser.ParseSync(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.sync');
   DoAdvance(); // skip 'sync'
@@ -1382,9 +1382,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseScope(): TASTNode;
+function TMorParser.ParseScope(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.scope');
   DoAdvance(); // skip 'scope'
@@ -1404,9 +1404,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseDeclare(): TASTNode;
+function TMorParser.ParseDeclare(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LKey: string;
 begin
   LNode := CreateNode('meta.declare');
@@ -1447,9 +1447,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseVisit(): TASTNode;
+function TMorParser.ParseVisit(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.visit');
   DoAdvance(); // skip 'visit'
@@ -1484,9 +1484,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseLookup(): TASTNode;
+function TMorParser.ParseLookup(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.lookup');
   DoAdvance(); // skip 'lookup'
@@ -1517,9 +1517,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseEmit(): TASTNode;
+function TMorParser.ParseEmit(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.emit');
   DoAdvance(); // skip 'emit'
@@ -1538,9 +1538,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseSection(): TASTNode;
+function TMorParser.ParseSection(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.section');
   DoAdvance(); // skip 'section'
@@ -1549,9 +1549,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseIndentBlock(): TASTNode;
+function TMorParser.ParseIndentBlock(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.indent_block');
   DoAdvance(); // skip 'indent'
@@ -1559,9 +1559,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseBefore(): TASTNode;
+function TMorParser.ParseBefore(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.before');
   DoAdvance(); // skip 'before'
@@ -1569,9 +1569,9 @@ begin
   Result := LNode;
 end;
 
-function TMorParser.ParseAfter(): TASTNode;
+function TMorParser.ParseAfter(): TMorASTNode;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   LNode := CreateNode('meta.after');
   DoAdvance(); // skip 'after'
@@ -1581,10 +1581,10 @@ end;
 
 { Public }
 
-function TMorParser.Parse(const ATokens: TList<TToken>;
-  const AFilename: string): TASTNode;
+function TMorParser.Parse(const ATokens: TList<TMorToken>;
+  const AFilename: string): TMorASTNode;
 var
-  LRoot: TASTNode;
+  LRoot: TMorASTNode;
   LKind: string;
 begin
   FTokens := ATokens;
@@ -1620,7 +1620,7 @@ begin
     begin
       if Assigned(FErrors) then
         FErrors.Add(FFilename, Current().Line, Current().Col,
-          esError, ERR_MORPARSER_UNEXPECTED_TOP,
+          esError, MOR_ERR_MORPARSER_UNEXPECTED_TOP,
           RSMorParserUnexpectedTopLevel, [Current().Text]);
       DoAdvance(); // skip unexpected token to avoid infinite loop
     end;
@@ -1629,7 +1629,7 @@ begin
   Result := LRoot;
 end;
 
-function TMorParser.ParseSingleExpr(const ATokens: TList<TToken>): TASTNode;
+function TMorParser.ParseSingleExpr(const ATokens: TList<TMorToken>): TMorASTNode;
 begin
   FTokens := ATokens;
   FPos := 0;

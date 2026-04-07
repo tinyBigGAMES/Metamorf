@@ -21,7 +21,7 @@ uses
 // Registers C++ passthrough tokens, grammar handlers, and emit handlers
 // into the interpreter's dispatch tables. Must be called AFTER the .mor
 // setup pass completes so custom language rules take priority.
-procedure ConfigCpp(const AInterp: TMorInterpreter);
+procedure MorConfigCpp(const AInterp: TMorInterpreter);
 
 implementation
 
@@ -50,10 +50,10 @@ const
 procedure ConfigCppTokens(const AInterp: TMorInterpreter);
 var
   LKeywords: TDictionary<string, string>;
-  LOperators: TList<TOperatorEntryInterp>;
-  LStyles: TList<TStringStyleEntry>;
-  LEntry: TOperatorEntryInterp;
-  LStyle: TStringStyleEntry;
+  LOperators: TList<TMorOperatorEntryInterp>;
+  LStyles: TList<TMorStringStyleEntry>;
+  LEntry: TMorOperatorEntryInterp;
+  LStyle: TMorStringStyleEntry;
   LI: Integer;
 begin
   LKeywords := AInterp.GetKeywords();
@@ -124,8 +124,8 @@ begin
 
   // Re-sort operators longest-first after adding C++ ones
   LOperators.Sort(
-    System.Generics.Defaults.TComparer<TOperatorEntryInterp>.Construct(
-    function(const ALeft, ARight: TOperatorEntryInterp): Integer
+    System.Generics.Defaults.TComparer<TMorOperatorEntryInterp>.Construct(
+    function(const ALeft, ARight: TMorOperatorEntryInterp): Integer
     begin
       Result := Length(ARight.Text) - Length(ALeft.Text);
     end));
@@ -221,7 +221,7 @@ procedure ConfigCppGrammar(const AInterp: TMorInterpreter);
 var
   LI: Integer;
   LKind: string;
-  LNativeInfix: TNativeInfixEntry;
+  LNativeInfix: TMorNativeInfixEntry;
 begin
   // Statement passthrough: every cpp.keyword.* gets a native stmt handler
   // that collects all raw tokens as a stmt.cpp_raw node
@@ -232,11 +232,11 @@ begin
     if not AInterp.GetStmtRules().ContainsKey(LKind) then
     begin
       AInterp.RegisterNativeStmt(LKind,
-        function: TASTNode
+        function: TMorASTNode
         var
-          LNode: TASTNode;
+          LNode: TMorASTNode;
         begin
-          LNode := TASTNode.Create();
+          LNode := TMorASTNode.Create();
           LNode.SetKind('stmt.cpp_raw');
           LNode.SetAttr('cpp.raw', CollectRaw(AInterp, True));
           Result := LNode;
@@ -252,11 +252,11 @@ begin
     if not AInterp.GetPrefixRules().ContainsKey(LKind) then
     begin
       AInterp.RegisterNativePrefix(LKind,
-        function: TASTNode
+        function: TMorASTNode
         var
-          LNode: TASTNode;
+          LNode: TMorASTNode;
         begin
-          LNode := TASTNode.Create();
+          LNode := TMorASTNode.Create();
           LNode.SetKind('expr.cpp_raw');
           LNode.SetAttr('cpp.raw', CollectRaw(AInterp, False));
           Result := LNode;
@@ -268,9 +268,9 @@ begin
   LNativeInfix.Power := 90;
   LNativeInfix.Assoc := 'left';
   LNativeInfix.Handler :=
-    function(const ALeft: TASTNode): TASTNode
+    function(const ALeft: TMorASTNode): TMorASTNode
     var
-      LNode: TASTNode;
+      LNode: TMorASTNode;
       LName: string;
     begin
       AInterp.ParserAdvance(); // skip ::
@@ -289,7 +289,7 @@ begin
         LName := LName + '::' + AInterp.ParserCurrentText();
         AInterp.ParserAdvance();
       end;
-      LNode := TASTNode.Create();
+      LNode := TMorASTNode.Create();
       LNode.SetKind('expr.cpp_qualified');
       LNode.SetAttr('qualified.name', LName);
       Result := LNode;
@@ -300,12 +300,12 @@ begin
   LNativeInfix.Power := 85;
   LNativeInfix.Assoc := 'left';
   LNativeInfix.Handler :=
-    function(const ALeft: TASTNode): TASTNode
+    function(const ALeft: TMorASTNode): TMorASTNode
     var
-      LNode: TASTNode;
+      LNode: TMorASTNode;
     begin
       AInterp.ParserAdvance(); // skip ->
-      LNode := TASTNode.Create();
+      LNode := TMorASTNode.Create();
       LNode.SetKind('expr.cpp_arrow');
       LNode.SetAttr('field.name', AInterp.ParserCurrentText());
       AInterp.ParserAdvance(); // consume field name
@@ -316,9 +316,9 @@ begin
 
   // Statement # (preprocessor)
   AInterp.RegisterNativeStmt('cpp.op.hash',
-    function: TASTNode
+    function: TMorASTNode
     var
-      LNode: TASTNode;
+      LNode: TMorASTNode;
       LRaw: string;
       LInAngle: Boolean;
     begin
@@ -339,7 +339,7 @@ begin
         if not LInAngle then
           LRaw := LRaw + ' ';
       end;
-      LNode := TASTNode.Create();
+      LNode := TMorASTNode.Create();
       LNode.SetKind('stmt.preprocessor');
       LNode.SetAttr('cpp.raw', LRaw.Trim());
       Result := LNode;
@@ -350,9 +350,9 @@ procedure ConfigCppCodeGen(const AInterp: TMorInterpreter);
 begin
   // stmt.cpp_raw -> emit raw text as line to source
   AInterp.RegisterNativeEmit('stmt.cpp_raw',
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     var
-      LOutput: TCodeOutput;
+      LOutput: TMorCodeOutput;
     begin
       LOutput := AInterp.GetOutput();
       if LOutput <> nil then
@@ -361,9 +361,9 @@ begin
 
   // stmt.preprocessor -> emit raw text as line to HEADER
   AInterp.RegisterNativeEmit('stmt.preprocessor',
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     var
-      LOutput: TCodeOutput;
+      LOutput: TMorCodeOutput;
     begin
       LOutput := AInterp.GetOutput();
       if LOutput <> nil then
@@ -372,9 +372,9 @@ begin
 
   // expr.cpp_raw -> emit raw text inline
   AInterp.RegisterNativeEmit('expr.cpp_raw',
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     var
-      LOutput: TCodeOutput;
+      LOutput: TMorCodeOutput;
     begin
       LOutput := AInterp.GetOutput();
       if LOutput <> nil then
@@ -383,9 +383,9 @@ begin
 
   // expr.cpp_qualified -> emit qualified name inline
   AInterp.RegisterNativeEmit('expr.cpp_qualified',
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     var
-      LOutput: TCodeOutput;
+      LOutput: TMorCodeOutput;
     begin
       LOutput := AInterp.GetOutput();
       if LOutput <> nil then
@@ -394,9 +394,9 @@ begin
 
   // expr.cpp_arrow -> emit child then ->field
   AInterp.RegisterNativeEmit('expr.cpp_arrow',
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     var
-      LOutput: TCodeOutput;
+      LOutput: TMorCodeOutput;
     begin
       LOutput := AInterp.GetOutput();
       if LOutput <> nil then
@@ -409,9 +409,9 @@ begin
 
   // expr.cpp_cast -> emit (type)(operand)
   AInterp.RegisterNativeEmit('expr.cpp_cast',
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     var
-      LOutput: TCodeOutput;
+      LOutput: TMorCodeOutput;
     begin
       LOutput := AInterp.GetOutput();
       if LOutput <> nil then
@@ -423,7 +423,7 @@ begin
     end);
 end;
 
-procedure ConfigCpp(const AInterp: TMorInterpreter);
+procedure MorConfigCpp(const AInterp: TMorInterpreter);
 begin
   ConfigCppTokens(AInterp);
   ConfigCppGrammar(AInterp);

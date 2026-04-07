@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -24,16 +24,15 @@ uses
 
 const
   // x64 trap flag (bit 8 of RFLAGS)
-  TRAP_FLAG = $100;
+  MOR_TRAP_FLAG = $100;
 
   // INT3 opcode
-  INT3_OPCODE = $CC;
+  MOR_INT3_OPCODE = $CC;
 
 type
-  //============================================================================
-  // TDebugStopReason - Why execution stopped
-  //============================================================================
-  TDebugStopReason = (
+
+  { TMorDebugStopReason }
+  TMorDebugStopReason = (
     dsrNone,
     dsrBreakpoint,       // Hit an INT3 breakpoint
     dsrSingleStep,       // Completed a single-step (trap flag)
@@ -42,11 +41,9 @@ type
     dsrDllLoad           // Target DLL loaded (DLL debug mode)
   );
 
-  //============================================================================
-  // TDebugStopEvent - Information about why execution stopped
-  //============================================================================
-  TDebugStopEvent = record
-    Reason: TDebugStopReason;
+  { TMorDebugStopEvent }
+  TMorDebugStopEvent = record
+    Reason: TMorDebugStopReason;
     Address: UInt64;          // Address where stop occurred
     ThreadId: DWORD;
     ExitCode: Cardinal;       // Valid when Reason = dsrProcessExit
@@ -54,25 +51,16 @@ type
     ExceptionMessage: string; // Human-readable exception description
   end;
 
-  //============================================================================
-  // TResumeAction - What to do when resuming execution
-  //============================================================================
-  TResumeAction = (
+  { TMorResumeAction }
+  TMorResumeAction = (
     raContinue,       // Resume normal execution
     raStepOver,       // Step to next source line (same function)
     raStepIn,         // Step into function call
     raStepOut         // Step out of current function
   );
 
-  //============================================================================
-  // TDebugTarget - Abstract base for debug modes.
-  // Provides uniform interface for memory access, execution control,
-  // and address mapping. All debug components (breakpoint manager,
-  // stepping, stack walker) work through this abstraction.
-  //============================================================================
-
-  { TDebugTarget }
-  TDebugTarget = class(TErrorsObject)
+  { TMorDebugTarget }
+  TMorDebugTarget = class(TMorErrorsObject)
   protected
     FBreakOnExceptions: Boolean;
   public
@@ -116,7 +104,7 @@ type
     // Lifecycle
     function Start(): Boolean; virtual; abstract;
     procedure Stop(); virtual; abstract;
-    function WaitForStop(out AEvent: TDebugStopEvent): Boolean; virtual; abstract;
+    function WaitForStop(out AEvent: TMorDebugStopEvent): Boolean; virtual; abstract;
     function IsRunning(): Boolean; virtual; abstract;
 
     // Exception handling
@@ -124,27 +112,22 @@ type
     function GetBreakOnExceptions(): Boolean;
   end;
 
-  //============================================================================
-  // TPEDebugTarget - Out-of-process debugging via Windows Debug API.
-  // A dedicated thread runs WaitForDebugEvent in a loop, catching
-  // INT3 and single-step exceptions in the debuggee process.
-  //============================================================================
+  { TMorPEDebugTarget }
+  TMorPEDebugTarget = class;
 
-  TPEDebugTarget = class;
-
-  { TPEDebugLoopThread }
-  TPEDebugLoopThread = class(TThread)
+  { TMorPEDebugLoopThread }
+  TMorPEDebugLoopThread = class(TThread)
   private
-    FTarget: TPEDebugTarget;
+    FTarget: TMorPEDebugTarget;
     function IsTargetDll(const AEvent: TDebugEvent): Boolean;
   protected
     procedure Execute(); override;
   public
-    constructor Create(const ATarget: TPEDebugTarget);
+    constructor Create(const ATarget: TMorPEDebugTarget);
   end;
 
   { TPEDebugTarget }
-  TPEDebugTarget = class(TDebugTarget)
+  TMorPEDebugTarget = class(TMorDebugTarget)
   private
     FExePath: string;
     FProcessHandle: THandle;
@@ -157,7 +140,7 @@ type
     FStoppedEvent: THandle;
     FResumeEvent: THandle;
     FCapturedContext: TContext;
-    FStoppedReason: TDebugStopReason;
+    FStoppedReason: TMorDebugStopReason;
     FStoppedAddress: UInt64;
     FStoppedThreadId: DWORD;
     FExceptionCode: Cardinal;
@@ -170,7 +153,7 @@ type
     FLaunchDoneEvent: THandle;
     FLaunchPath: string;
     FLaunchSucceeded: Boolean;
-    FDebugLoopThread: TPEDebugLoopThread;
+    FDebugLoopThread: TMorPEDebugLoopThread;
 
     // DLL debugging fields
     FDllPath: string;                  // Target DLL we're debugging
@@ -211,7 +194,7 @@ type
     // Lifecycle
     function Start(): Boolean; override;
     procedure Stop(); override;
-    function WaitForStop(out AEvent: TDebugStopEvent): Boolean; override;
+    function WaitForStop(out AEvent: TMorDebugStopEvent): Boolean; override;
     function IsRunning(): Boolean; override;
 
     // Re-patch tracking
@@ -249,18 +232,18 @@ const
 // TDebugTarget - Base
 //==============================================================================
 
-constructor TDebugTarget.Create();
+constructor TMorDebugTarget.Create();
 begin
   inherited Create();
   FBreakOnExceptions := False;
 end;
 
-destructor TDebugTarget.Destroy();
+destructor TMorDebugTarget.Destroy();
 begin
   inherited Destroy();
 end;
 
-function TDebugTarget.ReadBytes(const AAddress: UInt64;
+function TMorDebugTarget.ReadBytes(const AAddress: UInt64;
   const ASize: Cardinal): TBytes;
 var
   LI: Cardinal;
@@ -270,37 +253,37 @@ begin
     Result[LI] := ReadByte(AAddress + LI);
 end;
 
-procedure TDebugTarget.SetRepatchOffset(const AOffset: Int64);
+procedure TMorDebugTarget.SetRepatchOffset(const AOffset: Int64);
 begin
   // Default no-op
 end;
 
-function TDebugTarget.GetRepatchOffset(): Int64;
+function TMorDebugTarget.GetRepatchOffset(): Int64;
 begin
   Result := -1;
 end;
 
-procedure TDebugTarget.SignalConfigDone();
+procedure TMorDebugTarget.SignalConfigDone();
 begin
   // Default no-op
 end;
 
-procedure TDebugTarget.WaitUntilReady();
+procedure TMorDebugTarget.WaitUntilReady();
 begin
   // Default no-op
 end;
 
-procedure TDebugTarget.UnblockWaitForStop();
+procedure TMorDebugTarget.UnblockWaitForStop();
 begin
   // Default no-op
 end;
 
-procedure TDebugTarget.SetBreakOnExceptions(const AEnabled: Boolean);
+procedure TMorDebugTarget.SetBreakOnExceptions(const AEnabled: Boolean);
 begin
   FBreakOnExceptions := AEnabled;
 end;
 
-function TDebugTarget.GetBreakOnExceptions(): Boolean;
+function TMorDebugTarget.GetBreakOnExceptions(): Boolean;
 begin
   Result := FBreakOnExceptions;
 end;
@@ -309,14 +292,14 @@ end;
 // TPEDebugLoopThread
 //==============================================================================
 
-constructor TPEDebugLoopThread.Create(const ATarget: TPEDebugTarget);
+constructor TMorPEDebugLoopThread.Create(const ATarget: TMorPEDebugTarget);
 begin
   inherited Create(True);  // Create suspended
   FreeOnTerminate := False;
   FTarget := ATarget;
 end;
 
-function TPEDebugLoopThread.IsTargetDll(
+function TMorPEDebugLoopThread.IsTargetDll(
   const AEvent: TDebugEvent): Boolean;
 var
   LNamePtr: Pointer;
@@ -360,7 +343,7 @@ begin
   Result := SameText(ExtractFileName(LDllName), LTargetName);
 end;
 
-procedure TPEDebugLoopThread.Execute();
+procedure TMorPEDebugLoopThread.Execute();
 var
   LEvent: TDebugEvent;
   LContinueStatus: DWORD;
@@ -505,7 +488,7 @@ begin
           if LRepatch >= 0 then
           begin
             // Repatch uses absolute address (FRepatchOffset stores address)
-            FTarget.WriteByte(UInt64(LRepatch), INT3_OPCODE);
+            FTarget.WriteByte(UInt64(LRepatch), MOR_INT3_OPCODE);
             FTarget.FlushCode(UInt64(LRepatch), 1);
             FTarget.FRepatchOffset := -1;
 
@@ -513,7 +496,7 @@ begin
             FillChar(LContext, SizeOf(LContext), 0);
             LContext.ContextFlags := CONTEXT_FULL;
             GetThreadContext(FTarget.FMainThreadHandle, LContext);
-            LContext.EFlags := LContext.EFlags and (not TRAP_FLAG);
+            LContext.EFlags := LContext.EFlags and (not MOR_TRAP_FLAG);
             SetThreadContext(FTarget.FMainThreadHandle, LContext);
 
             ContinueDebugEvent(LEvent.dwProcessId, LEvent.dwThreadId,
@@ -527,7 +510,7 @@ begin
           GetThreadContext(FTarget.FMainThreadHandle, LContext);
 
           // Clear trap flag
-          LContext.EFlags := LContext.EFlags and (not TRAP_FLAG);
+          LContext.EFlags := LContext.EFlags and (not MOR_TRAP_FLAG);
           SetThreadContext(FTarget.FMainThreadHandle, LContext);
 
           FTarget.FCapturedContext := LContext;
@@ -655,7 +638,7 @@ end;
 // TPEDebugTarget
 //==============================================================================
 
-constructor TPEDebugTarget.Create();
+constructor TMorPEDebugTarget.Create();
 begin
   inherited Create();
   FExePath := '';
@@ -690,7 +673,7 @@ begin
   FDllFound := False;
 end;
 
-destructor TPEDebugTarget.Destroy();
+destructor TMorPEDebugTarget.Destroy();
 begin
   Stop();
   inherited Destroy();
@@ -700,12 +683,12 @@ end;
 // Setup
 //------------------------------------------------------------------------------
 
-procedure TPEDebugTarget.SetExePath(const APath: string);
+procedure TMorPEDebugTarget.SetExePath(const APath: string);
 begin
   FExePath := APath;
 end;
 
-procedure TPEDebugTarget.SetDllMode(const ADllPath: string;
+procedure TMorPEDebugTarget.SetDllMode(const ADllPath: string;
   const AHostExePath: string);
 begin
   FDllPath := ADllPath;
@@ -719,7 +702,7 @@ end;
 // ReadTextSectionFromPE - Read .text RVA and size from PE headers
 //------------------------------------------------------------------------------
 
-procedure TPEDebugTarget.ReadTextSectionFromPE();
+procedure TMorPEDebugTarget.ReadTextSectionFromPE();
 var
   LDosHeader: IMAGE_DOS_HEADER;
   LNTHeaders: IMAGE_NT_HEADERS64;
@@ -770,7 +753,7 @@ end;
 // Lifecycle
 //------------------------------------------------------------------------------
 
-function TPEDebugTarget.Start(): Boolean;
+function TMorPEDebugTarget.Start(): Boolean;
 begin
   Result := False;
 
@@ -833,7 +816,7 @@ begin
 
   // Start the debug loop thread (CreateProcessW must be on same thread
   // as WaitForDebugEvent per Windows Debug API requirement)
-  FDebugLoopThread := TPEDebugLoopThread.Create(Self);
+  FDebugLoopThread := TMorPEDebugLoopThread.Create(Self);
   FDebugLoopThread.Start();
 
   // Wait for the thread to finish launching the process
@@ -850,7 +833,7 @@ begin
   Result := True;
 end;
 
-procedure TPEDebugTarget.Stop();
+procedure TMorPEDebugTarget.Stop();
 begin
   // Always clean up the debug loop thread, even if the process already exited
   // (EXIT_PROCESS_DEBUG_EVENT sets FStarted := False before we get here)
@@ -924,12 +907,12 @@ begin
   end;
 end;
 
-function TPEDebugTarget.IsRunning(): Boolean;
+function TMorPEDebugTarget.IsRunning(): Boolean;
 begin
   Result := FStarted;
 end;
 
-function TPEDebugTarget.WaitForStop(out AEvent: TDebugStopEvent): Boolean;
+function TMorPEDebugTarget.WaitForStop(out AEvent: TMorDebugStopEvent): Boolean;
 begin
   // Block until the debug loop thread signals a stop
   Result := WaitForSingleObject(FStoppedEvent, INFINITE) = WAIT_OBJECT_0;
@@ -952,26 +935,26 @@ end;
 // Execution Control
 //------------------------------------------------------------------------------
 
-procedure TPEDebugTarget.Resume();
+procedure TMorPEDebugTarget.Resume();
 begin
   SetEvent(FResumeEvent);
 end;
 
-procedure TPEDebugTarget.SetTrapFlag();
+procedure TMorPEDebugTarget.SetTrapFlag();
 begin
-  FCapturedContext.EFlags := FCapturedContext.EFlags or TRAP_FLAG;
+  FCapturedContext.EFlags := FCapturedContext.EFlags or MOR_TRAP_FLAG;
 end;
 
-procedure TPEDebugTarget.ClearTrapFlag();
+procedure TMorPEDebugTarget.ClearTrapFlag();
 begin
-  FCapturedContext.EFlags := FCapturedContext.EFlags and (not TRAP_FLAG);
+  FCapturedContext.EFlags := FCapturedContext.EFlags and (not MOR_TRAP_FLAG);
 end;
 
 //------------------------------------------------------------------------------
 // Memory Operations (via ReadProcessMemory / WriteProcessMemory)
 //------------------------------------------------------------------------------
 
-function TPEDebugTarget.ReadByte(const AAddress: UInt64): Byte;
+function TMorPEDebugTarget.ReadByte(const AAddress: UInt64): Byte;
 var
   LBytesRead: NativeUInt;
 begin
@@ -986,7 +969,7 @@ begin
   end;
 end;
 
-procedure TPEDebugTarget.WriteByte(const AAddress: UInt64;
+procedure TMorPEDebugTarget.WriteByte(const AAddress: UInt64;
   const AValue: Byte);
 var
   LBytesWritten: NativeUInt;
@@ -1001,7 +984,7 @@ begin
   end;
 end;
 
-function TPEDebugTarget.ReadUInt64(const AAddress: UInt64): UInt64;
+function TMorPEDebugTarget.ReadUInt64(const AAddress: UInt64): UInt64;
 var
   LBytesRead: NativeUInt;
 begin
@@ -1016,7 +999,7 @@ begin
   end;
 end;
 
-procedure TPEDebugTarget.FlushCode(const AAddress: UInt64;
+procedure TMorPEDebugTarget.FlushCode(const AAddress: UInt64;
   const ASize: Cardinal);
 begin
   FlushInstructionCache(FProcessHandle, Pointer(AAddress), ASize);
@@ -1026,12 +1009,12 @@ end;
 // Thread Context
 //------------------------------------------------------------------------------
 
-function TPEDebugTarget.GetContext(): TContext;
+function TMorPEDebugTarget.GetContext(): TContext;
 begin
   Result := FCapturedContext;
 end;
 
-procedure TPEDebugTarget.SetContext(const AContext: TContext);
+procedure TMorPEDebugTarget.SetContext(const AContext: TContext);
 begin
   FCapturedContext := AContext;
 end;
@@ -1040,7 +1023,7 @@ end;
 // Address Queries
 //------------------------------------------------------------------------------
 
-function TPEDebugTarget.IsOurCode(const AAddress: UInt64): Boolean;
+function TMorPEDebugTarget.IsOurCode(const AAddress: UInt64): Boolean;
 var
   LTextStart: UInt64;
 begin
@@ -1060,23 +1043,23 @@ end;
 // Re-patch tracking
 //------------------------------------------------------------------------------
 
-procedure TPEDebugTarget.SetRepatchOffset(const AOffset: Int64);
+procedure TMorPEDebugTarget.SetRepatchOffset(const AOffset: Int64);
 begin
   FRepatchOffset := AOffset;
 end;
 
-function TPEDebugTarget.GetRepatchOffset(): Int64;
+function TMorPEDebugTarget.GetRepatchOffset(): Int64;
 begin
   Result := FRepatchOffset;
 end;
 
-procedure TPEDebugTarget.SignalConfigDone();
+procedure TMorPEDebugTarget.SignalConfigDone();
 begin
   if FConfigDoneEvent <> 0 then
     SetEvent(FConfigDoneEvent);
 end;
 
-procedure TPEDebugTarget.WaitUntilReady();
+procedure TMorPEDebugTarget.WaitUntilReady();
 begin
   // Wait for the debug loop thread to process CREATE_PROCESS_DEBUG_EVENT
   // and reach the initial breakpoint (where ReadTextSectionFromPE runs)
@@ -1084,7 +1067,7 @@ begin
     WaitForSingleObject(FReadyEvent, 10000);
 end;
 
-procedure TPEDebugTarget.UnblockWaitForStop();
+procedure TMorPEDebugTarget.UnblockWaitForStop();
 begin
   if FStoppedEvent <> 0 then
     SetEvent(FStoppedEvent);

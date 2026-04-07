@@ -1,13 +1,6 @@
 ﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
-  LSP (Language Server Protocol) Implementation.
-
-  Three layers:
-    TMorLSPDocument  - Holds source, runs pipeline, queries AST
-    TMorLSPService   - Pure logic, no JSON. Answers every LSP query
-    TMorLSPServer    - JSON-RPC framing and dispatch loop
-
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
 
@@ -40,19 +33,11 @@ uses
 
 type
 
-  //===========================================================================
-  // Forward declarations
-  //===========================================================================
-
+  { Forward declarations }
   TMorLSPDocument = class;
   TMorLSPService  = class;
-  //TMorLSPServer   = class;
 
-  //===========================================================================
-  // LSP Protocol Record Types
-  //===========================================================================
-
-  { TMorLSPPosition - zero-based line and character }
+  { TMorLSPPosition }
   TMorLSPPosition = record
     Line: Integer;
     Character: Integer;
@@ -71,7 +56,7 @@ type
     function ToJSON(): TJSONObject;
     class function FromJSON(const AObj: TJSONObject): TMorLSPRange; static;
     class function FromSourceRange(
-      const ARange: TSourceRange): TMorLSPRange; static;
+      const ARange: TMorSourceRange): TMorLSPRange; static;
   end;
 
   { TMorLSPLocation }
@@ -227,23 +212,16 @@ type
     function ToJSON(const ADirection: string): TJSONObject;
   end;
 
-  //===========================================================================
-  // Document Management
-  //===========================================================================
-
-  { TMorLSPDocument
-    Runs the full compiler pipeline on each open/change.
-    Uses a shared TMorInterpreter (read-only after LoadMor) with
-    per-document scopes, output, errors, and AST. }
-  TMorLSPDocument = class(TBaseObject)
+  { TMorLSPDocument }
+  TMorLSPDocument = class(TMorBaseObject)
   private
     FUri: string;
     FContent: string;
     FVersion: Integer;
     FLines: TStringList;
-    FAST: TASTNode;
-    FErrors: TErrors;
-    FTokens: TList<TToken>;
+    FAST: TMorASTNode;
+    FErrors: TMorErrors;
+    FTokens: TList<TMorToken>;
     FScopes: TScopeManager;
     FInterp: TMorInterpreter;  // shared, NOT owned
 
@@ -263,9 +241,9 @@ type
     procedure SetInterpreter(const AInterp: TMorInterpreter);
     procedure Parse();
 
-    function GetAST(): TASTNode;
-    function GetErrors(): TErrors;
-    function GetTokens(): TList<TToken>;
+    function GetAST(): TMorASTNode;
+    function GetErrors(): TMorErrors;
+    function GetTokens(): TList<TMorToken>;
     function GetScopes(): TScopeManager;
 
     function OffsetToPosition(const AOffset: Integer): TMorLSPPosition;
@@ -274,17 +252,13 @@ type
     function GetLine(const AIndex: Integer): string;
 
     function FindNodeAtPosition(
-      const APosition: TMorLSPPosition): TASTNode;
+      const APosition: TMorLSPPosition): TMorASTNode;
     function FindTokenAtPosition(
-      const APosition: TMorLSPPosition): TToken;
+      const APosition: TMorLSPPosition): TMorToken;
   end;
 
-  //===========================================================================
-  // LSP Service (Logic Layer - No JSON)
-  //===========================================================================
-
   { TMorLSPService }
-  TMorLSPService = class(TBaseObject)
+  TMorLSPService = class(TMorBaseObject)
   private
     FDocuments: TObjectDictionary<string, TMorLSPDocument>;
     FInterp: TMorInterpreter;  // shared, NOT owned
@@ -292,16 +266,16 @@ type
     function GetDocument(const AUri: string): TMorLSPDocument;
 
     // Internal helpers
-    function GetIdentifierFromNode(const ANode: TASTNode): string;
+    function GetIdentifierFromNode(const ANode: TMorASTNode): string;
     function ResolveIdentifierAtPosition(
       const ADoc: TMorLSPDocument;
       const APosition: TMorLSPPosition;
-      out ANode: TASTNode): string;
+      out ANode: TMorASTNode): string;
     function LookupSymbolByName(const ADoc: TMorLSPDocument;
       const AName: string): TSymbol;
-    procedure CollectFoldingRangesFromNode(const ANode: TASTNode;
+    procedure CollectFoldingRangesFromNode(const ANode: TMorASTNode;
       var ARanges: TArray<TMorLSPFoldingRange>);
-    procedure CollectReferencesInNode(const ANode: TASTNode;
+    procedure CollectReferencesInNode(const ANode: TMorASTNode;
       const ATargetName: string; const AUri: string;
       var ALocations: TArray<TMorLSPLocation>);
     procedure CollectReferencesFromTokens(
@@ -321,7 +295,7 @@ type
     function SymKindToCompletionKind(const ASymKind: string): Integer;
     function TokenKindToSemanticType(const AKind: string): Integer;
     function ErrorSeverityToLSPSeverity(
-      const ASeverity: TErrorSeverity): Integer;
+      const ASeverity: TMorErrorSeverity): Integer;
 
   public
     constructor Create(); override;
@@ -375,12 +349,8 @@ type
     class function UriToFilePath(const AUri: string): string; static;
   end;
 
-  //===========================================================================
-  // LSP Server (Protocol Layer - JSON-RPC)
-  //===========================================================================
-
   { TMorLSPServer }
-  TMorLSPServer = class(TBaseObject)
+  TMorLSPServer = class(TMorBaseObject)
   private
     FService: TMorLSPService;
     FEngineAPI: TMorEngineAPI;
@@ -456,9 +426,7 @@ uses
   Metamorf.GenericParser,
   Metamorf.CodeGen;
 
-//=============================================================================
-// TMorLSPPosition
-//=============================================================================
+{ TMorLSPPosition }
 
 procedure TMorLSPPosition.Clear();
 begin
@@ -479,10 +447,6 @@ begin
   Result.Line := AObj.GetValue<Integer>('line', 0);
   Result.Character := AObj.GetValue<Integer>('character', 0);
 end;
-
-//=============================================================================
-// TMorLSPRange
-//=============================================================================
 
 procedure TMorLSPRange.Clear();
 begin
@@ -513,7 +477,7 @@ begin
 end;
 
 class function TMorLSPRange.FromSourceRange(
-  const ARange: TSourceRange): TMorLSPRange;
+  const ARange: TMorSourceRange): TMorLSPRange;
 begin
   // LSP is 0-based; Metamorf source ranges are 1-based
   Result.StartPos.Line := Max(0, ARange.StartLine - 1);
@@ -521,10 +485,6 @@ begin
   Result.EndPos.Line := Max(0, ARange.EndLine - 1);
   Result.EndPos.Character := Max(0, ARange.EndColumn - 1);
 end;
-
-//=============================================================================
-// TMorLSPLocation
-//=============================================================================
 
 function TMorLSPLocation.IsEmpty(): Boolean;
 begin
@@ -538,20 +498,12 @@ begin
   Result.AddPair('range', Range.ToJSON());
 end;
 
-//=============================================================================
-// TMorLSPDiagnosticRelated
-//=============================================================================
-
 function TMorLSPDiagnosticRelated.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
   Result.AddPair('location', Location.ToJSON());
   Result.AddPair('message', Message);
 end;
-
-//=============================================================================
-// TMorLSPDiagnostic
-//=============================================================================
 
 function TMorLSPDiagnostic.ToJSON(): TJSONObject;
 var
@@ -575,10 +527,6 @@ begin
   end;
 end;
 
-//=============================================================================
-// TMorLSPCompletionItem
-//=============================================================================
-
 function TMorLSPCompletionItem.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
@@ -597,10 +545,6 @@ begin
     Result.AddPair('sortText', SortText);
 end;
 
-//=============================================================================
-// TMorLSPParameterInfo
-//=============================================================================
-
 function TMorLSPParameterInfo.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
@@ -608,10 +552,6 @@ begin
   if Documentation <> '' then
     Result.AddPair('documentation', Documentation);
 end;
-
-//=============================================================================
-// TMorLSPSignatureInfo
-//=============================================================================
 
 function TMorLSPSignatureInfo.ToJSON(): TJSONObject;
 var
@@ -631,10 +571,6 @@ begin
   end;
 end;
 
-//=============================================================================
-// TMorLSPSignatureHelp
-//=============================================================================
-
 function TMorLSPSignatureHelp.ToJSON(): TJSONObject;
 var
   LSigsArray: TJSONArray;
@@ -650,10 +586,6 @@ begin
   Result.AddPair('activeParameter',
     TJSONNumber.Create(ActiveParameter));
 end;
-
-//=============================================================================
-// TMorLSPHover
-//=============================================================================
 
 function TMorLSPHover.IsEmpty(): Boolean;
 begin
@@ -672,10 +604,6 @@ begin
   if HasRange then
     Result.AddPair('range', Range.ToJSON());
 end;
-
-//=============================================================================
-// TMorLSPDocumentSymbol
-//=============================================================================
 
 function TMorLSPDocumentSymbol.ToJSON(): TJSONObject;
 var
@@ -698,10 +626,6 @@ begin
   end;
 end;
 
-//=============================================================================
-// TMorLSPFoldingRange
-//=============================================================================
-
 function TMorLSPFoldingRange.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
@@ -711,10 +635,6 @@ begin
     Result.AddPair('kind', Kind);
 end;
 
-//=============================================================================
-// TMorLSPInlayHint
-//=============================================================================
-
 function TMorLSPInlayHint.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
@@ -723,20 +643,12 @@ begin
   Result.AddPair('kind', TJSONNumber.Create(Kind));
 end;
 
-//=============================================================================
-// TMorLSPTextEdit
-//=============================================================================
-
 function TMorLSPTextEdit.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
   Result.AddPair('range', Range.ToJSON());
   Result.AddPair('newText', NewText);
 end;
-
-//=============================================================================
-// TMorLSPWorkspaceEdit
-//=============================================================================
 
 function TMorLSPWorkspaceEdit.ToJSON(): TJSONObject;
 var
@@ -751,10 +663,6 @@ begin
   Result.AddPair('edits', LEditsArray);
 end;
 
-//=============================================================================
-// TMorLSPSymbolInformation
-//=============================================================================
-
 function TMorLSPSymbolInformation.ToJSON(): TJSONObject;
 var
   LLocation: TJSONObject;
@@ -768,10 +676,6 @@ begin
   Result.AddPair('location', LLocation);
 end;
 
-//=============================================================================
-// TMorLSPCallHierarchyItem
-//=============================================================================
-
 function TMorLSPCallHierarchyItem.ToJSON(): TJSONObject;
 begin
   Result := TJSONObject.Create();
@@ -781,10 +685,6 @@ begin
   Result.AddPair('range', Range.ToJSON());
   Result.AddPair('selectionRange', SelectionRange.ToJSON());
 end;
-
-//=============================================================================
-// TMorLSPCallHierarchyCall
-//=============================================================================
 
 function TMorLSPCallHierarchyCall.ToJSON(
   const ADirection: string): TJSONObject;
@@ -799,10 +699,6 @@ begin
     LRangesArray.AddElement(FromRanges[LI].ToJSON());
   Result.AddPair('fromRanges', LRangesArray);
 end;
-
-//=============================================================================
-// TMorLSPDocument
-//=============================================================================
 
 constructor TMorLSPDocument.Create();
 begin
@@ -872,11 +768,11 @@ end;
 
 procedure TMorLSPDocument.Parse();
 var
-  LGenLexer: TGenericLexer;
-  LGenParser: TGenericParser;
-  LOutput: TCodeOutput;
-  LMasterRoot: TASTNode;
-  LBranch: TASTNode;
+  LGenLexer: TMorGenericLexer;
+  LGenParser: TMorGenericParser;
+  LOutput: TMorCodeOutput;
+  LMasterRoot: TMorASTNode;
+  LBranch: TMorASTNode;
 begin
   // Free previous results
   FreeAndNil(FScopes);
@@ -884,11 +780,11 @@ begin
   FreeAndNil(FTokens);
   FreeAndNil(FErrors);
 
-  FErrors := TErrors.Create();
+  FErrors := TMorErrors.Create();
   FErrors.SetMaxErrors(100);
 
   // Lex user source via table-driven lexer
-  LGenLexer := TGenericLexer.Create();
+  LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(FErrors);
     LGenLexer.Configure(FInterp);
@@ -904,7 +800,7 @@ begin
   end;
 
   // Parse user source into a branch
-  LGenParser := TGenericParser.Create();
+  LGenParser := TMorGenericParser.Create();
   try
     LGenParser.SetErrors(FErrors);
     LGenParser.Configure(FInterp);
@@ -920,7 +816,7 @@ begin
   end;
 
   // Assemble master AST (single branch for this document)
-  LMasterRoot := TASTNode.Create();
+  LMasterRoot := TMorASTNode.Create();
   LMasterRoot.SetKind('master.root');
   LMasterRoot.AddChild(LBranch);
   FAST := LMasterRoot;
@@ -928,7 +824,7 @@ begin
   // Run semantic analysis with per-document scopes
   FScopes := TScopeManager.Create();
   FScopes.SetErrors(FErrors);
-  LOutput := TCodeOutput.Create();
+  LOutput := TMorCodeOutput.Create();
   try
     FInterp.SetScopes(FScopes);
     FInterp.SetOutput(LOutput);
@@ -942,17 +838,17 @@ begin
   UpdateLines();
 end;
 
-function TMorLSPDocument.GetAST(): TASTNode;
+function TMorLSPDocument.GetAST(): TMorASTNode;
 begin
   Result := FAST;
 end;
 
-function TMorLSPDocument.GetErrors(): TErrors;
+function TMorLSPDocument.GetErrors(): TMorErrors;
 begin
   Result := FErrors;
 end;
 
-function TMorLSPDocument.GetTokens(): TList<TToken>;
+function TMorLSPDocument.GetTokens(): TList<TMorToken>;
 begin
   Result := FTokens;
 end;
@@ -1045,9 +941,9 @@ begin
 end;
 
 function TMorLSPDocument.FindNodeAtPosition(
-  const APosition: TMorLSPPosition): TASTNode;
+  const APosition: TMorLSPPosition): TMorASTNode;
 
-  function ContainsPosition(const ARange: TSourceRange): Boolean;
+  function ContainsPosition(const ARange: TMorSourceRange): Boolean;
   var
     LLine: Integer;
     LChar: Integer;
@@ -1074,11 +970,11 @@ function TMorLSPDocument.FindNodeAtPosition(
       Result := True;
   end;
 
-  function SearchNode(const ANode: TASTNode): TASTNode;
+  function SearchNode(const ANode: TMorASTNode): TMorASTNode;
   var
     LI: Integer;
-    LChild: TASTNode;
-    LFound: TASTNode;
+    LChild: TMorASTNode;
+    LFound: TMorASTNode;
     LContains: Boolean;
   begin
     Result := nil;
@@ -1108,14 +1004,14 @@ begin
 end;
 
 function TMorLSPDocument.FindTokenAtPosition(
-  const APosition: TMorLSPPosition): TToken;
+  const APosition: TMorLSPPosition): TMorToken;
 var
   LLine: Integer;
   LCol: Integer;
   LLow: Integer;
   LHigh: Integer;
   LMid: Integer;
-  LToken: TToken;
+  LToken: TMorToken;
   LTokenEnd: Integer;
 begin
   Result.Kind := '';
@@ -1159,10 +1055,6 @@ begin
     end;
   end;
 end;
-
-//=============================================================================
-// TMorLSPService
-//=============================================================================
 
 constructor TMorLSPService.Create();
 begin
@@ -1231,12 +1123,8 @@ begin
   Result := FDocuments.ContainsKey(AUri);
 end;
 
-//-----------------------------------------------------------------------------
-// Internal helpers
-//-----------------------------------------------------------------------------
-
 function TMorLSPService.GetIdentifierFromNode(
-  const ANode: TASTNode): string;
+  const ANode: TMorASTNode): string;
 begin
   Result := '';
   if ANode = nil then Exit;
@@ -1251,9 +1139,9 @@ end;
 function TMorLSPService.ResolveIdentifierAtPosition(
   const ADoc: TMorLSPDocument;
   const APosition: TMorLSPPosition;
-  out ANode: TASTNode): string;
+  out ANode: TMorASTNode): string;
 var
-  LToken: TToken;
+  LToken: TMorToken;
 begin
   Result := '';
   ANode := nil;
@@ -1354,7 +1242,7 @@ begin
 end;
 
 function TMorLSPService.ErrorSeverityToLSPSeverity(
-  const ASeverity: TErrorSeverity): Integer;
+  const ASeverity: TMorErrorSeverity): Integer;
 begin
   if ASeverity = esHint then
     Result := 4
@@ -1380,19 +1268,15 @@ begin
   Result := StringReplace(Result, '/', PathDelim, [rfReplaceAll]);
 end;
 
-//-----------------------------------------------------------------------------
-// LSP Features
-//-----------------------------------------------------------------------------
-
 function TMorLSPService.GetDiagnostics(
   const AUri: string): TArray<TMorLSPDiagnostic>;
 var
   LDoc: TMorLSPDocument;
-  LErrors: TErrors;
-  LItems: TList<TError>;
+  LErrors: TMorErrors;
+  LItems: TList<TMorError>;
   LI: Integer;
   LJ: Integer;
-  LError: TError;
+  LError: TMorError;
   LDiag: TMorLSPDiagnostic;
   LRelated: TMorLSPDiagnosticRelated;
 begin
@@ -1473,7 +1357,7 @@ function TMorLSPService.GetHover(const AUri: string;
 var
   LDoc: TMorLSPDocument;
   LPosition: TMorLSPPosition;
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LName: string;
   LSym: TSymbol;
   LContent: string;
@@ -1514,11 +1398,11 @@ function TMorLSPService.GetDefinition(const AUri: string;
 var
   LDoc: TMorLSPDocument;
   LPosition: TMorLSPPosition;
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LName: string;
   LSym: TSymbol;
-  LDeclNode: TASTNode;
-  LDeclRange: TSourceRange;
+  LDeclNode: TMorASTNode;
+  LDeclRange: TMorSourceRange;
 begin
   Result.Uri := '';
   Result.Range.Clear();
@@ -1534,7 +1418,7 @@ begin
   LSym := LookupSymbolByName(LDoc, LName);
   if (LSym <> nil) and (LSym.GetDeclNode() <> nil) then
   begin
-    LDeclNode := TASTNode(LSym.GetDeclNode());
+    LDeclNode := TMorASTNode(LSym.GetDeclNode());
     LDeclRange := LDeclNode.GetRange();
     if not LDeclRange.IsEmpty() then
     begin
@@ -1553,7 +1437,7 @@ begin
 end;
 
 procedure TMorLSPService.CollectReferencesInNode(
-  const ANode: TASTNode;
+  const ANode: TMorASTNode;
   const ATargetName: string; const AUri: string;
   var ALocations: TArray<TMorLSPLocation>);
 var
@@ -1582,10 +1466,10 @@ procedure TMorLSPService.CollectReferencesFromTokens(
   const ATargetName: string; const AUri: string;
   var ALocations: TArray<TMorLSPLocation>);
 var
-  LTokens: TList<TToken>;
+  LTokens: TList<TMorToken>;
   LI: Integer;
   LJ: Integer;
-  LToken: TToken;
+  LToken: TMorToken;
   LLocation: TMorLSPLocation;
   LAlreadyFound: Boolean;
   LLine: Integer;
@@ -1636,7 +1520,7 @@ function TMorLSPService.GetReferences(const AUri: string;
 var
   LDoc: TMorLSPDocument;
   LPosition: TMorLSPPosition;
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LName: string;
 begin
   SetLength(Result, 0);
@@ -1662,7 +1546,7 @@ procedure TMorLSPService.CollectDocSymbolsFromScope(
 var
   LPair: TPair<string, TSymbol>;
   LSym: TMorLSPDocumentSymbol;
-  LDeclNode: TASTNode;
+  LDeclNode: TMorASTNode;
   LI: Integer;
   LChildScope: TScope;
 begin
@@ -1683,7 +1567,7 @@ begin
     // Get range from declaration node if available
     if LPair.Value.GetDeclNode() <> nil then
     begin
-      LDeclNode := TASTNode(LPair.Value.GetDeclNode());
+      LDeclNode := TMorASTNode(LPair.Value.GetDeclNode());
       if not LDeclNode.GetRange().IsEmpty() then
         LSym.Range := TMorLSPRange.FromSourceRange(LDeclNode.GetRange())
       else
@@ -1755,12 +1639,12 @@ begin
 end;
 
 procedure TMorLSPService.CollectFoldingRangesFromNode(
-  const ANode: TASTNode;
+  const ANode: TMorASTNode;
   var ARanges: TArray<TMorLSPFoldingRange>);
 var
   LI: Integer;
   LRange: TMorLSPFoldingRange;
-  LSrcRange: TSourceRange;
+  LSrcRange: TMorSourceRange;
 begin
   if ANode = nil then Exit;
 
@@ -1797,9 +1681,9 @@ function TMorLSPService.GetSemanticTokens(
   const AUri: string): TArray<Integer>;
 var
   LDoc: TMorLSPDocument;
-  LTokens: TList<TToken>;
+  LTokens: TList<TMorToken>;
   LI: Integer;
-  LToken: TToken;
+  LToken: TMorToken;
   LType: Integer;
   LPrevLine: Integer;
   LPrevChar: Integer;
@@ -1852,7 +1736,7 @@ function TMorLSPService.GetRenameEdits(const AUri: string;
 var
   LDoc: TMorLSPDocument;
   LPosition: TMorLSPPosition;
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LName: string;
   LLocations: TArray<TMorLSPLocation>;
   LEdit: TMorLSPTextEdit;
@@ -1892,7 +1776,7 @@ procedure TMorLSPService.CollectWorkspaceSymbolsFromScope(
 var
   LPair: TPair<string, TSymbol>;
   LInfo: TMorLSPSymbolInformation;
-  LDeclNode: TASTNode;
+  LDeclNode: TMorASTNode;
   LI: Integer;
   LChildScope: TScope;
 begin
@@ -1913,7 +1797,7 @@ begin
 
     if LPair.Value.GetDeclNode() <> nil then
     begin
-      LDeclNode := TASTNode(LPair.Value.GetDeclNode());
+      LDeclNode := TMorASTNode(LPair.Value.GetDeclNode());
       if not LDeclNode.GetRange().IsEmpty() then
         LInfo.Range := TMorLSPRange.FromSourceRange(LDeclNode.GetRange())
       else
@@ -2009,11 +1893,6 @@ begin
   SetLength(Result, 0);
   // Code actions (quick fixes) will be added based on diagnostic codes.
 end;
-
-
-//=============================================================================
-// TMorLSPServer
-//=============================================================================
 
 constructor TMorLSPServer.Create();
 begin

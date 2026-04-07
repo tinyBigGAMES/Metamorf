@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -28,10 +28,9 @@ uses
   Metamorf.Debug.Runtime;
 
 type
-  //============================================================================
-  // TDAPState - DAP session lifecycle states
-  //============================================================================
-  TDAPState = (
+
+  { TMorDAPState }
+  TMorDAPState = (
     dsIdle,              // Server created, not yet listening
     dsListening,         // TCP socket listening, awaiting connection
     dsConnected,         // Client connected, awaiting initialize
@@ -42,18 +41,13 @@ type
     dsTerminated         // Debug session ended
   );
 
-  //============================================================================
-  // TDAPServer - Debug Adapter Protocol server over TCP/JSON.
-  // Speaks the standard DAP protocol that VS Code and other editors use.
-  //============================================================================
-
-  { TDAPServer }
-  TDAPServer = class(TErrorsObject)
+  { TMorDAPServer }
+  TMorDAPServer = class(TMorErrorsObject)
   private
-    FRuntime: TDebugRuntime;        // Reference (not owned)
-    FSourceMap: TPDBSourceMap;      // Reference (not owned)
+    FRuntime: TMorDebugRuntime;        // Reference (not owned)
+    FSourceMap: TMorPDBSourceMap;      // Reference (not owned)
     FPort: Integer;
-    FState: TDAPState;
+    FState: TMorDAPState;
     FSeq: Integer;                  // Outgoing message sequence counter
 
     // WinSock
@@ -104,8 +98,8 @@ type
     constructor Create(); override;
     destructor Destroy(); override;
 
-    procedure SetRuntime(const ARuntime: TDebugRuntime);
-    procedure SetSourceMap(const ASourceMap: TPDBSourceMap);
+    procedure SetRuntime(const ARuntime: TMorDebugRuntime);
+    procedure SetSourceMap(const ASourceMap: TMorPDBSourceMap);
 
     // Lifecycle
     function StartListening(const APort: Integer): Boolean;
@@ -116,16 +110,13 @@ type
 
     // Properties
     function GetPort(): Integer;
-    function GetState(): TDAPState;
+    function GetState(): TMorDAPState;
   end;
 
 implementation
 
-//==============================================================================
-// TDAPServer -- Constructor / Destructor
-//==============================================================================
-
-constructor TDAPServer.Create();
+{ TMorDAPServer }
+constructor TMorDAPServer.Create();
 begin
   inherited Create();
   FRuntime := nil;
@@ -141,37 +132,33 @@ begin
   FStopOnEntry := False;
 end;
 
-destructor TDAPServer.Destroy();
+destructor TMorDAPServer.Destroy();
 begin
   StopServer();
   inherited Destroy();
 end;
 
-procedure TDAPServer.SetRuntime(const ARuntime: TDebugRuntime);
+procedure TMorDAPServer.SetRuntime(const ARuntime: TMorDebugRuntime);
 begin
   FRuntime := ARuntime;
 end;
 
-procedure TDAPServer.SetSourceMap(const ASourceMap: TPDBSourceMap);
+procedure TMorDAPServer.SetSourceMap(const ASourceMap: TMorPDBSourceMap);
 begin
   FSourceMap := ASourceMap;
 end;
 
-function TDAPServer.GetPort(): Integer;
+function TMorDAPServer.GetPort(): Integer;
 begin
   Result := FPort;
 end;
 
-function TDAPServer.GetState(): TDAPState;
+function TMorDAPServer.GetState(): TMorDAPState;
 begin
   Result := FState;
 end;
 
-//==============================================================================
-// TDAPServer -- TCP Lifecycle
-//==============================================================================
-
-function TDAPServer.StartListening(const APort: Integer): Boolean;
+function TMorDAPServer.StartListening(const APort: Integer): Boolean;
 var
   LAddr: TSockAddrIn;
   LOptVal: Integer;
@@ -227,7 +214,7 @@ begin
   Result := True;
 end;
 
-function TDAPServer.WaitForConnection(): Boolean;
+function TMorDAPServer.WaitForConnection(): Boolean;
 begin
   Result := False;
   if FState <> dsListening then
@@ -246,7 +233,7 @@ begin
   Result := True;
 end;
 
-procedure TDAPServer.StopServer();
+procedure TMorDAPServer.StopServer();
 begin
   if FClientSocket <> INVALID_SOCKET then
   begin
@@ -266,11 +253,7 @@ begin
   FState := dsIdle;
 end;
 
-//==============================================================================
-// TDAPServer -- Message I/O (Content-Length framing)
-//==============================================================================
-
-function TDAPServer.ReadMessage(): TJSONObject;
+function TMorDAPServer.ReadMessage(): TJSONObject;
 var
   LBuf: AnsiChar;
   LHeader: AnsiString;
@@ -336,7 +319,7 @@ begin
   end;
 end;
 
-procedure TDAPServer.SendMessage(const AMsg: TJSONObject);
+procedure TMorDAPServer.SendMessage(const AMsg: TJSONObject);
 var
   LBody: TBytes;
   LHeader: AnsiString;
@@ -348,7 +331,7 @@ begin
   send(FClientSocket, LBody[0], Length(LBody), 0);
 end;
 
-procedure TDAPServer.SendResponse(const ARequestSeq: Integer;
+procedure TMorDAPServer.SendResponse(const ARequestSeq: Integer;
   const ACommand: string; const ASuccess: Boolean;
   const ABody: TJSONObject; const AMessage: string);
 var
@@ -378,7 +361,7 @@ begin
   end;
 end;
 
-procedure TDAPServer.SendEvent(const AEventName: string;
+procedure TMorDAPServer.SendEvent(const AEventName: string;
   const ABody: TJSONObject);
 var
   LMsg: TJSONObject;
@@ -401,11 +384,7 @@ begin
   end;
 end;
 
-//==============================================================================
-// TDAPServer -- Message Loop + Dispatch
-//==============================================================================
-
-procedure TDAPServer.RunMessageLoop();
+procedure TMorDAPServer.RunMessageLoop();
 var
   LMsg: TJSONObject;
   LCommand: string;
@@ -445,7 +424,7 @@ begin
   end;
 end;
 
-procedure TDAPServer.DispatchRequest(const AMsg: TJSONObject);
+procedure TMorDAPServer.DispatchRequest(const AMsg: TJSONObject);
 var
   LCommand: string;
   LSeq: Integer;
@@ -496,11 +475,7 @@ begin
     SendResponse(LSeq, LCommand, False, nil, 'Unknown command: ' + LCommand);
 end;
 
-//==============================================================================
-// TDAPServer -- DAP Command Handlers
-//==============================================================================
-
-procedure TDAPServer.HandleInitialize(const ASeq: Integer;
+procedure TMorDAPServer.HandleInitialize(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LBody: TJSONObject;
@@ -535,7 +510,7 @@ begin
   FState := dsInitialized;
 end;
 
-procedure TDAPServer.HandleLaunch(const ASeq: Integer;
+procedure TMorDAPServer.HandleLaunch(const ASeq: Integer;
   const AArgs: TJSONObject);
 begin
   // Extract launch configuration fields
@@ -550,7 +525,7 @@ begin
   SendResponse(ASeq, 'launch', True);
 end;
 
-procedure TDAPServer.HandleSetBreakpoints(const ASeq: Integer;
+procedure TMorDAPServer.HandleSetBreakpoints(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LSource: TJSONObject;
@@ -605,13 +580,13 @@ begin
   SendResponse(ASeq, 'setBreakpoints', True, LBody);
 end;
 
-procedure TDAPServer.HandleSetExceptionBreakpoints(const ASeq: Integer;
+procedure TMorDAPServer.HandleSetExceptionBreakpoints(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LFilters: TJSONArray;
   LI: Integer;
   LEnabled: Boolean;
-  LTarget: TDebugTarget;
+  LTarget: TMorDebugTarget;
 begin
   LEnabled := False;
 
@@ -643,7 +618,7 @@ begin
   SendResponse(ASeq, 'setExceptionBreakpoints', True);
 end;
 
-procedure TDAPServer.HandleConfigurationDone(const ASeq: Integer);
+procedure TMorDAPServer.HandleConfigurationDone(const ASeq: Integer);
 begin
   // Client has finished sending initial breakpoints -- start the debuggee
   FState := dsRunning;
@@ -653,7 +628,7 @@ begin
   FRuntime.ConfigurationDone();
 end;
 
-procedure TDAPServer.HandleThreads(const ASeq: Integer);
+procedure TMorDAPServer.HandleThreads(const ASeq: Integer);
 var
   LBody: TJSONObject;
   LThreads: TJSONArray;
@@ -671,14 +646,14 @@ begin
   SendResponse(ASeq, 'threads', True, LBody);
 end;
 
-procedure TDAPServer.HandleStackTrace(const ASeq: Integer;
+procedure TMorDAPServer.HandleStackTrace(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LBody: TJSONObject;
   LFrames: TJSONArray;
   LFrameObj: TJSONObject;
   LSourceObj: TJSONObject;
-  LStack: TArray<TDebugStackFrame>;
+  LStack: TArray<TMorDebugStackFrame>;
   LI: Integer;
 begin
   LStack := FRuntime.GetCallStack();
@@ -709,7 +684,7 @@ begin
   SendResponse(ASeq, 'stackTrace', True, LBody);
 end;
 
-procedure TDAPServer.HandleScopes(const ASeq: Integer;
+procedure TMorDAPServer.HandleScopes(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LBody: TJSONObject;
@@ -729,13 +704,13 @@ begin
   SendResponse(ASeq, 'scopes', True, LBody);
 end;
 
-procedure TDAPServer.HandleVariables(const ASeq: Integer;
+procedure TMorDAPServer.HandleVariables(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LBody: TJSONObject;
   LVarsArray: TJSONArray;
   LVarObj: TJSONObject;
-  LVars: TArray<TDebugVariable>;
+  LVars: TArray<TMorDebugVariable>;
   LI: Integer;
 begin
   LVarsArray := TJSONArray.Create();
@@ -757,11 +732,7 @@ begin
   SendResponse(ASeq, 'variables', True, LBody);
 end;
 
-//------------------------------------------------------------------------------
-// Execution control handlers
-//------------------------------------------------------------------------------
-
-procedure TDAPServer.HandleContinue(const ASeq: Integer);
+procedure TMorDAPServer.HandleContinue(const ASeq: Integer);
 var
   LBody: TJSONObject;
 begin
@@ -782,7 +753,7 @@ begin
   FRuntime.DoContinue();
 end;
 
-procedure TDAPServer.HandleNext(const ASeq: Integer);
+procedure TMorDAPServer.HandleNext(const ASeq: Integer);
 begin
   if FState <> dsStopped then
   begin
@@ -794,7 +765,7 @@ begin
   FRuntime.StepOver();
 end;
 
-procedure TDAPServer.HandleStepIn(const ASeq: Integer);
+procedure TMorDAPServer.HandleStepIn(const ASeq: Integer);
 begin
   if FState <> dsStopped then
   begin
@@ -806,7 +777,7 @@ begin
   FRuntime.StepIn();
 end;
 
-procedure TDAPServer.HandleStepOut(const ASeq: Integer);
+procedure TMorDAPServer.HandleStepOut(const ASeq: Integer);
 begin
   if FState <> dsStopped then
   begin
@@ -818,18 +789,18 @@ begin
   FRuntime.StepOut();
 end;
 
-procedure TDAPServer.HandlePause(const ASeq: Integer);
+procedure TMorDAPServer.HandlePause(const ASeq: Integer);
 begin
   // Not fully supported in v1 -- would need to inject INT3
   SendResponse(ASeq, 'pause', True);
 end;
 
-procedure TDAPServer.HandleEvaluate(const ASeq: Integer;
+procedure TMorDAPServer.HandleEvaluate(const ASeq: Integer;
   const AArgs: TJSONObject);
 var
   LExpression: string;
   LBody: TJSONObject;
-  LVar: TDebugVariable;
+  LVar: TMorDebugVariable;
 begin
   LExpression := '';
   if AArgs <> nil then
@@ -860,21 +831,17 @@ begin
   end;
 end;
 
-procedure TDAPServer.HandleDisconnect(const ASeq: Integer);
+procedure TMorDAPServer.HandleDisconnect(const ASeq: Integer);
 begin
   SendResponse(ASeq, 'disconnect', True);
   SendEvent('terminated');
   FState := dsTerminated;
 end;
 
-//------------------------------------------------------------------------------
-// Stop event handling -- sends DAP stopped event to client
-//------------------------------------------------------------------------------
-
-procedure TDAPServer.ProcessStopEvent();
+procedure TMorDAPServer.ProcessStopEvent();
 var
   LBody: TJSONObject;
-  LEvent: TDebugStopEvent;
+  LEvent: TMorDebugStopEvent;
 begin
   LEvent := FRuntime.GetLastStopEvent();
 

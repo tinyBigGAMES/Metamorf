@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -24,10 +24,8 @@ uses
   Metamorf.Debug.Target;
 
 type
-  //============================================================================
-  // TBreakpointInfo - A single breakpoint
-  //============================================================================
-  TBreakpointInfo = record
+  { TMorBreakpointInfo }
+  TMorBreakpointInfo = record
     ID: Integer;
     SourceFile: string;
     SourceLine: Integer;
@@ -41,10 +39,8 @@ type
     HitCondition: Integer;        // Break only when HitCount >= this value (0 = ignore)
   end;
 
-  //============================================================================
-  // TDebugStackFrame - A single frame in the call stack
-  //============================================================================
-  TDebugStackFrame = record
+  { TMorDebugStackFrame }
+  TMorDebugStackFrame = record
     FrameID: Integer;
     FunctionName: string;
     SourceFile: string;
@@ -55,25 +51,20 @@ type
     RIP: UInt64;
   end;
 
-  //============================================================================
-  // TBreakpointManager - Manages breakpoints through TDebugTarget.
-  // Works with absolute virtual addresses (PDB model).
-  //============================================================================
-
-  { TBreakpointManager }
-  TBreakpointManager = class(TErrorsObject)
+  { TMorBreakpointManager }
+  TMorBreakpointManager = class(TMorErrorsObject)
   private
-    FTarget: TDebugTarget;         // Reference (not owned)
-    FSourceMap: TPDBSourceMap;     // Reference (not owned)
-    FBreakpoints: TList<TBreakpointInfo>;
+    FTarget: TMorDebugTarget;         // Reference (not owned)
+    FSourceMap: TMorPDBSourceMap;     // Reference (not owned)
+    FBreakpoints: TList<TMorBreakpointInfo>;
     FNextID: Integer;
 
   public
     constructor Create(); override;
     destructor Destroy(); override;
 
-    procedure SetTarget(const ATarget: TDebugTarget);
-    procedure SetSourceMap(const ASourceMap: TPDBSourceMap);
+    procedure SetTarget(const ATarget: TMorDebugTarget);
+    procedure SetSourceMap(const ASourceMap: TMorPDBSourceMap);
 
     // Set/remove breakpoints
     function SetBreakpoint(const AFile: string; const ALine: Integer;
@@ -86,11 +77,11 @@ type
     // Query
     function IsOurBreakpoint(const AAddress: UInt64): Boolean;
     function GetBreakpointAt(const AAddress: UInt64;
-      out AInfo: TBreakpointInfo): Boolean;
+      out AInfo: TMorBreakpointInfo): Boolean;
     function GetBreakpointByID(const AID: Integer;
-      out AInfo: TBreakpointInfo): Boolean;
+      out AInfo: TMorBreakpointInfo): Boolean;
     function GetBreakpointCount(): Integer;
-    function GetBreakpoint(const AIndex: Integer): TBreakpointInfo;
+    function GetBreakpoint(const AIndex: Integer): TMorBreakpointInfo;
 
     // Patching (applies/removes INT3 bytes)
     procedure ApplyAll();
@@ -98,39 +89,29 @@ type
     procedure UnpatchBreakpoint(const AIndex: Integer);
   end;
 
-  //============================================================================
-  // TStackWalker - Walks the RBP chain to build a call stack.
-  // Works through TDebugTarget for memory reads, TPDBSourceMap for mapping.
-  //============================================================================
-
-  { TStackWalker }
-  TStackWalker = class(TBaseObject)
+  { TMorStackWalker }
+  TMorStackWalker = class(TMorBaseObject)
   public
-    function WalkStack(const ATarget: TDebugTarget;
-      const ASourceMap: TPDBSourceMap;
-      const AContext: TContext): TArray<TDebugStackFrame>;
+    function WalkStack(const ATarget: TMorDebugTarget;
+      const ASourceMap: TMorPDBSourceMap;
+      const AContext: TContext): TArray<TMorDebugStackFrame>;
   end;
 
-  //============================================================================
-  // TDebugRuntime - Coordinates breakpoints, stepping, and stack walking.
-  // Main debug logic layer between TDebugTarget and the DAP server.
-  //============================================================================
-
-  { TDebugRuntime }
-  TDebugRuntime = class(TErrorsObject)
+  { TMorDebugRuntime }
+  TMorDebugRuntime = class(TMorErrorsObject)
   private
-    FTarget: TDebugTarget;              // Reference (not owned)
-    FSourceMap: TPDBSourceMap;           // Reference (not owned)
-    FBreakpoints: TBreakpointManager;   // Owned
-    FStackWalker: TStackWalker;         // Owned
-    FLastStopEvent: TDebugStopEvent;
+    FTarget: TMorDebugTarget;              // Reference (not owned)
+    FSourceMap: TMorPDBSourceMap;           // Reference (not owned)
+    FBreakpoints: TMorBreakpointManager;   // Owned
+    FStackWalker: TMorStackWalker;         // Owned
+    FLastStopEvent: TMorDebugStopEvent;
 
   public
     constructor Create(); override;
     destructor Destroy(); override;
 
-    procedure SetTarget(const ATarget: TDebugTarget);
-    procedure SetSourceMap(const ASourceMap: TPDBSourceMap);
+    procedure SetTarget(const ATarget: TMorDebugTarget);
+    procedure SetSourceMap(const ASourceMap: TMorPDBSourceMap);
 
     // Breakpoint management (delegates to FBreakpoints)
     function SetBreakpoint(const AFile: string; const ALine: Integer;
@@ -148,54 +129,51 @@ type
     procedure ConfigurationDone();
 
     // Inspection
-    function GetCallStack(): TArray<TDebugStackFrame>;
-    function GetLastStopEvent(): TDebugStopEvent;
-    function GetVariables(): TArray<TDebugVariable>;
-    function Evaluate(const AExpression: string): TDebugVariable;
+    function GetCallStack(): TArray<TMorDebugStackFrame>;
+    function GetLastStopEvent(): TMorDebugStopEvent;
+    function GetVariables(): TArray<TMorDebugVariable>;
+    function Evaluate(const AExpression: string): TMorDebugVariable;
 
     // Access
-    function GetBreakpoints(): TBreakpointManager;
-    function GetTarget(): TDebugTarget;
-    function GetSourceMap(): TPDBSourceMap;
+    function GetBreakpoints(): TMorBreakpointManager;
+    function GetTarget(): TMorDebugTarget;
+    function GetSourceMap(): TMorPDBSourceMap;
   end;
 
 implementation
 
-//==============================================================================
-// TBreakpointManager
-//==============================================================================
-
-constructor TBreakpointManager.Create();
+{ TMorBreakpointManager }
+constructor TMorBreakpointManager.Create();
 begin
   inherited Create();
   FTarget := nil;
   FSourceMap := nil;
-  FBreakpoints := TList<TBreakpointInfo>.Create();
+  FBreakpoints := TList<TMorBreakpointInfo>.Create();
   FNextID := 1;
 end;
 
-destructor TBreakpointManager.Destroy();
+destructor TMorBreakpointManager.Destroy();
 begin
   RemoveAll();
   FBreakpoints.Free();
   inherited Destroy();
 end;
 
-procedure TBreakpointManager.SetTarget(const ATarget: TDebugTarget);
+procedure TMorBreakpointManager.SetTarget(const ATarget: TMorDebugTarget);
 begin
   FTarget := ATarget;
 end;
 
-procedure TBreakpointManager.SetSourceMap(const ASourceMap: TPDBSourceMap);
+procedure TMorBreakpointManager.SetSourceMap(const ASourceMap: TMorPDBSourceMap);
 begin
   FSourceMap := ASourceMap;
 end;
 
-function TBreakpointManager.SetBreakpoint(const AFile: string;
+function TMorBreakpointManager.SetBreakpoint(const AFile: string;
   const ALine: Integer; const ACondition: string;
   const AHitCondition: Integer): Integer;
 var
-  LInfo: TBreakpointInfo;
+  LInfo: TMorBreakpointInfo;
   LAddress: UInt64;
 begin
   Result := -1;
@@ -235,7 +213,7 @@ begin
   Result := LInfo.ID;
 end;
 
-function TBreakpointManager.RemoveBreakpoint(const AID: Integer): Boolean;
+function TMorBreakpointManager.RemoveBreakpoint(const AID: Integer): Boolean;
 var
   LI: Integer;
 begin
@@ -253,9 +231,9 @@ begin
   end;
 end;
 
-function TBreakpointManager.SetTempBreakpoint(const AAddress: UInt64): Integer;
+function TMorBreakpointManager.SetTempBreakpoint(const AAddress: UInt64): Integer;
 var
-  LInfo: TBreakpointInfo;
+  LInfo: TMorBreakpointInfo;
 begin
   if FTarget = nil then
     Exit(-1);
@@ -279,7 +257,7 @@ begin
   Result := LInfo.ID;
 end;
 
-procedure TBreakpointManager.RemoveAllTemp();
+procedure TMorBreakpointManager.RemoveAllTemp();
 var
   LI: Integer;
 begin
@@ -294,7 +272,7 @@ begin
   end;
 end;
 
-procedure TBreakpointManager.RemoveAll();
+procedure TMorBreakpointManager.RemoveAll();
 var
   LI: Integer;
 begin
@@ -306,7 +284,7 @@ begin
   FBreakpoints.Clear();
 end;
 
-function TBreakpointManager.IsOurBreakpoint(const AAddress: UInt64): Boolean;
+function TMorBreakpointManager.IsOurBreakpoint(const AAddress: UInt64): Boolean;
 var
   LI: Integer;
 begin
@@ -318,8 +296,8 @@ begin
   end;
 end;
 
-function TBreakpointManager.GetBreakpointAt(const AAddress: UInt64;
-  out AInfo: TBreakpointInfo): Boolean;
+function TMorBreakpointManager.GetBreakpointAt(const AAddress: UInt64;
+  out AInfo: TMorBreakpointInfo): Boolean;
 var
   LI: Integer;
 begin
@@ -335,8 +313,8 @@ begin
   end;
 end;
 
-function TBreakpointManager.GetBreakpointByID(const AID: Integer;
-  out AInfo: TBreakpointInfo): Boolean;
+function TMorBreakpointManager.GetBreakpointByID(const AID: Integer;
+  out AInfo: TMorBreakpointInfo): Boolean;
 var
   LI: Integer;
 begin
@@ -352,12 +330,12 @@ begin
   end;
 end;
 
-function TBreakpointManager.GetBreakpointCount(): Integer;
+function TMorBreakpointManager.GetBreakpointCount(): Integer;
 begin
   Result := FBreakpoints.Count;
 end;
 
-function TBreakpointManager.GetBreakpoint(const AIndex: Integer): TBreakpointInfo;
+function TMorBreakpointManager.GetBreakpoint(const AIndex: Integer): TMorBreakpointInfo;
 begin
   Result := FBreakpoints[AIndex];
 end;
@@ -366,10 +344,10 @@ end;
 // Breakpoint Patching
 //------------------------------------------------------------------------------
 
-procedure TBreakpointManager.ApplyAll();
+procedure TMorBreakpointManager.ApplyAll();
 var
   LI: Integer;
-  LInfo: TBreakpointInfo;
+  LInfo: TMorBreakpointInfo;
   LAddress: UInt64;
   LHasPending: Boolean;
   LWaitCount: Integer;
@@ -417,9 +395,9 @@ begin
   end;
 end;
 
-procedure TBreakpointManager.PatchBreakpoint(const AIndex: Integer);
+procedure TMorBreakpointManager.PatchBreakpoint(const AIndex: Integer);
 var
-  LInfo: TBreakpointInfo;
+  LInfo: TMorBreakpointInfo;
 begin
   LInfo := FBreakpoints[AIndex];
   if LInfo.IsPatched then
@@ -427,16 +405,16 @@ begin
 
   // Save original byte and write INT3 at absolute address
   LInfo.OriginalByte := FTarget.ReadByte(LInfo.Address);
-  FTarget.WriteByte(LInfo.Address, INT3_OPCODE);
+  FTarget.WriteByte(LInfo.Address, MOR_INT3_OPCODE);
   FTarget.FlushCode(LInfo.Address, 1);
   LInfo.IsPatched := True;
 
   FBreakpoints[AIndex] := LInfo;
 end;
 
-procedure TBreakpointManager.UnpatchBreakpoint(const AIndex: Integer);
+procedure TMorBreakpointManager.UnpatchBreakpoint(const AIndex: Integer);
 var
-  LInfo: TBreakpointInfo;
+  LInfo: TMorBreakpointInfo;
 begin
   LInfo := FBreakpoints[AIndex];
   if not LInfo.IsPatched then
@@ -454,11 +432,11 @@ end;
 // TStackWalker
 //==============================================================================
 
-function TStackWalker.WalkStack(const ATarget: TDebugTarget;
-  const ASourceMap: TPDBSourceMap;
-  const AContext: TContext): TArray<TDebugStackFrame>;
+function TMorStackWalker.WalkStack(const ATarget: TMorDebugTarget;
+  const ASourceMap: TMorPDBSourceMap;
+  const AContext: TContext): TArray<TMorDebugStackFrame>;
 var
-  LFrame: TDebugStackFrame;
+  LFrame: TMorDebugStackFrame;
   LFrameID: Integer;
   LRIP: UInt64;
   LRBP: UInt64;
@@ -522,60 +500,49 @@ begin
   end;
 end;
 
-//==============================================================================
-// TDebugRuntime
-//==============================================================================
-
-constructor TDebugRuntime.Create();
+{ TMorDebugRuntime }
+constructor TMorDebugRuntime.Create();
 begin
   inherited Create();
   FTarget := nil;
   FSourceMap := nil;
-  FBreakpoints := TBreakpointManager.Create();
-  FStackWalker := TStackWalker.Create();
+  FBreakpoints := TMorBreakpointManager.Create();
+  FStackWalker := TMorStackWalker.Create();
   FillChar(FLastStopEvent, SizeOf(FLastStopEvent), 0);
 end;
 
-destructor TDebugRuntime.Destroy();
+destructor TMorDebugRuntime.Destroy();
 begin
   FStackWalker.Free();
   FBreakpoints.Free();
   inherited Destroy();
 end;
 
-procedure TDebugRuntime.SetTarget(const ATarget: TDebugTarget);
+procedure TMorDebugRuntime.SetTarget(const ATarget: TMorDebugTarget);
 begin
   FTarget := ATarget;
   FBreakpoints.SetTarget(ATarget);
 end;
 
-procedure TDebugRuntime.SetSourceMap(const ASourceMap: TPDBSourceMap);
+procedure TMorDebugRuntime.SetSourceMap(const ASourceMap: TMorPDBSourceMap);
 begin
   FSourceMap := ASourceMap;
   FBreakpoints.SetSourceMap(ASourceMap);
 end;
 
-//------------------------------------------------------------------------------
-// Breakpoint delegation
-//------------------------------------------------------------------------------
-
-function TDebugRuntime.SetBreakpoint(const AFile: string;
+function TMorDebugRuntime.SetBreakpoint(const AFile: string;
   const ALine: Integer; const ACondition: string;
   const AHitCondition: Integer): Integer;
 begin
   Result := FBreakpoints.SetBreakpoint(AFile, ALine, ACondition, AHitCondition);
 end;
 
-function TDebugRuntime.RemoveBreakpoint(const AID: Integer): Boolean;
+function TMorDebugRuntime.RemoveBreakpoint(const AID: Integer): Boolean;
 begin
   Result := FBreakpoints.RemoveBreakpoint(AID);
 end;
 
-//------------------------------------------------------------------------------
-// DAP Lifecycle
-//------------------------------------------------------------------------------
-
-procedure TDebugRuntime.ConfigurationDone();
+procedure TMorDebugRuntime.ConfigurationDone();
 begin
   // Wait until the debug loop thread has reached the initial breakpoint
   // (FActualImageBase is set, process memory is accessible)
@@ -590,13 +557,9 @@ begin
     FTarget.SignalConfigDone();
 end;
 
-//------------------------------------------------------------------------------
-// Execution Control
-//------------------------------------------------------------------------------
-
-function TDebugRuntime.DoContinue(const ASetTrapFlag: Boolean): Boolean;
+function TMorDebugRuntime.DoContinue(const ASetTrapFlag: Boolean): Boolean;
 var
-  LBPInfo: TBreakpointInfo;
+  LBPInfo: TMorBreakpointInfo;
   LContext: TContext;
   LAddress: UInt64;
 begin
@@ -643,7 +606,7 @@ begin
   Result := True;
 end;
 
-function TDebugRuntime.StepOver(): Boolean;
+function TMorDebugRuntime.StepOver(): Boolean;
 var
   LContext: TContext;
   LCurrentFile: string;
@@ -737,7 +700,7 @@ begin
   Result := DoContinue();
 end;
 
-function TDebugRuntime.StepIn(): Boolean;
+function TMorDebugRuntime.StepIn(): Boolean;
 var
   LContext: TContext;
   LAddr: UInt64;
@@ -779,7 +742,7 @@ begin
   Result := StepOver();
 end;
 
-function TDebugRuntime.StepOut(): Boolean;
+function TMorDebugRuntime.StepOut(): Boolean;
 var
   LContext: TContext;
   LReturnAddr: UInt64;
@@ -813,14 +776,14 @@ begin
   Result := DoContinue();
 end;
 
-function TDebugRuntime.WaitForStop(): Boolean;
+function TMorDebugRuntime.WaitForStop(): Boolean;
 var
-  LEvent: TDebugStopEvent;
-  LBPInfo: TBreakpointInfo;
+  LEvent: TMorDebugStopEvent;
+  LBPInfo: TMorBreakpointInfo;
   LI: Integer;
   LFound: Boolean;
   LShouldBreak: Boolean;
-  LCondVar: TDebugVariable;
+  LCondVar: TMorDebugVariable;
 begin
   Result := False;
   if FTarget = nil then
@@ -894,11 +857,7 @@ begin
   Result := True;
 end;
 
-//------------------------------------------------------------------------------
-// Inspection
-//------------------------------------------------------------------------------
-
-function TDebugRuntime.GetCallStack(): TArray<TDebugStackFrame>;
+function TMorDebugRuntime.GetCallStack(): TArray<TMorDebugStackFrame>;
 var
   LContext: TContext;
 begin
@@ -912,20 +871,20 @@ begin
   Result := FStackWalker.WalkStack(FTarget, FSourceMap, LContext);
 end;
 
-function TDebugRuntime.GetLastStopEvent(): TDebugStopEvent;
+function TMorDebugRuntime.GetLastStopEvent(): TMorDebugStopEvent;
 begin
   Result := FLastStopEvent;
 end;
 
-function TDebugRuntime.GetVariables(): TArray<TDebugVariable>;
+function TMorDebugRuntime.GetVariables(): TArray<TMorDebugVariable>;
 var
-  LVars: TArray<TDebugVariable>;
+  LVars: TArray<TMorDebugVariable>;
   LContext: TContext;
   LAddress: UInt64;
   LBytes: TBytes;
   LI: Integer;
-  LVar: TDebugVariable;
-  LResultList: TList<TDebugVariable>;
+  LVar: TMorDebugVariable;
+  LResultList: TList<TMorDebugVariable>;
 begin
   Result := nil;
   if (FTarget = nil) or (FSourceMap = nil) then
@@ -939,7 +898,7 @@ begin
   // Capture thread context for RBP
   LContext := FTarget.GetContext();
 
-  LResultList := TList<TDebugVariable>.Create();
+  LResultList := TList<TMorDebugVariable>.Create();
   try
     for LI := 0 to High(LVars) do
     begin
@@ -981,18 +940,14 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Expression evaluation -- looks up a single variable by name
-//------------------------------------------------------------------------------
-
-function TDebugRuntime.Evaluate(const AExpression: string): TDebugVariable;
+function TMorDebugRuntime.Evaluate(const AExpression: string): TMorDebugVariable;
 var
-  LVars: TArray<TDebugVariable>;
+  LVars: TArray<TMorDebugVariable>;
   LI: Integer;
   LExpr: string;
 begin
   // Default: not found
-  Result := Default(TDebugVariable);
+  Result := Default(TMorDebugVariable);
   Result.VarName := AExpression;
 
   LExpr := Trim(AExpression);
@@ -1011,21 +966,17 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Accessors
-//------------------------------------------------------------------------------
-
-function TDebugRuntime.GetBreakpoints(): TBreakpointManager;
+function TMorDebugRuntime.GetBreakpoints(): TMorBreakpointManager;
 begin
   Result := FBreakpoints;
 end;
 
-function TDebugRuntime.GetTarget(): TDebugTarget;
+function TMorDebugRuntime.GetTarget(): TMorDebugTarget;
 begin
   Result := FTarget;
 end;
 
-function TDebugRuntime.GetSourceMap(): TPDBSourceMap;
+function TMorDebugRuntime.GetSourceMap(): TMorPDBSourceMap;
 begin
   Result := FSourceMap;
 end;

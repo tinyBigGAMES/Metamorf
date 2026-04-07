@@ -25,51 +25,59 @@ uses
   Metamorf.Config,
   Metamorf.Resources;
 
+const
+  ERR_ZIGBUILD_NO_OUTPUT_PATH   = 'Z001';
+  ERR_ZIGBUILD_NO_SOURCES       = 'Z002';
+  ERR_ZIGBUILD_SAVE_FAILED      = 'Z003';
+  ERR_ZIGBUILD_ZIG_NOT_FOUND    = 'Z004';
+  ERR_ZIGBUILD_BUILD_FAILED     = 'Z005';
+  WRN_ZIGBUILD_CANNOT_RUN_CROSS = 'Z006';
+
 type
 
-  { TBuildMode }
-  TBuildMode = (
+  { TMorBuildMode }
+  TMorBuildMode = (
     bmExe,
     bmLib,
     bmDll
   );
 
-  { TOptimizeLevel }
-  TOptimizeLevel = (
+  { TMorOptimizeLevel }
+  TMorOptimizeLevel = (
     olDebug,
     olReleaseSafe,
     olReleaseFast,
     olReleaseSmall
   );
 
-  { TTargetPlatform }
-  TTargetPlatform = (
+  { TMorTargetPlatform }
+  TMorTargetPlatform = (
     tpWin64,
     tpLinux64
   );
 
-  { TSubsystemType }
-  TSubsystemType = (
+  { TMorSubsystemType }
+  TMorSubsystemType = (
     stConsole,
     stGUI
   );
 
-  { TBreakpointEntry }
-  TBreakpointEntry = record
+  { TMorBreakpointEntry }
+  TMorBreakpointEntry = record
     FileName: string;
     LineNumber: Integer;
   end;
 
 
-  { TBuild }
-  TBuild = class(TErrorsObject)
+  { TMorBuild }
+  TMorBuild = class(TMorErrorsObject)
   private
     FOutputPath: string;
     FProjectName: string;
-    FBuildMode: TBuildMode;
-    FOptimizeLevel: TOptimizeLevel;
-    FTarget: TTargetPlatform;
-    FSubsystem: TSubsystemType;
+    FBuildMode: TMorBuildMode;
+    FOptimizeLevel: TMorOptimizeLevel;
+    FTarget: TMorTargetPlatform;
+    FSubsystem: TMorSubsystemType;
     FSourceFiles: TStringList;
     FIncludePaths: TStringList;
     FLibraryPaths: TStringList;
@@ -78,13 +86,13 @@ type
     FUndefines: TStringList;
     FCopyDLLs: TStringList;
     //FErrors: TErrors;
-    FOutput: TCallback<TCaptureConsoleCallback>;
+    FOutput: TMorCallback<TMorCaptureConsoleCallback>;
     FLastExitCode: DWORD;
     FRawOutput: Boolean;
 
     // Toolchain path
     FToolchainPath: string;
-    FBuildConfig: TConfig;
+    FBuildConfig: TMorConfig;
     FBuildConfigPath: string;
 
     // Version info / post-build resources
@@ -100,7 +108,7 @@ type
     FExeIcon: string;
 
     // Breakpoints
-    FBreakpoints: TList<TBreakpointEntry>;
+    FBreakpoints: TList<TMorBreakpointEntry>;
 
     function GenerateBuildZig(): string;
     function BuildFlagsString(): string;
@@ -122,11 +130,11 @@ type
     // Configuration
     procedure SetOutputPath(const APath: string);
     procedure SetProjectName(const AProjectName: string);
-    procedure SetBuildMode(const ABuildMode: TBuildMode);
-    procedure SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
-    procedure SetTarget(const ATarget: TTargetPlatform);
-    procedure SetSubsystem(const ASubsystem: TSubsystemType);
-    procedure SetOutputCallback(const ACallback: TCaptureConsoleCallback; const AUserData: Pointer = nil);
+    procedure SetBuildMode(const ABuildMode: TMorBuildMode);
+    procedure SetOptimizeLevel(const AOptimizeLevel: TMorOptimizeLevel);
+    procedure SetTarget(const ATarget: TMorTargetPlatform);
+    procedure SetSubsystem(const ASubsystem: TMorSubsystemType);
+    procedure SetOutputCallback(const ACallback: TMorCaptureConsoleCallback; const AUserData: Pointer = nil);
     procedure SetRawOutput(const AValue: Boolean);
 
     // Source files
@@ -185,10 +193,10 @@ type
     function GetLastExitCode(): DWORD;
     function GetOutputPath(): string;
     function GetProjectName(): string;
-    function GetBuildMode(): TBuildMode;
-    function GetOptimizeLevel(): TOptimizeLevel;
-    function GetTarget(): TTargetPlatform;
-    function GetSubsystem(): TSubsystemType;
+    function GetBuildMode(): TMorBuildMode;
+    function GetOptimizeLevel(): TMorOptimizeLevel;
+    function GetTarget(): TMorTargetPlatform;
+    function GetSubsystem(): TMorSubsystemType;
     function GetSourceFileCount(): Integer;
     function GetSourceFile(const AIndex: Integer): string;
 
@@ -223,7 +231,7 @@ type
     // Breakpoints
     procedure AddBreakpoint(const AFileName: string; const ALineNumber: Integer);
     procedure ClearBreakpoints();
-    function GetBreakpoints(): TArray<TBreakpointEntry>;
+    function GetBreakpoints(): TArray<TMorBreakpointEntry>;
     procedure WriteBreakpointsFile(const AExePath: string);
 
     // Toolchain paths
@@ -240,9 +248,9 @@ implementation
 uses
   Metamorf.Common;
 
-{ TBuild }
+{ TMorBuild }
 
-constructor TBuild.Create();
+constructor TMorBuild.Create();
 begin
   inherited;
 
@@ -275,10 +283,10 @@ begin
   FExeIcon := '';
 
   // Breakpoints
-  FBreakpoints := TList<TBreakpointEntry>.Create();
+  FBreakpoints := TList<TMorBreakpointEntry>.Create();
 
   // Toolchain config
-  FBuildConfig := TConfig.Create();
+  FBuildConfig := TMorConfig.Create();
   FBuildConfigPath := TPath.Combine(
     TPath.GetDirectoryName(ParamStr(0)),
     'build.toml'
@@ -308,7 +316,7 @@ begin
   end;
 end;
 
-destructor TBuild.Destroy();
+destructor TMorBuild.Destroy();
 begin
   // Save toolchain config
   FBuildConfig.SetString('build.toolchain_path',
@@ -328,27 +336,27 @@ begin
   inherited;
 end;
 
-procedure TBuild.SetOutputPath(const APath: string);
+procedure TMorBuild.SetOutputPath(const APath: string);
 begin
   FOutputPath := APath;
 end;
 
-procedure TBuild.SetProjectName(const AProjectName: string);
+procedure TMorBuild.SetProjectName(const AProjectName: string);
 begin
   FProjectName := AProjectName;
 end;
 
-procedure TBuild.SetBuildMode(const ABuildMode: TBuildMode);
+procedure TMorBuild.SetBuildMode(const ABuildMode: TMorBuildMode);
 begin
   FBuildMode := ABuildMode;
 end;
 
-procedure TBuild.SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
+procedure TMorBuild.SetOptimizeLevel(const AOptimizeLevel: TMorOptimizeLevel);
 begin
   FOptimizeLevel := AOptimizeLevel;
 end;
 
-procedure TBuild.SetTarget(const ATarget: TTargetPlatform);
+procedure TMorBuild.SetTarget(const ATarget: TMorTargetPlatform);
 begin
   FTarget := ATarget;
 
@@ -395,36 +403,36 @@ begin
   end;
 end;
 
-procedure TBuild.SetSubsystem(const ASubsystem: TSubsystemType);
+procedure TMorBuild.SetSubsystem(const ASubsystem: TMorSubsystemType);
 begin
   FSubsystem := ASubsystem;
 end;
 
-function TBuild.GetSubsystem(): TSubsystemType;
+function TMorBuild.GetSubsystem(): TMorSubsystemType;
 begin
   Result := FSubsystem;
 end;
 
-procedure TBuild.SetOutputCallback(const ACallback: TCaptureConsoleCallback; const AUserData: Pointer);
+procedure TMorBuild.SetOutputCallback(const ACallback: TMorCaptureConsoleCallback; const AUserData: Pointer);
 begin
   FOutput.Callback := ACallback;
   FOutput.UserData := AUserData;
 end;
 
-procedure TBuild.SetRawOutput(const AValue: Boolean);
+procedure TMorBuild.SetRawOutput(const AValue: Boolean);
 begin
   FRawOutput := AValue;
 end;
 
 // Source files
 
-procedure TBuild.AddSourceFile(const ASourceFile: string);
+procedure TMorBuild.AddSourceFile(const ASourceFile: string);
 begin
   if (ASourceFile <> '') and (FSourceFiles.IndexOf(ASourceFile) < 0) then
     FSourceFiles.Add(ASourceFile);
 end;
 
-procedure TBuild.RemoveSourceFile(const ASourceFile: string);
+procedure TMorBuild.RemoveSourceFile(const ASourceFile: string);
 var
   LIndex: Integer;
 begin
@@ -433,20 +441,20 @@ begin
     FSourceFiles.Delete(LIndex);
 end;
 
-procedure TBuild.ClearSourceFiles();
+procedure TMorBuild.ClearSourceFiles();
 begin
   FSourceFiles.Clear();
 end;
 
 // Include paths
 
-procedure TBuild.AddIncludePath(const APath: string);
+procedure TMorBuild.AddIncludePath(const APath: string);
 begin
   if (APath <> '') and (FIncludePaths.IndexOf(APath) < 0) then
     FIncludePaths.Add(APath);
 end;
 
-procedure TBuild.RemoveIncludePath(const APath: string);
+procedure TMorBuild.RemoveIncludePath(const APath: string);
 var
   LIndex: Integer;
 begin
@@ -455,20 +463,20 @@ begin
     FIncludePaths.Delete(LIndex);
 end;
 
-procedure TBuild.ClearIncludePaths();
+procedure TMorBuild.ClearIncludePaths();
 begin
   FIncludePaths.Clear();
 end;
 
 // Library paths
 
-procedure TBuild.AddLibraryPath(const APath: string);
+procedure TMorBuild.AddLibraryPath(const APath: string);
 begin
   if (APath <> '') and (FLibraryPaths.IndexOf(APath) < 0) then
     FLibraryPaths.Add(APath);
 end;
 
-procedure TBuild.RemoveLibraryPath(const APath: string);
+procedure TMorBuild.RemoveLibraryPath(const APath: string);
 var
   LIndex: Integer;
 begin
@@ -477,7 +485,7 @@ begin
     FLibraryPaths.Delete(LIndex);
 end;
 
-procedure TBuild.ClearLibraryPaths();
+procedure TMorBuild.ClearLibraryPaths();
 begin
   FLibraryPaths.Clear();
 end;
@@ -485,13 +493,13 @@ end;
 
 // Link libraries
 
-procedure TBuild.AddLinkLibrary(const ALibrary: string);
+procedure TMorBuild.AddLinkLibrary(const ALibrary: string);
 begin
   if (ALibrary <> '') and (FLinkLibraries.IndexOf(ALibrary) < 0) then
     FLinkLibraries.Add(ALibrary);
 end;
 
-procedure TBuild.RemoveLinkLibrary(const ALibrary: string);
+procedure TMorBuild.RemoveLinkLibrary(const ALibrary: string);
 var
   LIndex: Integer;
 begin
@@ -500,14 +508,14 @@ begin
     FLinkLibraries.Delete(LIndex);
 end;
 
-procedure TBuild.ClearLinkLibraries();
+procedure TMorBuild.ClearLinkLibraries();
 begin
   FLinkLibraries.Clear();
 end;
 
 // Defines
 
-function TBuild.FindDefineIndex(const ADefineName: string): Integer;
+function TMorBuild.FindDefineIndex(const ADefineName: string): Integer;
 var
   LI: Integer;
   LEntry: string;
@@ -532,7 +540,7 @@ begin
   end;
 end;
 
-procedure TBuild.SetDefine(const ADefineName: string);
+procedure TMorBuild.SetDefine(const ADefineName: string);
 var
   LIndex: Integer;
 begin
@@ -547,7 +555,7 @@ begin
     FDefines.Add(ADefineName);
 end;
 
-procedure TBuild.SetDefine(const ADefineName, AValue: string);
+procedure TMorBuild.SetDefine(const ADefineName, AValue: string);
 var
   LIndex: Integer;
   LEntry: string;
@@ -565,7 +573,7 @@ begin
     FDefines.Add(LEntry);
 end;
 
-procedure TBuild.RemoveDefine(const ADefineName: string);
+procedure TMorBuild.RemoveDefine(const ADefineName: string);
 var
   LIndex: Integer;
 begin
@@ -574,24 +582,24 @@ begin
     FDefines.Delete(LIndex);
 end;
 
-procedure TBuild.ClearDefines();
+procedure TMorBuild.ClearDefines();
 begin
   FDefines.Clear();
 end;
 
-function TBuild.HasDefine(const ADefineName: string): Boolean;
+function TMorBuild.HasDefine(const ADefineName: string): Boolean;
 begin
   Result := FindDefineIndex(ADefineName) >= 0;
 end;
 
-function TBuild.GetDefines(): TStringList;
+function TMorBuild.GetDefines(): TStringList;
 begin
   Result := FDefines;
 end;
 
 // Undefines
 
-procedure TBuild.UnsetDefine(const ADefineName: string);
+procedure TMorBuild.UnsetDefine(const ADefineName: string);
 begin
   if ADefineName = '' then
     Exit;
@@ -600,7 +608,7 @@ begin
     FUndefines.Add(ADefineName);
 end;
 
-procedure TBuild.RemoveUndefine(const ADefineName: string);
+procedure TMorBuild.RemoveUndefine(const ADefineName: string);
 var
   LIndex: Integer;
 begin
@@ -609,30 +617,30 @@ begin
     FUndefines.Delete(LIndex);
 end;
 
-procedure TBuild.ClearUndefines();
+procedure TMorBuild.ClearUndefines();
 begin
   FUndefines.Clear();
 end;
 
-function TBuild.HasUndefine(const ADefineName: string): Boolean;
+function TMorBuild.HasUndefine(const ADefineName: string): Boolean;
 begin
   Result := FUndefines.IndexOf(ADefineName) >= 0;
 end;
 
-function TBuild.GetUndefines(): TStringList;
+function TMorBuild.GetUndefines(): TStringList;
 begin
   Result := FUndefines;
 end;
 
 // Copy DLLs
 
-procedure TBuild.AddCopyDLL(const ADLLPath: string);
+procedure TMorBuild.AddCopyDLL(const ADLLPath: string);
 begin
   if FCopyDLLs.IndexOf(ADLLPath) < 0 then
     FCopyDLLs.Add(ADLLPath);
 end;
 
-procedure TBuild.RemoveCopyDLL(const ADLLPath: string);
+procedure TMorBuild.RemoveCopyDLL(const ADLLPath: string);
 var
   LIndex: Integer;
 begin
@@ -641,14 +649,14 @@ begin
     FCopyDLLs.Delete(LIndex);
 end;
 
-procedure TBuild.ClearCopyDLLs();
+procedure TMorBuild.ClearCopyDLLs();
 begin
   FCopyDLLs.Clear();
 end;
 
 // Clear all
 
-procedure TBuild.Clear();
+procedure TMorBuild.Clear();
 begin
   ClearSourceFiles();
   ClearIncludePaths();
@@ -678,42 +686,42 @@ begin
   FExeIcon := '';
 end;
 
-function TBuild.GetLastExitCode(): DWORD;
+function TMorBuild.GetLastExitCode(): DWORD;
 begin
   Result := FLastExitCode;
 end;
 
-function TBuild.GetOutputPath(): string;
+function TMorBuild.GetOutputPath(): string;
 begin
   Result := FOutputPath;
 end;
 
-function TBuild.GetProjectName(): string;
+function TMorBuild.GetProjectName(): string;
 begin
   Result := FProjectName;
 end;
 
-function TBuild.GetBuildMode(): TBuildMode;
+function TMorBuild.GetBuildMode(): TMorBuildMode;
 begin
   Result := FBuildMode;
 end;
 
-function TBuild.GetOptimizeLevel(): TOptimizeLevel;
+function TMorBuild.GetOptimizeLevel(): TMorOptimizeLevel;
 begin
   Result := FOptimizeLevel;
 end;
 
-function TBuild.GetTarget(): TTargetPlatform;
+function TMorBuild.GetTarget(): TMorTargetPlatform;
 begin
   Result := FTarget;
 end;
 
-function TBuild.GetSourceFileCount(): Integer;
+function TMorBuild.GetSourceFileCount(): Integer;
 begin
   Result := FSourceFiles.Count;
 end;
 
-function TBuild.GetSourceFile(const AIndex: Integer): string;
+function TMorBuild.GetSourceFile(const AIndex: Integer): string;
 begin
   if (AIndex >= 0) and (AIndex < FSourceFiles.Count) then
     Result := FSourceFiles[AIndex]
@@ -723,7 +731,7 @@ end;
 
 // Platform extension helpers
 
-function TBuild.GetExeExtension(): string;
+function TMorBuild.GetExeExtension(): string;
 begin
   case FTarget of
     tpWin64:
@@ -735,7 +743,7 @@ begin
   end;
 end;
 
-function TBuild.GetDllExtension(): string;
+function TMorBuild.GetDllExtension(): string;
 begin
   case FTarget of
     tpWin64:
@@ -747,7 +755,7 @@ begin
   end;
 end;
 
-function TBuild.GetLibExtension(): string;
+function TMorBuild.GetLibExtension(): string;
 begin
   case FTarget of
     tpWin64:
@@ -759,7 +767,7 @@ begin
   end;
 end;
 
-function TBuild.GetOutputFilename(): string;
+function TMorBuild.GetOutputFilename(): string;
 var
   LExtension: string;
 begin
@@ -777,7 +785,7 @@ begin
   Result := FProjectName + LExtension;
 end;
 
-function TBuild.GetZigTargetString(): string;
+function TMorBuild.GetZigTargetString(): string;
 begin
   case FTarget of
     tpWin64:
@@ -789,7 +797,7 @@ begin
   end;
 end;
 
-function TBuild.GetZigOptimizeString(): string;
+function TMorBuild.GetZigOptimizeString(): string;
 begin
   case FOptimizeLevel of
     olDebug:
@@ -805,7 +813,7 @@ begin
   end;
 end;
 
-function TBuild.GetTargetDisplayName(): string;
+function TMorBuild.GetTargetDisplayName(): string;
 begin
   case FTarget of
     tpWin64:
@@ -817,7 +825,7 @@ begin
   end;
 end;
 
-function TBuild.GetOptimizeLevelDisplayName(): string;
+function TMorBuild.GetOptimizeLevelDisplayName(): string;
 begin
   case FOptimizeLevel of
     olDebug:
@@ -833,7 +841,7 @@ begin
   end;
 end;
 
-function TBuild.GetSubsystemDisplayName(): string;
+function TMorBuild.GetSubsystemDisplayName(): string;
 begin
   if FSubsystem = stGUI then
     Result := 'GUI'
@@ -841,7 +849,7 @@ begin
     Result := 'Console';
 end;
 
-function TBuild.BuildFlagsString(): string;
+function TMorBuild.BuildFlagsString(): string;
 var
   LFlags: TStringList;
   LI: Integer;
@@ -899,7 +907,7 @@ begin
   end;
 end;
 
-procedure TBuild.ParseFlagsLine(const ALine: string);
+procedure TMorBuild.ParseFlagsLine(const ALine: string);
 var
   LStart: Integer;
   LEnd: Integer;
@@ -949,7 +957,7 @@ begin
   end;
 end;
 
-function TBuild.GenerateBuildZig(): string;
+function TMorBuild.GenerateBuildZig(): string;
 var
   LBuilder: TStringBuilder;
   LI: Integer;
@@ -1137,7 +1145,7 @@ begin
   end;
 end;
 
-function TBuild.FilterOutputBuffer(const ABuffer: string): string;
+function TMorBuild.FilterOutputBuffer(const ABuffer: string): string;
 var
   LCleanLine: string;
   LFilePath: string;
@@ -1145,7 +1153,7 @@ var
   LColNum: Integer;
   LSeverity: string;
   LMessage: string;
-  LErrorSeverity: TErrorSeverity;
+  LErrorSeverity: TMorErrorSeverity;
 
   function StripAnsiCodes(const AText: string): string;
   var
@@ -1291,7 +1299,7 @@ begin
   Result := ABuffer;
 end;
 
-procedure TBuild.HandleOutputLine(const ALine: string; const AUserData: Pointer);
+procedure TMorBuild.HandleOutputLine(const ALine: string; const AUserData: Pointer);
 var
   LFiltered: string;
 begin
@@ -1309,7 +1317,7 @@ begin
     FOutput.Callback(LFiltered, FOutput.UserData);
 end;
 
-function TBuild.LoadBuildFile(const AFilename: string): Boolean;
+function TMorBuild.LoadBuildFile(const AFilename: string): Boolean;
 var
   LLines: TStringList;
   LLine: string;
@@ -1447,7 +1455,7 @@ begin
   end;
 end;
 
-function TBuild.SaveBuildFile(): Boolean;
+function TMorBuild.SaveBuildFile(): Boolean;
 var
   LBuildZigPath: string;
   LContent: string;
@@ -1473,7 +1481,7 @@ begin
 
   // Generate build.zig path and ensure directory exists
   LBuildZigPath := TPath.Combine(FOutputPath, 'build.zig');
-  TUtils.CreateDirInPath(LBuildZigPath);
+  TMorUtils.CreateDirInPath(LBuildZigPath);
   LContent := GenerateBuildZig();
 
   // Write without BOM - Zig doesn't accept BOM in source files
@@ -1494,7 +1502,7 @@ begin
   end;
 end;
 
-function TBuild.Process(const AAutoRun: Boolean): Boolean;
+function TMorBuild.Process(const AAutoRun: Boolean): Boolean;
 var
   LZigExe: string;
   LI: Integer;
@@ -1527,13 +1535,13 @@ begin
   end;
 
   // Set environment variables for color output
-  TUtils.SetEnv('YES_COLOR', '1');
-  TUtils.SetEnv('CLICOLOR_FORCE', '1');
-  TUtils.SetEnv('TERM', 'xterm-256color');
+  TMorUtils.SetEnv('YES_COLOR', '1');
+  TMorUtils.SetEnv('CLICOLOR_FORCE', '1');
+  TMorUtils.SetEnv('TERM', 'xterm-256color');
 
   // Run zig build
   Status(RSZigBuildBuilding, [FProjectName]);
-  TUtils.CaptureZigConsolePTY(
+  TMorUtils.CaptureZigConsolePTY(
     PChar(LZigExe),
     'build --color auto --summary none --multiline-errors newline --error-style minimal',
     FOutputPath,
@@ -1558,7 +1566,7 @@ begin
     LOutputFile := TPath.Combine(FOutputPath, TPath.Combine('zig-out', TPath.Combine('lib', GetOutputFilename())))
   else
     LOutputFile := TPath.Combine(FOutputPath, TPath.Combine('zig-out', TPath.Combine('bin', GetOutputFilename())));
-  Status(RSZigBuildOutput, [TUtils.NormalizePath(TPath.GetFullPath(LOutputFile))]);
+  Status(RSZigBuildOutput, [TMorUtils.NormalizePath(TPath.GetFullPath(LOutputFile))]);
 
   // Copy DLLs to output directory
   if FCopyDLLs.Count > 0 then
@@ -1597,7 +1605,7 @@ begin
     Result := True;
 end;
 
-function TBuild.Run(): Boolean;
+function TMorBuild.Run(): Boolean;
 var
   LExePath: string;
   LWslPath: string;
@@ -1646,9 +1654,9 @@ begin
   if FTarget = tpLinux64 then
   begin
     // Convert to WSL path and chmod +x before running
-    LWslPath := TUtils.WindowsPathToWSL(LExePath);
-    TUtils.CaptureZigConsolePTY('wsl.exe', PChar('chmod +x "' + LWslPath + '"'), TPath.GetDirectoryName(LExePath), FLastExitCode, nil, nil);
-    TUtils.CaptureZigConsolePTY(
+    LWslPath := TMorUtils.WindowsPathToWSL(LExePath);
+    TMorUtils.CaptureZigConsolePTY('wsl.exe', PChar('chmod +x "' + LWslPath + '"'), TPath.GetDirectoryName(LExePath), FLastExitCode, nil, nil);
+    TMorUtils.CaptureZigConsolePTY(
       'wsl.exe',
       PChar('"' + LWslPath + '"'),
       TPath.GetDirectoryName(LExePath),
@@ -1659,7 +1667,7 @@ begin
   end
   else
   begin
-    TUtils.CaptureZigConsolePTY(
+    TMorUtils.CaptureZigConsolePTY(
       PChar(LExePath),
       '',
       TPath.GetDirectoryName(LExePath),
@@ -1679,7 +1687,7 @@ begin
   Result := True;
 end;
 
-function TBuild.ClearCache(): Boolean;
+function TMorBuild.ClearCache(): Boolean;
 var
   LCachePath: string;
 begin
@@ -1689,7 +1697,7 @@ begin
     TDirectory.Delete(LCachePath, True);
 end;
 
-function TBuild.ClearOutput(): Boolean;
+function TMorBuild.ClearOutput(): Boolean;
 var
   LOutputDir: string;
 begin
@@ -1701,7 +1709,7 @@ end;
 
 // Version info / post-build resources
 
-procedure TBuild.ApplyPostBuildResources(const AExePath: string);
+procedure TMorBuild.ApplyPostBuildResources(const AExePath: string);
 var
   LIsExe: Boolean;
   LIsDll: Boolean;
@@ -1714,8 +1722,8 @@ begin
   // Add manifest to executable
   if LIsExe then
   begin
-    if TUtils.ResourceExist('EXE_MANIFEST') then
-      if not TUtils.AddResManifestFromResource('EXE_MANIFEST', AExePath) then
+    if TMorUtils.ResourceExist('EXE_MANIFEST') then
+      if not TMorUtils.AddResManifestFromResource('EXE_MANIFEST', AExePath) then
         if Assigned(FErrors) then
           FErrors.Add(esWarning, 'W980',
             'Failed to add manifest to executable', []);
@@ -1725,7 +1733,7 @@ begin
   if LIsExe and (FExeIcon <> '') then
   begin
     if TFile.Exists(FExeIcon) then
-      TUtils.UpdateIconResource(AExePath, FExeIcon)
+      TMorUtils.UpdateIconResource(AExePath, FExeIcon)
     else if Assigned(FErrors) then
       FErrors.Add(esWarning, 'W982',
         'Icon file not found: %s', [FExeIcon]);
@@ -1733,136 +1741,136 @@ begin
 
   // Stamp version info
   if FAddVersionInfo then
-    TUtils.UpdateVersionInfoResource(AExePath,
+    TMorUtils.UpdateVersionInfoResource(AExePath,
       FVIMajor, FVIMinor, FVIPatch, FVIProductName,
       FVIDescription, FVIFilename, FVICompanyName, FVICopyright);
 end;
 
-procedure TBuild.SetAddVersionInfo(const AValue: Boolean);
+procedure TMorBuild.SetAddVersionInfo(const AValue: Boolean);
 begin
   FAddVersionInfo := AValue;
 end;
 
-function TBuild.GetAddVersionInfo(): Boolean;
+function TMorBuild.GetAddVersionInfo(): Boolean;
 begin
   Result := FAddVersionInfo;
 end;
 
-procedure TBuild.SetVIMajor(const AValue: Word);
+procedure TMorBuild.SetVIMajor(const AValue: Word);
 begin
   FVIMajor := AValue;
 end;
 
-function TBuild.GetVIMajor(): Word;
+function TMorBuild.GetVIMajor(): Word;
 begin
   Result := FVIMajor;
 end;
 
-procedure TBuild.SetVIMinor(const AValue: Word);
+procedure TMorBuild.SetVIMinor(const AValue: Word);
 begin
   FVIMinor := AValue;
 end;
 
-function TBuild.GetVIMinor(): Word;
+function TMorBuild.GetVIMinor(): Word;
 begin
   Result := FVIMinor;
 end;
 
-procedure TBuild.SetVIPatch(const AValue: Word);
+procedure TMorBuild.SetVIPatch(const AValue: Word);
 begin
   FVIPatch := AValue;
 end;
 
-function TBuild.GetVIPatch(): Word;
+function TMorBuild.GetVIPatch(): Word;
 begin
   Result := FVIPatch;
 end;
 
-procedure TBuild.SetVIProductName(const AValue: string);
+procedure TMorBuild.SetVIProductName(const AValue: string);
 begin
   FVIProductName := AValue;
 end;
 
-function TBuild.GetVIProductName(): string;
+function TMorBuild.GetVIProductName(): string;
 begin
   Result := FVIProductName;
 end;
 
-procedure TBuild.SetVIDescription(const AValue: string);
+procedure TMorBuild.SetVIDescription(const AValue: string);
 begin
   FVIDescription := AValue;
 end;
 
-function TBuild.GetVIDescription(): string;
+function TMorBuild.GetVIDescription(): string;
 begin
   Result := FVIDescription;
 end;
 
-procedure TBuild.SetVIFilename(const AValue: string);
+procedure TMorBuild.SetVIFilename(const AValue: string);
 begin
   FVIFilename := AValue;
 end;
 
-function TBuild.GetVIFilename(): string;
+function TMorBuild.GetVIFilename(): string;
 begin
   Result := FVIFilename;
 end;
 
-procedure TBuild.SetVICompanyName(const AValue: string);
+procedure TMorBuild.SetVICompanyName(const AValue: string);
 begin
   FVICompanyName := AValue;
 end;
 
-function TBuild.GetVICompanyName(): string;
+function TMorBuild.GetVICompanyName(): string;
 begin
   Result := FVICompanyName;
 end;
 
-procedure TBuild.SetVICopyright(const AValue: string);
+procedure TMorBuild.SetVICopyright(const AValue: string);
 begin
   FVICopyright := AValue;
 end;
 
-function TBuild.GetVICopyright(): string;
+function TMorBuild.GetVICopyright(): string;
 begin
   Result := FVICopyright;
 end;
 
-procedure TBuild.SetExeIcon(const AValue: string);
+procedure TMorBuild.SetExeIcon(const AValue: string);
 begin
   FExeIcon := AValue;
 end;
 
-function TBuild.GetExeIcon(): string;
+function TMorBuild.GetExeIcon(): string;
 begin
   Result := FExeIcon;
 end;
 
 // Breakpoints
 
-procedure TBuild.AddBreakpoint(const AFileName: string; const ALineNumber: Integer);
+procedure TMorBuild.AddBreakpoint(const AFileName: string; const ALineNumber: Integer);
 var
-  LEntry: TBreakpointEntry;
+  LEntry: TMorBreakpointEntry;
 begin
   LEntry.FileName := AFileName;
   LEntry.LineNumber := ALineNumber;
   FBreakpoints.Add(LEntry);
 end;
 
-procedure TBuild.ClearBreakpoints();
+procedure TMorBuild.ClearBreakpoints();
 begin
   FBreakpoints.Clear();
 end;
 
-function TBuild.GetBreakpoints(): TArray<TBreakpointEntry>;
+function TMorBuild.GetBreakpoints(): TArray<TMorBreakpointEntry>;
 begin
   Result := FBreakpoints.ToArray();
 end;
 
-procedure TBuild.WriteBreakpointsFile(const AExePath: string);
+procedure TMorBuild.WriteBreakpointsFile(const AExePath: string);
 var
   LBreakpointFile: string;
-  LConfig: TConfig;
+  LConfig: TMorConfig;
   LExeDir: string;
   LRelativePath: string;
   LI: Integer;
@@ -1874,7 +1882,7 @@ begin
   LBreakpointFile := TPath.ChangeExtension(AExePath, MOR_BREAKPOINT_EXT);
   LExeDir := TPath.GetDirectoryName(AExePath);
 
-  LConfig := TConfig.Create();
+  LConfig := TMorConfig.Create();
   try
     for LI := 0 to FBreakpoints.Count - 1 do
     begin
@@ -1892,7 +1900,7 @@ end;
 
 // -- Toolchain paths ----------------------------------------------------------
 
-procedure TBuild.SetToolchainPath(const APath: string);
+procedure TMorBuild.SetToolchainPath(const APath: string);
 begin
   if APath = '' then
     FToolchainPath := TPath.Combine(
@@ -1915,33 +1923,33 @@ begin
   FBuildConfig.SetString('build.toolchain_path', APath);
 end;
 
-function TBuild.GetToolchainPath(): string;
+function TMorBuild.GetToolchainPath(): string;
 begin
   Result := FToolchainPath;
 end;
 
-function TBuild.GetZigPath(const AFilename: string): string;
+function TMorBuild.GetZigPath(const AFilename: string): string;
 begin
   Result := TPath.Combine(FToolchainPath, 'zig');
   if AFilename <> '' then
     Result := TPath.Combine(Result, AFilename);
 end;
 
-function TBuild.GetRuntimePath(const AFilename: string): string;
+function TMorBuild.GetRuntimePath(const AFilename: string): string;
 begin
   Result := TPath.Combine(FToolchainPath, 'runtime');
   if AFilename <> '' then
     Result := TPath.Combine(Result, AFilename);
 end;
 
-function TBuild.GetLibsPath(const AFilename: string): string;
+function TMorBuild.GetLibsPath(const AFilename: string): string;
 begin
   Result := TPath.Combine(FToolchainPath, 'libs');
   if AFilename <> '' then
     Result := TPath.Combine(Result, AFilename);
 end;
 
-function TBuild.GetAssetsPath(const AFilename: string): string;
+function TMorBuild.GetAssetsPath(const AFilename: string): string;
 begin
   Result := TPath.Combine(FToolchainPath, 'assets');
   if AFilename <> '' then

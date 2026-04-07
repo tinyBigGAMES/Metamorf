@@ -31,9 +31,9 @@ const
   MOR_AST_VERSION   = 1;
 
 // Report an error with position info extracted from an AST node's token.
-procedure ReportNodeError(
-  const AErrors: TErrors;
-  const ANode: TASTNode;
+procedure MorReportNodeError(
+  const AErrors: TMorErrors;
+  const ANode: TMorASTNode;
   const ACode: string;
   const AFmt: string;
   const AArgs: array of const
@@ -41,15 +41,15 @@ procedure ReportNodeError(
 
 implementation
 
-procedure ReportNodeError(
-  const AErrors: TErrors;
-  const ANode: TASTNode;
+procedure MorReportNodeError(
+  const AErrors: TMorErrors;
+  const ANode: TMorASTNode;
   const ACode: string;
   const AFmt: string;
   const AArgs: array of const
 );
 var
-  LToken: TToken;
+  LToken: TMorToken;
 begin
   if not Assigned(AErrors) then
     Exit;

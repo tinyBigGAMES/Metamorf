@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -27,32 +27,25 @@ uses
   Metamorf.Debug.Client;
 
 const
-  CDefaultDAPPort = 4711;
-  CTimeoutContinueMS = 5000;
-  CTimeoutStepMS = 2000;
+  MOR_DEFAULT_DAP_PORT = 4711;
+  MOR_TIMOUT_CONTINUE_MS = 5000;
+  MOR_TIMEOUT_MS = 2000;
 
 type
-  //============================================================================
-  // TREPLBreakpoint - Local breakpoint tracking record
-  //============================================================================
-  TREPLBreakpoint = record
+  { TMorREPLBreakpoint }
+  TMorREPLBreakpoint = record
     SourceFile: string;
     SourceLine: Integer;
     Verified: Boolean;
   end;
 
-  //============================================================================
-  // TMetamorfDebugREPL - Interactive console debugger for Metamorf programs.
-  // Drives TMetamorfDebugServer + TMetamorfDebugClient over DAP/TCP.
-  //============================================================================
-
-  { TMetamorfDebugREPL }
-  TMetamorfDebugREPL = class(TBaseObject)
+  { TMorMetamorfDebugREPL }
+  TMorDebugREPL = class(TMorBaseObject)
   private
-    FServer: TMetamorfDebugServer;
-    FClient: TMetamorfDebugClient;
+    FServer: TMorDebugServer;
+    FClient: TMorDebugClient;
     FServerThread: TThread;
-    FBreakpoints: TList<TREPLBreakpoint>;
+    FBreakpoints: TList<TMorREPLBreakpoint>;
     FRunning: Boolean;
     FExePath: string;
     FPort: Integer;
@@ -91,7 +84,7 @@ type
     constructor Create(); override;
     destructor Destroy(); override;
 
-    procedure Run(const AExePath: string; const APort: Integer = CDefaultDAPPort);
+    procedure Run(const AExePath: string; const APort: Integer = MOR_DEFAULT_DAP_PORT);
     procedure Stop();
 
     property TimeoutContinueMS: Integer read FTimeoutContinueMS write FTimeoutContinueMS;
@@ -103,34 +96,30 @@ implementation
 uses
   Metamorf.Config;
 
-
-//==============================================================================
-// TMetamorfDebugREPL
-//==============================================================================
-
-constructor TMetamorfDebugREPL.Create();
+{ TMorDebugREPL }
+constructor TMorDebugREPL.Create();
 begin
   inherited Create();
   FServer := nil;
   FClient := nil;
   FServerThread := nil;
-  FBreakpoints := TList<TREPLBreakpoint>.Create();
+  FBreakpoints := TList<TMorREPLBreakpoint>.Create();
   FRunning := False;
   FExePath := '';
-  FPort := CDefaultDAPPort;
+  FPort := MOR_DEFAULT_DAP_PORT;
   FPrompt := '(dbg) ';
-  FTimeoutContinueMS := CTimeoutContinueMS;
-  FTimeoutStepMS := CTimeoutStepMS;
+  FTimeoutContinueMS := MOR_TIMOUT_CONTINUE_MS;
+  FTimeoutStepMS := MOR_TIMEOUT_MS;
 end;
 
-destructor TMetamorfDebugREPL.Destroy();
+destructor TMorDebugREPL.Destroy();
 begin
   StopSession();
   FBreakpoints.Free();
   inherited Destroy();
 end;
 
-procedure TMetamorfDebugREPL.StopSession();
+procedure TMorDebugREPL.StopSession();
 begin
   if Assigned(FClient) then
   begin
@@ -156,7 +145,7 @@ begin
   end;
 end;
 
-procedure TMetamorfDebugREPL.StartSession();
+procedure TMorDebugREPL.StartSession();
 var
   LExePath: string;
   LPort: Integer;
@@ -164,7 +153,7 @@ begin
   LExePath := FExePath;
   LPort := FPort;
 
-  FServer := TMetamorfDebugServer.Create();
+  FServer := TMorDebugServer.Create();
 
   // Start server on background thread (DebugExe blocks on WaitForConnection)
   FServerThread := TThread.CreateAnonymousThread(
@@ -179,39 +168,39 @@ begin
   // Give server time to start listening
   Sleep(500);
 
-  FClient := TMetamorfDebugClient.Create();
+  FClient := TMorDebugClient.Create();
 end;
 
-function TMetamorfDebugREPL.DoDAHandshake(): Boolean;
+function TMorDebugREPL.DoDAHandshake(): Boolean;
 begin
   Result := False;
 
   if not FClient.Connect('127.0.0.1', FPort) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Connect failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Connect failed: ' + FClient.GetLastError() + COLOR_RESET);
     Exit;
   end;
-  TUtils.PrintLn('Connected to debug server on port %d', [FPort]);
+  TMorUtils.PrintLn('Connected to debug server on port %d', [FPort]);
 
   if not FClient.Initialize() then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Initialize failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Initialize failed: ' + FClient.GetLastError() + COLOR_RESET);
     Exit;
   end;
 
   if not FClient.Launch(FExePath, False) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Launch failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Launch failed: ' + FClient.GetLastError() + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn(COLOR_GREEN + 'DAP handshake complete' + COLOR_RESET);
+  TMorUtils.PrintLn(COLOR_GREEN + 'DAP handshake complete' + COLOR_RESET);
   Result := True;
 end;
 
-procedure TMetamorfDebugREPL.ShowSourceContext();
+procedure TMorDebugREPL.ShowSourceContext();
 var
-  LFrames: TArray<TDAPClientStackFrame>;
+  LFrames: TArray<TMorDAPClientStackFrame>;
   LSourceFile: string;
   LSourceLine: Integer;
   LLines: TStringList;
@@ -233,7 +222,7 @@ begin
   // Try to read the source file from disk
   if not TFile.Exists(LSourceFile) then
   begin
-    TUtils.PrintLn('  Stopped at %s:%d (%s)',
+    TMorUtils.PrintLn('  Stopped at %s:%d (%s)',
       [ExtractFileName(LSourceFile), LSourceLine, LFrames[0].FunctionName]);
     Exit;
   end;
@@ -249,7 +238,7 @@ begin
     if LEnd >= LLines.Count then
       LEnd := LLines.Count - 1;
 
-    TUtils.PrintLn('');
+    TMorUtils.PrintLn('');
     for LI := LStart to LEnd do
     begin
       // Lines in TStringList are 0-based; source lines are 1-based
@@ -257,19 +246,19 @@ begin
         LArrow := COLOR_YELLOW + '>>'
       else
         LArrow := '  ';
-      TUtils.PrintLn('%s%4d: %s%s', [LArrow, LI + 1, LLines[LI], COLOR_RESET]);
+      TMorUtils.PrintLn('%s%4d: %s%s', [LArrow, LI + 1, LLines[LI], COLOR_RESET]);
     end;
-    TUtils.PrintLn('');
+    TMorUtils.PrintLn('');
   finally
     LLines.Free();
   end;
 end;
 
-procedure TMetamorfDebugREPL.SendBreakpointsForFile(const ASourceFile: string);
+procedure TMorDebugREPL.SendBreakpointsForFile(const ASourceFile: string);
 var
   LLines: TList<Integer>;
   LI: Integer;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
 begin
   // Collect all lines for this file
   LLines := TList<Integer>.Create();
@@ -288,31 +277,31 @@ begin
   end;
 end;
 
-procedure TMetamorfDebugREPL.LoadBreakpointsFromFile(const APath: string);
+procedure TMorDebugREPL.LoadBreakpointsFromFile(const APath: string);
 var
-  LConfig: TConfig;
+  LConfig: TMorConfig;
   LCount: Integer;
   LI: Integer;
   LFile: string;
   LLine: Integer;
   LExeDir: string;
   LExpandedFile: string;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
 begin
   if not TFile.Exists(APath) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Breakpoint file not found: ' + APath + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Breakpoint file not found: ' + APath + COLOR_RESET);
     Exit;
   end;
 
   // Get executable directory for expanding relative paths
   LExeDir := TPath.GetDirectoryName(FExePath);
 
-  LConfig := TConfig.Create();
+  LConfig := TMorConfig.Create();
   try
     if not LConfig.LoadFromFile(APath) then
     begin
-      TUtils.PrintLn(COLOR_RED + 'Failed to parse breakpoints file: ' +
+      TMorUtils.PrintLn(COLOR_RED + 'Failed to parse breakpoints file: ' +
         LConfig.GetLastError() + COLOR_RESET);
       Exit;
     end;
@@ -340,19 +329,19 @@ begin
         FBreakpoints.Add(LBP);
     end;
 
-    TUtils.PrintLn('Loaded %d breakpoint(s) from %s',
+    TMorUtils.PrintLn('Loaded %d breakpoint(s) from %s',
       [FBreakpoints.Count, ExtractFileName(APath)]);
   finally
     LConfig.Free();
   end;
 end;
 
-procedure TMetamorfDebugREPL.Run(const AExePath: string; const APort: Integer);
+procedure TMorDebugREPL.Run(const AExePath: string; const APort: Integer);
 var
   LCommand: string;
   LBreakpointFile: string;
   LFiles: TDictionary<string, Boolean>;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
   LKey: string;
 begin
   FExePath := AExePath;
@@ -360,14 +349,14 @@ begin
 
   if not TFile.Exists(FExePath) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Executable not found: ' + FExePath + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Executable not found: ' + FExePath + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn('');
-  TUtils.PrintLn(COLOR_CYAN + '=== Metamorf Debug REPL ===' + COLOR_RESET);
-  TUtils.PrintLn('Executable: %s', [FExePath]);
-  TUtils.PrintLn('');
+  TMorUtils.PrintLn('');
+  TMorUtils.PrintLn(COLOR_CYAN + '=== Metamorf Debug REPL ===' + COLOR_RESET);
+  TMorUtils.PrintLn('Executable: %s', [FExePath]);
+  TMorUtils.PrintLn('');
 
   // Start server + client
   StartSession();
@@ -383,17 +372,17 @@ begin
   FClient.OnStopped :=
     procedure(const AReason: string; const AThreadId: Integer)
     begin
-      TUtils.PrintLn('  [stopped] %s (thread %d)', [AReason, AThreadId]);
+      TMorUtils.PrintLn('  [stopped] %s (thread %d)', [AReason, AThreadId]);
     end;
   FClient.OnExited :=
     procedure(const AExitCode: Integer)
     begin
-      TUtils.PrintLn('  [exited] code %d', [AExitCode]);
+      TMorUtils.PrintLn('  [exited] code %d', [AExitCode]);
     end;
   FClient.OnOutput :=
     procedure(const AOutput: string)
     begin
-      TUtils.Print(AOutput);
+      TMorUtils.Print(AOutput);
     end;
 
   // Load breakpoints from sidecar file if it exists
@@ -418,13 +407,13 @@ begin
   // Start execution
   if not FClient.ConfigurationDone() then
   begin
-    TUtils.PrintLn(COLOR_RED + 'ConfigurationDone failed: ' +
+    TMorUtils.PrintLn(COLOR_RED + 'ConfigurationDone failed: ' +
       FClient.GetLastError() + COLOR_RESET);
     StopSession();
     Exit;
   end;
 
-  TUtils.PrintLn(COLOR_GREEN + 'Running...' + COLOR_RESET);
+  TMorUtils.PrintLn(COLOR_GREEN + 'Running...' + COLOR_RESET);
 
   // Wait for first stop (breakpoint or exit)
   FClient.ProcessPendingEvents(FTimeoutContinueMS);
@@ -432,13 +421,13 @@ begin
   if FClient.State = dcsStopped then
   begin
     ShowSourceContext();
-    TUtils.PrintLn(COLOR_CYAN + '=== INTERACTIVE REPL ===' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_CYAN + '=== INTERACTIVE REPL ===' + COLOR_RESET);
     ShowHelp();
-    TUtils.PrintLn('');
+    TMorUtils.PrintLn('');
   end
   else if FClient.State = dcsExited then
   begin
-    TUtils.PrintLn(COLOR_YELLOW + 'Program exited without stopping.' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_YELLOW + 'Program exited without stopping.' + COLOR_RESET);
     StopSession();
     Exit;
   end;
@@ -453,12 +442,12 @@ begin
     ProcessCommand(LCommand);
   end;
 
-  TUtils.PrintLn('');
-  TUtils.PrintLn(COLOR_GREEN + 'REPL session complete.' + COLOR_RESET);
+  TMorUtils.PrintLn('');
+  TMorUtils.PrintLn(COLOR_GREEN + 'REPL session complete.' + COLOR_RESET);
   StopSession();
 end;
 
-procedure TMetamorfDebugREPL.Stop();
+procedure TMorDebugREPL.Stop();
 begin
   FRunning := False;
 end;
@@ -467,7 +456,7 @@ end;
 // ProcessCommand - dispatch user input to handlers
 //------------------------------------------------------------------------------
 
-procedure TMetamorfDebugREPL.ProcessCommand(const ACommand: string);
+procedure TMorDebugREPL.ProcessCommand(const ACommand: string);
 begin
   if ACommand = '' then
     Exit;
@@ -509,46 +498,46 @@ begin
   else if ACommand = 'src' then
     ShowSourceContext()
   else
-    TUtils.PrintLn(COLOR_RED + 'Unknown command: ' + ACommand + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Unknown command: ' + ACommand + COLOR_RESET);
 end;
 
 //------------------------------------------------------------------------------
 // ShowHelp
 //------------------------------------------------------------------------------
 
-procedure TMetamorfDebugREPL.ShowHelp();
+procedure TMorDebugREPL.ShowHelp();
 begin
-  TUtils.PrintLn('Commands:');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'h, help' + COLOR_RESET + '         - Show this help');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'b <file>:<line>' + COLOR_RESET + ' - Set breakpoint');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'bl' + COLOR_RESET + '              - List breakpoints');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'bd <id>' + COLOR_RESET + '         - Delete breakpoint by ID');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'bc' + COLOR_RESET + '              - Clear all breakpoints');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'bt' + COLOR_RESET + '              - Show call stack (backtrace)');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'locals' + COLOR_RESET + '          - Show local variables');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'p <expr>' + COLOR_RESET + '        - Print/evaluate expression');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'c' + COLOR_RESET + '               - Continue execution');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'n' + COLOR_RESET + '               - Next (step over)');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 's' + COLOR_RESET + '               - Step into');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'finish' + COLOR_RESET + '          - Step out');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'r' + COLOR_RESET + '               - Restart program');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'file <path>' + COLOR_RESET + '     - Load different executable');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'src' + COLOR_RESET + '             - Show source context');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'threads' + COLOR_RESET + '         - Show threads');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'verbose on/off' + COLOR_RESET + '  - Toggle DAP message logging');
-  TUtils.PrintLn('  ' + COLOR_CYAN + 'quit' + COLOR_RESET + '            - Exit REPL');
+  TMorUtils.PrintLn('Commands:');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'h, help' + COLOR_RESET + '         - Show this help');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'b <file>:<line>' + COLOR_RESET + ' - Set breakpoint');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'bl' + COLOR_RESET + '              - List breakpoints');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'bd <id>' + COLOR_RESET + '         - Delete breakpoint by ID');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'bc' + COLOR_RESET + '              - Clear all breakpoints');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'bt' + COLOR_RESET + '              - Show call stack (backtrace)');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'locals' + COLOR_RESET + '          - Show local variables');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'p <expr>' + COLOR_RESET + '        - Print/evaluate expression');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'c' + COLOR_RESET + '               - Continue execution');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'n' + COLOR_RESET + '               - Next (step over)');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 's' + COLOR_RESET + '               - Step into');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'finish' + COLOR_RESET + '          - Step out');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'r' + COLOR_RESET + '               - Restart program');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'file <path>' + COLOR_RESET + '     - Load different executable');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'src' + COLOR_RESET + '             - Show source context');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'threads' + COLOR_RESET + '         - Show threads');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'verbose on/off' + COLOR_RESET + '  - Toggle DAP message logging');
+  TMorUtils.PrintLn('  ' + COLOR_CYAN + 'quit' + COLOR_RESET + '            - Exit REPL');
 end;
 
 //------------------------------------------------------------------------------
 // Breakpoint handlers
 //------------------------------------------------------------------------------
 
-procedure TMetamorfDebugREPL.HandleSetBreakpoint(const ACommand: string);
+procedure TMorDebugREPL.HandleSetBreakpoint(const ACommand: string);
 var
   LColonPos: Integer;
   LFile: string;
   LLine: Integer;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
 begin
   // Format: b <file>:<line>
   LColonPos := Pos(':', ACommand);
@@ -564,46 +553,46 @@ begin
       LBP.Verified := False;
       FBreakpoints.Add(LBP);
       SendBreakpointsForFile(LFile);
-      TUtils.PrintLn(COLOR_GREEN + 'Breakpoint set at %s:%d' + COLOR_RESET,
+      TMorUtils.PrintLn(COLOR_GREEN + 'Breakpoint set at %s:%d' + COLOR_RESET,
         [LFile, LLine]);
     end
     else
-      TUtils.PrintLn(COLOR_RED + 'Invalid format. Use: b <file>:<line>' + COLOR_RESET);
+      TMorUtils.PrintLn(COLOR_RED + 'Invalid format. Use: b <file>:<line>' + COLOR_RESET);
   end
   else
-    TUtils.PrintLn(COLOR_RED + 'Invalid format. Use: b <file>:<line>' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Invalid format. Use: b <file>:<line>' + COLOR_RESET);
 end;
 
-procedure TMetamorfDebugREPL.HandleListBreakpoints();
+procedure TMorDebugREPL.HandleListBreakpoints();
 var
   LI: Integer;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
 begin
   if FBreakpoints.Count = 0 then
   begin
-    TUtils.PrintLn('No breakpoints set');
+    TMorUtils.PrintLn('No breakpoints set');
     Exit;
   end;
 
-  TUtils.PrintLn('Breakpoints (%d):', [FBreakpoints.Count]);
+  TMorUtils.PrintLn('Breakpoints (%d):', [FBreakpoints.Count]);
   for LI := 0 to FBreakpoints.Count - 1 do
   begin
     LBP := FBreakpoints[LI];
-    TUtils.PrintLn('  #%d: %s:%d', [LI + 1, LBP.SourceFile, LBP.SourceLine]);
+    TMorUtils.PrintLn('  #%d: %s:%d', [LI + 1, LBP.SourceFile, LBP.SourceLine]);
   end;
 end;
 
-procedure TMetamorfDebugREPL.HandleDeleteBreakpoint(const ACommand: string);
+procedure TMorDebugREPL.HandleDeleteBreakpoint(const ACommand: string);
 var
   LIndex: Integer;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
   LFile: string;
 begin
   // Format: bd <id> (1-based)
   LIndex := StrToIntDef(Trim(Copy(ACommand, 4, MaxInt)), -1);
   if (LIndex < 1) or (LIndex > FBreakpoints.Count) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Invalid breakpoint ID' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Invalid breakpoint ID' + COLOR_RESET);
     Exit;
   end;
 
@@ -613,13 +602,13 @@ begin
 
   // Re-send remaining breakpoints for that file
   SendBreakpointsForFile(LFile);
-  TUtils.PrintLn(COLOR_GREEN + 'Breakpoint #%d deleted' + COLOR_RESET, [LIndex]);
+  TMorUtils.PrintLn(COLOR_GREEN + 'Breakpoint #%d deleted' + COLOR_RESET, [LIndex]);
 end;
 
-procedure TMetamorfDebugREPL.HandleClearBreakpoints();
+procedure TMorDebugREPL.HandleClearBreakpoints();
 var
   LFiles: TDictionary<string, Boolean>;
-  LBP: TREPLBreakpoint;
+  LBP: TMorREPLBreakpoint;
   LKey: string;
 begin
   // Collect unique files before clearing
@@ -637,55 +626,55 @@ begin
     LFiles.Free();
   end;
 
-  TUtils.PrintLn(COLOR_GREEN + 'All breakpoints cleared' + COLOR_RESET);
+  TMorUtils.PrintLn(COLOR_GREEN + 'All breakpoints cleared' + COLOR_RESET);
 end;
 
 //------------------------------------------------------------------------------
 // Inspection handlers
 //------------------------------------------------------------------------------
 
-procedure TMetamorfDebugREPL.HandleBacktrace();
+procedure TMorDebugREPL.HandleBacktrace();
 var
-  LFrames: TArray<TDAPClientStackFrame>;
+  LFrames: TArray<TMorDAPClientStackFrame>;
   LI: Integer;
 begin
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
   LFrames := FClient.GetCallStack();
   if Length(LFrames) = 0 then
   begin
-    TUtils.PrintLn('No stack frames');
+    TMorUtils.PrintLn('No stack frames');
     Exit;
   end;
 
-  TUtils.PrintLn('Call stack (%d frames):', [Length(LFrames)]);
+  TMorUtils.PrintLn('Call stack (%d frames):', [Length(LFrames)]);
   for LI := 0 to High(LFrames) do
-    TUtils.PrintLn('  #%d: %s at %s:%d',
+    TMorUtils.PrintLn('  #%d: %s at %s:%d',
       [LI, LFrames[LI].FunctionName, LFrames[LI].SourceFile, LFrames[LI].SourceLine]);
 end;
 
-procedure TMetamorfDebugREPL.HandleLocals();
+procedure TMorDebugREPL.HandleLocals();
 var
-  LFrames: TArray<TDAPClientStackFrame>;
-  LScopes: TArray<TDAPClientScope>;
-  LVars: TArray<TDAPClientVariable>;
+  LFrames: TArray<TMorDAPClientStackFrame>;
+  LScopes: TArray<TMorDAPClientScope>;
+  LVars: TArray<TMorDAPClientVariable>;
   LI: Integer;
   LJ: Integer;
 begin
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
   LFrames := FClient.GetCallStack();
   if Length(LFrames) = 0 then
   begin
-    TUtils.PrintLn(COLOR_RED + 'No stack frames' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'No stack frames' + COLOR_RESET);
     Exit;
   end;
 
@@ -693,33 +682,33 @@ begin
   LScopes := FClient.GetScopes(LFrames[0].FrameID);
   if Length(LScopes) = 0 then
   begin
-    TUtils.PrintLn('No scopes available');
+    TMorUtils.PrintLn('No scopes available');
     Exit;
   end;
 
   // Get variables for each scope
   for LI := 0 to High(LScopes) do
   begin
-    TUtils.PrintLn('%s:', [LScopes[LI].ScopeName]);
+    TMorUtils.PrintLn('%s:', [LScopes[LI].ScopeName]);
     LVars := FClient.GetVariables(LScopes[LI].VariablesReference);
     if Length(LVars) = 0 then
-      TUtils.PrintLn('  (none)')
+      TMorUtils.PrintLn('  (none)')
     else
     begin
       for LJ := 0 to High(LVars) do
       begin
         if LVars[LJ].VarType <> '' then
-          TUtils.PrintLn('  %s (%s) = %s',
+          TMorUtils.PrintLn('  %s (%s) = %s',
             [LVars[LJ].VarName, LVars[LJ].VarType, LVars[LJ].VarValue])
         else
-          TUtils.PrintLn('  %s = %s',
+          TMorUtils.PrintLn('  %s = %s',
             [LVars[LJ].VarName, LVars[LJ].VarValue]);
       end;
     end;
   end;
 end;
 
-procedure TMetamorfDebugREPL.HandlePrint(const ACommand: string);
+procedure TMorDebugREPL.HandlePrint(const ACommand: string);
 var
   LExpr: string;
   LResult: string;
@@ -728,25 +717,25 @@ begin
   LExpr := Trim(Copy(ACommand, 3, MaxInt));
   if LExpr = '' then
   begin
-    TUtils.PrintLn(COLOR_YELLOW + 'Usage: p <variable>' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_YELLOW + 'Usage: p <variable>' + COLOR_RESET);
     Exit;
   end;
 
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
   LResult := FClient.Evaluate(LExpr);
   if LResult <> '' then
-    TUtils.PrintLn('%s = %s', [LExpr, LResult])
+    TMorUtils.PrintLn('%s = %s', [LExpr, LResult])
   else
   begin
     if FClient.HasError() then
-      TUtils.PrintLn(COLOR_RED + '%s' + COLOR_RESET, [FClient.GetLastError()])
+      TMorUtils.PrintLn(COLOR_RED + '%s' + COLOR_RESET, [FClient.GetLastError()])
     else
-      TUtils.PrintLn(COLOR_YELLOW + 'Variable ''%s'' not found' + COLOR_RESET, [LExpr]);
+      TMorUtils.PrintLn(COLOR_YELLOW + 'Variable ''%s'' not found' + COLOR_RESET, [LExpr]);
   end;
 end;
 
@@ -754,108 +743,108 @@ end;
 // Execution control handlers
 //------------------------------------------------------------------------------
 
-procedure TMetamorfDebugREPL.HandleContinue();
+procedure TMorDebugREPL.HandleContinue();
 begin
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn('Continuing...');
+  TMorUtils.PrintLn('Continuing...');
   if FClient.DoContinue() then
   begin
     FClient.ProcessPendingEvents(FTimeoutContinueMS);
     if FClient.State = dcsStopped then
     begin
-      TUtils.PrintLn(COLOR_GREEN + 'Stopped' + COLOR_RESET);
+      TMorUtils.PrintLn(COLOR_GREEN + 'Stopped' + COLOR_RESET);
       ShowSourceContext();
     end
     else if FClient.State = dcsExited then
-      TUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
+      TMorUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
   end
   else
-    TUtils.PrintLn(COLOR_RED + 'Continue failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Continue failed: ' + FClient.GetLastError() + COLOR_RESET);
 end;
 
-procedure TMetamorfDebugREPL.HandleNext();
+procedure TMorDebugREPL.HandleNext();
 begin
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn('Stepping over...');
+  TMorUtils.PrintLn('Stepping over...');
   if FClient.StepOver() then
   begin
     FClient.ProcessPendingEvents(FTimeoutStepMS);
     if FClient.State = dcsStopped then
       ShowSourceContext()
     else if FClient.State = dcsExited then
-      TUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
+      TMorUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
   end
   else
-    TUtils.PrintLn(COLOR_RED + 'Step failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Step failed: ' + FClient.GetLastError() + COLOR_RESET);
 end;
 
-procedure TMetamorfDebugREPL.HandleStepInto();
+procedure TMorDebugREPL.HandleStepInto();
 begin
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn('Stepping into...');
+  TMorUtils.PrintLn('Stepping into...');
   if FClient.StepIn() then
   begin
     FClient.ProcessPendingEvents(FTimeoutStepMS);
     if FClient.State = dcsStopped then
       ShowSourceContext()
     else if FClient.State = dcsExited then
-      TUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
+      TMorUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
   end
   else
-    TUtils.PrintLn(COLOR_RED + 'Step failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Step failed: ' + FClient.GetLastError() + COLOR_RESET);
 end;
 
-procedure TMetamorfDebugREPL.HandleStepOut();
+procedure TMorDebugREPL.HandleStepOut();
 begin
   if FClient.State <> dcsStopped then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Not stopped' + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn('Stepping out...');
+  TMorUtils.PrintLn('Stepping out...');
   if FClient.StepOut() then
   begin
     FClient.ProcessPendingEvents(FTimeoutStepMS);
     if FClient.State = dcsStopped then
       ShowSourceContext()
     else if FClient.State = dcsExited then
-      TUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
+      TMorUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
   end
   else
-    TUtils.PrintLn(COLOR_RED + 'Step failed: ' + FClient.GetLastError() + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Step failed: ' + FClient.GetLastError() + COLOR_RESET);
 end;
 
 //------------------------------------------------------------------------------
 // Restart, File, Verbose, Threads
 //------------------------------------------------------------------------------
 
-procedure TMetamorfDebugREPL.HandleRestart();
+procedure TMorDebugREPL.HandleRestart();
 var
-  LSavedBreakpoints: TList<TREPLBreakpoint>;
-  LBP: TREPLBreakpoint;
+  LSavedBreakpoints: TList<TMorREPLBreakpoint>;
+  LBP: TMorREPLBreakpoint;
   LFiles: TDictionary<string, Boolean>;
   LKey: string;
 begin
-  TUtils.PrintLn('Restarting program...');
+  TMorUtils.PrintLn('Restarting program...');
 
   // Save breakpoints before teardown
-  LSavedBreakpoints := TList<TREPLBreakpoint>.Create();
+  LSavedBreakpoints := TList<TMorREPLBreakpoint>.Create();
   try
     for LBP in FBreakpoints do
       LSavedBreakpoints.Add(LBP);
@@ -877,7 +866,7 @@ begin
   // Re-do DAP handshake
   if not DoDAHandshake() then
   begin
-    TUtils.PrintLn(COLOR_RED + 'Restart failed during handshake' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Restart failed during handshake' + COLOR_RESET);
     StopSession();
     Exit;
   end;
@@ -886,17 +875,17 @@ begin
   FClient.OnStopped :=
     procedure(const AReason: string; const AThreadId: Integer)
     begin
-      TUtils.PrintLn('  [stopped] %s (thread %d)', [AReason, AThreadId]);
+      TMorUtils.PrintLn('  [stopped] %s (thread %d)', [AReason, AThreadId]);
     end;
   FClient.OnExited :=
     procedure(const AExitCode: Integer)
     begin
-      TUtils.PrintLn('  [exited] code %d', [AExitCode]);
+      TMorUtils.PrintLn('  [exited] code %d', [AExitCode]);
     end;
   FClient.OnOutput :=
     procedure(const AOutput: string)
     begin
-      TUtils.Print(AOutput);
+      TMorUtils.Print(AOutput);
     end;
 
   // Re-send all breakpoints (grouped by file)
@@ -911,18 +900,18 @@ begin
     finally
       LFiles.Free();
     end;
-    TUtils.PrintLn('Restored %d breakpoint(s)', [FBreakpoints.Count]);
+    TMorUtils.PrintLn('Restored %d breakpoint(s)', [FBreakpoints.Count]);
   end;
 
   // Start execution
   if not FClient.ConfigurationDone() then
   begin
-    TUtils.PrintLn(COLOR_RED + 'ConfigurationDone failed: ' +
+    TMorUtils.PrintLn(COLOR_RED + 'ConfigurationDone failed: ' +
       FClient.GetLastError() + COLOR_RESET);
     Exit;
   end;
 
-  TUtils.PrintLn(COLOR_GREEN + 'Program restarted!' + COLOR_RESET);
+  TMorUtils.PrintLn(COLOR_GREEN + 'Program restarted!' + COLOR_RESET);
 
   // Wait for first stop
   FClient.ProcessPendingEvents(FTimeoutContinueMS);
@@ -930,10 +919,10 @@ begin
   if FClient.State = dcsStopped then
     ShowSourceContext()
   else if FClient.State = dcsExited then
-    TUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_YELLOW + 'Program exited' + COLOR_RESET);
 end;
 
-procedure TMetamorfDebugREPL.HandleFile(const ACommand: string);
+procedure TMorDebugREPL.HandleFile(const ACommand: string);
 var
   LPath: string;
 begin
@@ -941,37 +930,37 @@ begin
 
   if not TFile.Exists(LPath) then
   begin
-    TUtils.PrintLn(COLOR_RED + 'File not found: ' + LPath + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'File not found: ' + LPath + COLOR_RESET);
     Exit;
   end;
 
   FExePath := LPath;
   FBreakpoints.Clear();
-  TUtils.PrintLn(COLOR_GREEN + 'Loaded: ' + FExePath + COLOR_RESET);
-  TUtils.PrintLn('Breakpoints cleared. Use ''r'' to run.');
+  TMorUtils.PrintLn(COLOR_GREEN + 'Loaded: ' + FExePath + COLOR_RESET);
+  TMorUtils.PrintLn('Breakpoints cleared. Use ''r'' to run.');
 end;
 
-procedure TMetamorfDebugREPL.HandleVerbose(const ACommand: string);
+procedure TMorDebugREPL.HandleVerbose(const ACommand: string);
 begin
   if ACommand = 'verbose on' then
   begin
     FClient.VerboseLogging := True;
-    TUtils.PrintLn(COLOR_GREEN + 'Verbose logging enabled' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_GREEN + 'Verbose logging enabled' + COLOR_RESET);
   end
   else if ACommand = 'verbose off' then
   begin
     FClient.VerboseLogging := False;
-    TUtils.PrintLn(COLOR_GREEN + 'Verbose logging disabled' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_GREEN + 'Verbose logging disabled' + COLOR_RESET);
   end
   else
-    TUtils.PrintLn(COLOR_RED + 'Usage: verbose on|off' + COLOR_RESET);
+    TMorUtils.PrintLn(COLOR_RED + 'Usage: verbose on|off' + COLOR_RESET);
 end;
 
-procedure TMetamorfDebugREPL.HandleThreads();
+procedure TMorDebugREPL.HandleThreads();
 begin
   // Single-threaded - hardcode response
-  TUtils.PrintLn('Threads (1):');
-  TUtils.PrintLn('  Thread 1: main');
+  TMorUtils.PrintLn('Threads (1):');
+  TMorUtils.PrintLn('  Thread 1: main');
 end;
 
 end.

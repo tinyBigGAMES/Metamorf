@@ -26,21 +26,21 @@ uses
 
 const
   // User Lexer Error Codes (UL001-UL099)
-  ERR_USERLEXER_UNEXPECTED_CHAR  = 'UL001';
-  ERR_USERLEXER_UNTERMINATED_STR = 'UL002';
-  ERR_USERLEXER_UNTERMINATED_CMT = 'UL003';
-  ERR_USERLEXER_INVALID_NUMBER   = 'UL004';
+  MOR_ERR_USERLEXER_UNEXPECTED_CHAR  = 'UL001';
+  MOR_ERR_USERLEXER_UNTERMINATED_STR = 'UL002';
+  MOR_ERR_USERLEXER_UNTERMINATED_CMT = 'UL003';
+  MOR_ERR_USERLEXER_INVALID_NUMBER   = 'UL004';
 
 type
 
-  { TCondEntry - tracks one level of conditional compilation nesting }
-  TCondEntry = record
+  { TMorCondEntry }
+  TMorCondEntry = record
     ParentSkipping: Boolean; // was FSkipping when this level was entered?
     BranchTaken: Boolean;    // did any branch at this level already emit?
   end;
 
-  { TGenericLexer }
-  TGenericLexer = class(TErrorsObject)
+  { TMorGenericLexer }
+  TMorGenericLexer = class(TMorErrorsObject)
   private
     FSource: string;
     FFilename: string;
@@ -49,18 +49,18 @@ type
     FCol: Integer;
 
     FKeywords: TDictionary<string, string>;
-    FOperators: TList<TOperatorEntryInterp>;
-    FStringStyles: TList<TStringStyleEntry>;
+    FOperators: TList<TMorOperatorEntryInterp>;
+    FStringStyles: TList<TMorStringStyleEntry>;
     FLineComments: TList<string>;
     FBlockComments: TList<TPair<string, string>>;
     FDirectives: TDictionary<string, string>;
     FDirectiveFlags: TDictionary<string, string>;
     FDirectivePrefix: string;
-    FConfig: TLexerConfig;
+    FConfig: TMorLexerConfig;
 
     // Conditional compilation state
     FDefines: TDictionary<string, Boolean>;
-    FCondStack: TList<TCondEntry>;
+    FCondStack: TList<TMorCondEntry>;
     FSkipping: Boolean;
 
     function AtEnd(): Boolean;
@@ -68,14 +68,14 @@ type
     function PeekAt(const AOffset: Integer): Char;
     function Advance(): Char;
     function MakeToken(const AKind: string; const AText: string;
-      const ALine: Integer; const ACol: Integer): TToken;
+      const ALine: Integer; const ACol: Integer): TMorToken;
 
     procedure SkipWhitespace();
     function SkipComment(): Boolean;
-    function TryOperator(var AToken: TToken): Boolean;
-    function TryStringLiteral(var AToken: TToken): Boolean;
-    function TryNumber(var AToken: TToken): Boolean;
-    function TryIdentifier(var AToken: TToken): Boolean;
+    function TryOperator(var AToken: TMorToken): Boolean;
+    function TryStringLiteral(var AToken: TMorToken): Boolean;
+    function TryNumber(var AToken: TMorToken): Boolean;
+    function TryIdentifier(var AToken: TMorToken): Boolean;
 
   public
     constructor Create(); override;
@@ -83,14 +83,14 @@ type
 
     procedure Configure(const AInterp: TMorInterpreter);
     function Tokenize(const ASource: string;
-      const AFilename: string = ''): TList<TToken>;
+      const AFilename: string = ''): TList<TMorToken>;
   end;
 
 implementation
 
-{ TGenericLexer }
+{ TMorGenericLexer }
 
-constructor TGenericLexer.Create();
+constructor TMorGenericLexer.Create();
 begin
   inherited;
   FKeywords := nil;
@@ -100,11 +100,11 @@ begin
   FBlockComments := nil;
   FDirectiveFlags := nil;
   FDefines := TDictionary<string, Boolean>.Create();
-  FCondStack := TList<TCondEntry>.Create();
+  FCondStack := TList<TMorCondEntry>.Create();
   FSkipping := False;
 end;
 
-destructor TGenericLexer.Destroy();
+destructor TMorGenericLexer.Destroy();
 begin
   FreeAndNil(FCondStack);
   FreeAndNil(FDefines);
@@ -112,7 +112,7 @@ begin
   inherited;
 end;
 
-procedure TGenericLexer.Configure(const AInterp: TMorInterpreter);
+procedure TMorGenericLexer.Configure(const AInterp: TMorInterpreter);
 begin
   FKeywords := AInterp.GetKeywords();
   FOperators := AInterp.GetOperators();
@@ -125,12 +125,12 @@ begin
   FDirectivePrefix := FConfig.DirectivePrefix;
 end;
 
-function TGenericLexer.AtEnd(): Boolean;
+function TMorGenericLexer.AtEnd(): Boolean;
 begin
   Result := FPos > Length(FSource);
 end;
 
-function TGenericLexer.Current(): Char;
+function TMorGenericLexer.Current(): Char;
 begin
   if AtEnd() then
     Result := #0
@@ -138,7 +138,7 @@ begin
     Result := FSource[FPos];
 end;
 
-function TGenericLexer.PeekAt(const AOffset: Integer): Char;
+function TMorGenericLexer.PeekAt(const AOffset: Integer): Char;
 var
   LIdx: Integer;
 begin
@@ -149,7 +149,7 @@ begin
     Result := FSource[LIdx];
 end;
 
-function TGenericLexer.Advance(): Char;
+function TMorGenericLexer.Advance(): Char;
 begin
   Result := Current();
   if not AtEnd() then
@@ -165,8 +165,8 @@ begin
   end;
 end;
 
-function TGenericLexer.MakeToken(const AKind: string; const AText: string;
-  const ALine: Integer; const ACol: Integer): TToken;
+function TMorGenericLexer.MakeToken(const AKind: string; const AText: string;
+  const ALine: Integer; const ACol: Integer): TMorToken;
 begin
   Result.Kind := AKind;
   Result.Text := AText;
@@ -175,13 +175,13 @@ begin
   Result.Col := ACol;
 end;
 
-procedure TGenericLexer.SkipWhitespace();
+procedure TMorGenericLexer.SkipWhitespace();
 begin
   while not AtEnd() and Current().IsWhiteSpace do
     Advance();
 end;
 
-function TGenericLexer.SkipComment(): Boolean;
+function TMorGenericLexer.SkipComment(): Boolean;
 var
   LI: Integer;
   LOpen: string;
@@ -262,17 +262,17 @@ begin
       // Unterminated
       if Assigned(FErrors) then
         FErrors.Add(FFilename, FLine, FCol,
-          esError, ERR_USERLEXER_UNTERMINATED_CMT,
+          esError, MOR_ERR_USERLEXER_UNTERMINATED_CMT,
           RSUserLexerUnterminatedComment);
       Exit(True);
     end;
   end;
 end;
 
-function TGenericLexer.TryOperator(var AToken: TToken): Boolean;
+function TMorGenericLexer.TryOperator(var AToken: TMorToken): Boolean;
 var
   LI: Integer;
-  LEntry: TOperatorEntryInterp;
+  LEntry: TMorOperatorEntryInterp;
   LLen: Integer;
   LStartLine: Integer;
   LStartCol: Integer;
@@ -309,10 +309,10 @@ begin
   end;
 end;
 
-function TGenericLexer.TryStringLiteral(var AToken: TToken): Boolean;
+function TMorGenericLexer.TryStringLiteral(var AToken: TMorToken): Boolean;
 var
   LI: Integer;
-  LStyle: TStringStyleEntry;
+  LStyle: TMorStringStyleEntry;
   LOpenLen: Integer;
   LStartLine: Integer;
   LStartCol: Integer;
@@ -386,7 +386,7 @@ begin
       // Unterminated string
       if Assigned(FErrors) then
         FErrors.Add(FFilename, LStartLine, LStartCol,
-          esError, ERR_USERLEXER_UNTERMINATED_STR,
+          esError, MOR_ERR_USERLEXER_UNTERMINATED_STR,
           RSUserLexerUnterminatedString);
       AToken := MakeToken(LStyle.Kind, LText, LStartLine, LStartCol);
       Result := True;
@@ -395,7 +395,7 @@ begin
   end;
 end;
 
-function TGenericLexer.TryNumber(var AToken: TToken): Boolean;
+function TMorGenericLexer.TryNumber(var AToken: TMorToken): Boolean;
 var
   LStartLine: Integer;
   LStartCol: Integer;
@@ -436,7 +436,7 @@ begin
     AToken := MakeToken('literal.integer', LText, LStartLine, LStartCol);
 end;
 
-function TGenericLexer.TryIdentifier(var AToken: TToken): Boolean;
+function TMorGenericLexer.TryIdentifier(var AToken: TMorToken): Boolean;
 var
   LStartLine: Integer;
   LStartCol: Integer;
@@ -474,13 +474,13 @@ begin
   end;
 end;
 
-function TGenericLexer.Tokenize(const ASource: string;
-  const AFilename: string): TList<TToken>;
+function TMorGenericLexer.Tokenize(const ASource: string;
+  const AFilename: string): TList<TMorToken>;
 var
-  LToken: TToken;
+  LToken: TMorToken;
   LFlag: string;
   LSymbol: string;
-  LEntry: TCondEntry;
+  LEntry: TMorCondEntry;
 begin
   FSource := ASource;
   FFilename := AFilename;
@@ -493,7 +493,7 @@ begin
   FCondStack.Clear();
   FSkipping := False;
 
-  Result := TList<TToken>.Create();
+  Result := TList<TMorToken>.Create();
 
   while not AtEnd() do
   begin
@@ -647,7 +647,7 @@ begin
       begin
         if Assigned(FErrors) then
           FErrors.Add(FFilename, LToken.Line, LToken.Col,
-            esError, ERR_USERLEXER_UNEXPECTED_CHAR,
+            esError, MOR_ERR_USERLEXER_UNEXPECTED_CHAR,
             RSUserLexerUnexpectedChar, [FDirectivePrefix]);
       end;
       Continue;
@@ -689,7 +689,7 @@ begin
     // Unexpected character
     if Assigned(FErrors) then
       FErrors.Add(FFilename, FLine, FCol,
-        esError, ERR_USERLEXER_UNEXPECTED_CHAR,
+        esError, MOR_ERR_USERLEXER_UNEXPECTED_CHAR,
         RSUserLexerUnexpectedChar, [Current()]);
     Advance();
   end;

@@ -37,22 +37,22 @@ uses
 
 const
   // Engine Error Codes (E001-E099)
-  ERR_ENGINE_FILE_NOT_FOUND   = 'E001';
-  ERR_ENGINE_MODULE_NOT_FOUND = 'E002';
+  MOR_ERR_ENGINE_FILE_NOT_FOUND   = 'E001';
+  MOR_ERR_ENGINE_MODULE_NOT_FOUND = 'E002';
 
 type
 
   { TMorEngine }
-  TMorEngine = class(TErrorsObject)
+  TMorEngine = class(TMorErrorsObject)
   private
-    FBuild: TBuild;
+    FBuild: TMorBuild;
     FMorLexer: TMorLexer;
     FMorParser: TMorParser;
     FInterp: TMorInterpreter;
     FProcessedFiles: TDictionary<string, Boolean>;
     FImportedMorFiles: TDictionary<string, Boolean>;
-    FMasterRoot: TASTNode;
-    FMorMasterRoot: TASTNode;
+    FMasterRoot: TMorASTNode;
+    FMorMasterRoot: TMorASTNode;
     FSourceDir: string;
     FMorFileDir: string;
     FOutputPath: string;
@@ -61,7 +61,7 @@ type
     function CompileModule(const AModuleName: string): Boolean;
 
     // .mor import callback (called by interpreter during setup)
-    function ImportMorFile(const AMorPath: string): TASTNode;
+    function ImportMorFile(const AMorPath: string): TMorASTNode;
 
     // Shared user source compilation (phases 3-7)
     procedure CompileUserSource(const ASourceFile: string;
@@ -87,15 +87,15 @@ type
       const AOutputPath: string; const AAutoRun: Boolean);
 
     // Build configuration wrappers
-    procedure SetTarget(const ATarget: TTargetPlatform);
-    function GetTarget(): TTargetPlatform;
-    procedure SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
-    function GetOptimizeLevel(): TOptimizeLevel;
-    procedure SetSubsystem(const ASubsystem: TSubsystemType);
-    function GetSubsystem(): TSubsystemType;
-    procedure SetBuildMode(const ABuildMode: TBuildMode);
-    function GetBuildMode(): TBuildMode;
-    procedure SetOutputCallback(const ACallback: TCaptureConsoleCallback;
+    procedure SetTarget(const ATarget: TMorTargetPlatform);
+    function GetTarget(): TMorTargetPlatform;
+    procedure SetOptimizeLevel(const AOptimizeLevel: TMorOptimizeLevel);
+    function GetOptimizeLevel(): TMorOptimizeLevel;
+    procedure SetSubsystem(const ASubsystem: TMorSubsystemType);
+    function GetSubsystem(): TMorSubsystemType;
+    procedure SetBuildMode(const ABuildMode: TMorBuildMode);
+    function GetBuildMode(): TMorBuildMode;
+    procedure SetOutputCallback(const ACallback: TMorCaptureConsoleCallback;
       const AUserData: Pointer = nil);
     procedure SetOutputPath(const APath: string);
     function GetOutputPath(): string;
@@ -118,8 +118,8 @@ type
 
     // Access to subcomponents
     function GetInterpreter(): TMorInterpreter;
-    function GetErrors(): TErrors;
-    function GetMorMasterRoot(): TASTNode;
+    function GetErrors(): TMorErrors;
+    function GetMorMasterRoot(): TMorASTNode;
 
     // Toolchain paths
     procedure SetToolchainPath(const APath: string);
@@ -138,9 +138,9 @@ constructor TMorEngine.Create();
 begin
   inherited;
 
-  FErrors := TErrors.Create();
+  FErrors := TMorErrors.Create();
 
-  FBuild := TBuild.Create();
+  FBuild := TMorBuild.Create();
   FBuild.SetErrors(FErrors);
 
   FMorLexer := TMorLexer.Create();
@@ -175,8 +175,8 @@ procedure TMorEngine.Compile(const AMorFile: string;
   const AAutoRun: Boolean);
 var
   LMorSource: string;
-  LMorTokens: TList<TToken>;
-  LMorAST: TASTNode;
+  LMorTokens: TList<TMorToken>;
+  LMorAST: TMorASTNode;
   LMorDisplay: string;
   LMorFile: string;
 begin
@@ -186,12 +186,12 @@ begin
 
   LMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
 
-  LMorDisplay := TUtils.DisplayPath(LMorFile);
+  LMorDisplay := TMorUtils.DisplayPath(LMorFile);
 
   // --- Phase 1: Read and parse .mor file ---
   if not TFile.Exists(LMorFile) then
   begin
-    FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
+    FErrors.Add(esFatal, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LMorDisplay]);
     Exit;
   end;
@@ -223,7 +223,7 @@ begin
   FImportedMorFiles.Add(TPath.GetFullPath(LMorFile), True);
 
   // Build .mor master root -- owns all .mor ASTs (main + imports)
-  FMorMasterRoot := TASTNode.Create();
+  FMorMasterRoot := TMorASTNode.Create();
   FMorMasterRoot.SetKind('mor.master');
   FMorMasterRoot.AddChild(LMorAST);
 
@@ -233,7 +233,7 @@ begin
   if FErrors.HasErrors() then Exit;
 
   // Register C++ passthrough (AFTER custom lang setup)
-  ConfigCpp(FInterp);
+  MorConfigCpp(FInterp);
   Status(RSEngineCppPassthrough);
 
   try
@@ -247,15 +247,15 @@ procedure TMorEngine.CompileUserSource(const ASourceFile: string;
   const AOutputPath: string; const AAutoRun: Boolean);
 var
   LUserSource: string;
-  LUserTokens: TList<TToken>;
-  LGenLexer: TGenericLexer;
-  LGenParser: TGenericParser;
-  LMasterRoot: TASTNode;
-  LUserBranch: TASTNode;
+  LUserTokens: TList<TMorToken>;
+  LGenLexer: TMorGenericLexer;
+  LGenParser: TMorGenericParser;
+  LMasterRoot: TMorASTNode;
+  LUserBranch: TMorASTNode;
   LScopes: TScopeManager;
-  LOutput: TCodeOutput;
-  LBranchOutput: TCodeOutput;
-  LBranch: TASTNode;
+  LOutput: TMorCodeOutput;
+  LBranchOutput: TMorCodeOutput;
+  LBranch: TMorASTNode;
   LGeneratedPath: string;
   LHeaderPath: string;
   LSourcePath: string;
@@ -264,12 +264,12 @@ var
   LSrcDisplay: string;
   LI: Integer;
 begin
-  LSrcDisplay := TUtils.DisplayPath(ASourceFile);
+  LSrcDisplay := TMorUtils.DisplayPath(ASourceFile);
 
   // --- Phase 3: Read and process user source ---
   if not TFile.Exists(ASourceFile) then
   begin
-    FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
+    FErrors.Add(esFatal, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LSrcDisplay]);
     Exit;
   end;
@@ -278,7 +278,7 @@ begin
 
   // Lex user source via table-driven lexer
   Status(RSUserLexerTokenizing, [LSrcDisplay]);
-  LGenLexer := TGenericLexer.Create();
+  LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(FErrors);
     LGenLexer.Configure(FInterp);
@@ -290,7 +290,7 @@ begin
 
   // Parse user source into a branch
   Status(RSUserParserParsing, [LSrcDisplay]);
-  LGenParser := TGenericParser.Create();
+  LGenParser := TMorGenericParser.Create();
   try
     LGenParser.SetErrors(FErrors);
     LGenParser.Configure(FInterp);
@@ -306,7 +306,7 @@ begin
   end;
 
   // Assemble master AST: single root, one branch per file
-  LMasterRoot := TASTNode.Create();
+  LMasterRoot := TMorASTNode.Create();
   LMasterRoot.SetKind('master.root');
   LMasterRoot.AddChild(LUserBranch);
   LUserBranch.SetAttr('source_name', TPath.GetFileNameWithoutExtension(ASourceFile));
@@ -318,7 +318,7 @@ begin
   // Wire scopes and output into interpreter
   LScopes := TScopeManager.Create();
   LScopes.SetErrors(FErrors);
-  LOutput := TCodeOutput.Create();
+  LOutput := TMorCodeOutput.Create();
   try
     FInterp.SetScopes(LScopes);
     FInterp.SetOutput(LOutput);
@@ -350,7 +350,7 @@ begin
       if LBranchName = '' then
         LBranchName := 'module_' + IntToStr(LI);
 
-      LBranchOutput := TCodeOutput.Create();
+      LBranchOutput := TMorCodeOutput.Create();
       try
         FInterp.SetOutput(LBranchOutput);
         Status(RSUserCodeGenEmitting, [LBranchName]);
@@ -374,7 +374,7 @@ begin
       if LBranchName = '' then
         LBranchName := LProjectName;
 
-      LBranchOutput := TCodeOutput.Create();
+      LBranchOutput := TMorCodeOutput.Create();
       try
         FInterp.SetOutput(LBranchOutput);
         Status(RSUserCodeGenEmitting, [LBranchName]);
@@ -442,7 +442,7 @@ begin
   // Load baked AST from embedded resource
   LResStream := TResourceStream.Create(HInstance, MOR_BAKED_AST_RES, RT_RCDATA);
   try
-    FMorMasterRoot := TASTNode.LoadASTFromStream(LResStream);
+    FMorMasterRoot := TMorASTNode.LoadASTFromStream(LResStream);
   finally
     LResStream.Free();
   end;
@@ -459,7 +459,7 @@ begin
   end;
 
   // Register C++ passthrough
-  ConfigCpp(FInterp);
+  MorConfigCpp(FInterp);
 
   // Compile user source using shared pipeline
   try
@@ -476,15 +476,15 @@ var
   LModulePath: string;
   LModuleDisplay: string;
   LSource: string;
-  LGenLexer: TGenericLexer;
-  LGenParser: TGenericParser;
-  LTokens: TList<TToken>;
-  LBranch: TASTNode;
+  LGenLexer: TMorGenericLexer;
+  LGenParser: TMorGenericParser;
+  LTokens: TList<TMorToken>;
+  LBranch: TMorASTNode;
 begin
   // Resolve filename using module extension
   LModuleFile := AModuleName + '.' + FInterp.GetModuleExtension();
   LModulePath := TPath.Combine(FSourceDir, LModuleFile);
-  LModuleDisplay := TUtils.DisplayPath(LModulePath);
+  LModuleDisplay := TMorUtils.DisplayPath(LModulePath);
 
   // Check dedup
   if FProcessedFiles.ContainsKey(TPath.GetFullPath(LModulePath)) then
@@ -493,7 +493,7 @@ begin
   // Check existence
   if not TFile.Exists(LModulePath) then
   begin
-    FErrors.Add(esError, ERR_ENGINE_MODULE_NOT_FOUND,
+    FErrors.Add(esError, MOR_ERR_ENGINE_MODULE_NOT_FOUND,
       RSFatalFileNotFound, [LModuleDisplay]);
     Exit(False);
   end;
@@ -502,7 +502,7 @@ begin
 
   // Lex module source
   Status(RSUserLexerTokenizing, [LModuleDisplay]);
-  LGenLexer := TGenericLexer.Create();
+  LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(FErrors);
     LGenLexer.Configure(FInterp);
@@ -514,7 +514,7 @@ begin
 
   // Parse module source into a branch
   Status(RSUserParserParsing, [LModuleDisplay]);
-  LGenParser := TGenericParser.Create();
+  LGenParser := TMorGenericParser.Create();
   try
     LGenParser.SetErrors(FErrors);
     LGenParser.Configure(FInterp);
@@ -536,13 +536,13 @@ begin
   Result := True;
 end;
 
-function TMorEngine.ImportMorFile(const AMorPath: string): TASTNode;
+function TMorEngine.ImportMorFile(const AMorPath: string): TMorASTNode;
 var
   LFullPath: string;
   LDisplay: string;
   LSource: string;
-  LTokens: TList<TToken>;
-  LAST: TASTNode;
+  LTokens: TList<TMorToken>;
+  LAST: TMorASTNode;
 begin
   Result := nil;
 
@@ -552,7 +552,7 @@ begin
   else
     LFullPath := TPath.GetFullPath(AMorPath);
 
-  LDisplay := TUtils.DisplayPath(LFullPath);
+  LDisplay := TMorUtils.DisplayPath(LFullPath);
 
   // Dedup check
   if FImportedMorFiles.ContainsKey(LFullPath) then
@@ -561,7 +561,7 @@ begin
   // Check existence
   if not TFile.Exists(LFullPath) then
   begin
-    FErrors.Add(esError, ERR_ENGINE_FILE_NOT_FOUND,
+    FErrors.Add(esError, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LDisplay]);
     Exit;
   end;
@@ -596,47 +596,47 @@ begin
   Result := LAST;
 end;
 
-procedure TMorEngine.SetTarget(const ATarget: TTargetPlatform);
+procedure TMorEngine.SetTarget(const ATarget: TMorTargetPlatform);
 begin
   FBuild.SetTarget(ATarget);
 end;
 
-function TMorEngine.GetTarget(): TTargetPlatform;
+function TMorEngine.GetTarget(): TMorTargetPlatform;
 begin
   Result := FBuild.GetTarget();
 end;
 
-procedure TMorEngine.SetOptimizeLevel(const AOptimizeLevel: TOptimizeLevel);
+procedure TMorEngine.SetOptimizeLevel(const AOptimizeLevel: TMorOptimizeLevel);
 begin
   FBuild.SetOptimizeLevel(AOptimizeLevel);
 end;
 
-function TMorEngine.GetOptimizeLevel(): TOptimizeLevel;
+function TMorEngine.GetOptimizeLevel(): TMorOptimizeLevel;
 begin
   Result := FBuild.GetOptimizeLevel();
 end;
 
-procedure TMorEngine.SetSubsystem(const ASubsystem: TSubsystemType);
+procedure TMorEngine.SetSubsystem(const ASubsystem: TMorSubsystemType);
 begin
   FBuild.SetSubsystem(ASubsystem);
 end;
 
-function TMorEngine.GetSubsystem(): TSubsystemType;
+function TMorEngine.GetSubsystem(): TMorSubsystemType;
 begin
   Result := FBuild.GetSubsystem();
 end;
 
-procedure TMorEngine.SetBuildMode(const ABuildMode: TBuildMode);
+procedure TMorEngine.SetBuildMode(const ABuildMode: TMorBuildMode);
 begin
   FBuild.SetBuildMode(ABuildMode);
 end;
 
-function TMorEngine.GetBuildMode(): TBuildMode;
+function TMorEngine.GetBuildMode(): TMorBuildMode;
 begin
   Result := FBuild.GetBuildMode();
 end;
 
-procedure TMorEngine.SetOutputCallback(const ACallback: TCaptureConsoleCallback;
+procedure TMorEngine.SetOutputCallback(const ACallback: TMorCaptureConsoleCallback;
   const AUserData: Pointer);
 begin
   FBuild.SetOutputCallback(ACallback, AUserData);
@@ -703,12 +703,12 @@ begin
   Result := FInterp;
 end;
 
-function TMorEngine.GetErrors(): TErrors;
+function TMorEngine.GetErrors(): TMorErrors;
 begin
   Result := FErrors;
 end;
 
-function TMorEngine.GetMorMasterRoot(): TASTNode;
+function TMorEngine.GetMorMasterRoot(): TMorASTNode;
 begin
   Result := FMorMasterRoot;
 end;
@@ -716,8 +716,8 @@ end;
 function TMorEngine.SetupLanguage(const AMorFile: string): Boolean;
 var
   LMorSource: string;
-  LMorTokens: TList<TToken>;
-  LMorAST: TASTNode;
+  LMorTokens: TList<TMorToken>;
+  LMorAST: TMorASTNode;
   LMorDisplay: string;
   LMorFile: string;
 begin
@@ -728,12 +728,12 @@ begin
   FImportedMorFiles.Clear();
 
   LMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
-  LMorDisplay := TUtils.DisplayPath(LMorFile);
+  LMorDisplay := TMorUtils.DisplayPath(LMorFile);
 
   // Read .mor file
   if not TFile.Exists(LMorFile) then
   begin
-    FErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
+    FErrors.Add(esFatal, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LMorDisplay]);
     Exit;
   end;
@@ -765,7 +765,7 @@ begin
   FImportedMorFiles.Add(TPath.GetFullPath(LMorFile), True);
 
   // Build .mor master root -- owns all .mor ASTs (main + imports)
-  FMorMasterRoot := TASTNode.Create();
+  FMorMasterRoot := TMorASTNode.Create();
   FMorMasterRoot.SetKind('mor.master');
   FMorMasterRoot.AddChild(LMorAST);
 
@@ -775,7 +775,7 @@ begin
   if FErrors.HasErrors() then Exit;
 
   // Register C++ passthrough
-  ConfigCpp(FInterp);
+  MorConfigCpp(FInterp);
   Status(RSEngineCppPassthrough);
 
   Result := True;

@@ -23,13 +23,13 @@ uses
 
 type
 
-  { TScope }
-  TScope = TDictionary<string, TValue>;
+  { TMorScope }
+  TMorScope = TDictionary<string, TValue>;
 
   { TEnvironment }
-  TEnvironment = class(TBaseObject)
+  TMorEnvironment = class(TMorBaseObject)
   private
-    FScopeStack: TObjectList<TScope>;
+    FScopeStack: TObjectList<TMorScope>;
 
   public
     constructor Create(); override;
@@ -48,32 +48,32 @@ type
 
 implementation
 
-{ TEnvironment }
+{ TMorEnvironment }
 
-constructor TEnvironment.Create();
+constructor TMorEnvironment.Create();
 begin
   inherited;
-  FScopeStack := TObjectList<TScope>.Create(True);
+  FScopeStack := TObjectList<TMorScope>.Create(True);
 
   // Push the global scope
   Push();
 end;
 
-destructor TEnvironment.Destroy();
+destructor TMorEnvironment.Destroy();
 begin
   FreeAndNil(FScopeStack);
   inherited;
 end;
 
-procedure TEnvironment.Push();
+procedure TMorEnvironment.Push();
 var
-  LScope: TScope;
+  LScope: TMorScope;
 begin
-  LScope := TScope.Create();
+  LScope := TMorScope.Create();
   FScopeStack.Add(LScope);
 end;
 
-procedure TEnvironment.Pop();
+procedure TMorEnvironment.Pop();
 begin
   if FScopeStack.Count <= 1 then
     raise Exception.Create('Cannot pop the global scope');
@@ -81,18 +81,18 @@ begin
   FScopeStack.Delete(FScopeStack.Count - 1);
 end;
 
-procedure TEnvironment.SetVar(const AName: string; const AValue: TValue);
+procedure TMorEnvironment.SetVar(const AName: string; const AValue: TValue);
 var
-  LScope: TScope;
+  LScope: TMorScope;
 begin
   LScope := FScopeStack[FScopeStack.Count - 1];
   LScope.AddOrSetValue(AName, AValue);
 end;
 
-procedure TEnvironment.UpdateVar(const AName: string; const AValue: TValue);
+procedure TMorEnvironment.UpdateVar(const AName: string; const AValue: TValue);
 var
   LI: Integer;
-  LScope: TScope;
+  LScope: TMorScope;
 begin
   // Search from top of stack downward for the nearest frame that has this var
   for LI := FScopeStack.Count - 1 downto 0 do
@@ -109,10 +109,10 @@ begin
   FScopeStack[FScopeStack.Count - 1].AddOrSetValue(AName, AValue);
 end;
 
-function TEnvironment.GetVar(const AName: string): TValue;
+function TMorEnvironment.GetVar(const AName: string): TValue;
 var
   LI: Integer;
-  LScope: TScope;
+  LScope: TMorScope;
   LValue: TValue;
 begin
   // Search from top of stack downward
@@ -126,10 +126,10 @@ begin
   Result := TValue.Empty;
 end;
 
-function TEnvironment.HasVar(const AName: string): Boolean;
+function TMorEnvironment.HasVar(const AName: string): Boolean;
 var
   LI: Integer;
-  LScope: TScope;
+  LScope: TMorScope;
 begin
   // Search from top of stack downward
   for LI := FScopeStack.Count - 1 downto 0 do
@@ -142,7 +142,7 @@ begin
   Result := False;
 end;
 
-function TEnvironment.Depth(): Integer;
+function TMorEnvironment.Depth(): Integer;
 begin
   Result := FScopeStack.Count;
 end;

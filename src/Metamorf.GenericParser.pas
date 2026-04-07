@@ -25,17 +25,17 @@ uses
 
 const
   // User Parser Error Codes (UP001-UP099)
-  ERR_USERPARSER_EXPECTED_TOKEN  = 'UP001';
-  ERR_USERPARSER_NO_PREFIX       = 'UP002';
-  ERR_USERPARSER_EXPECTED_IDENT  = 'UP003';
-  ERR_USERPARSER_UNEXPECTED_STMT = 'UP004';
+  MOR_ERR_USERPARSER_EXPECTED_TOKEN  = 'UP001';
+  MOR_ERR_USERPARSER_NO_PREFIX       = 'UP002';
+  MOR_ERR_USERPARSER_EXPECTED_IDENT  = 'UP003';
+  MOR_ERR_USERPARSER_UNEXPECTED_STMT = 'UP004';
 
 type
 
-  { TGenericParser }
-  TGenericParser = class(TErrorsObject)
+  { TMorGenericParser }
+  TMorGenericParser = class(TMorErrorsObject)
   private
-    FTokens: TList<TToken>;
+    FTokens: TList<TMorToken>;
     FPos: Integer;
     FFilename: string;
     FInterp: TMorInterpreter;
@@ -47,8 +47,8 @@ type
     procedure Configure(const AInterp: TMorInterpreter);
 
     // Token navigation (public so interpreter can call them)
-    function Current(): TToken;
-    function Peek(): TToken;
+    function Current(): TMorToken;
+    function Peek(): TMorToken;
     function AtEnd(): Boolean;
     function Check(const AKind: string): Boolean;
     function Match(const AKind: string): Boolean;
@@ -60,19 +60,19 @@ type
     procedure SetPos(const APos: Integer);
 
     // Parsing entry points
-    function ParseExpression(const AMinPower: Integer): TASTNode;
-    function ParseExpressionFrom(const ALeft: TASTNode;
-      const AMinPower: Integer): TASTNode;
-    function ParseStatement(): TASTNode;
-    function ParseProgram(const ATokens: TList<TToken>;
-      const AFilename: string = ''): TASTNode;
+    function ParseExpression(const AMinPower: Integer): TMorASTNode;
+    function ParseExpressionFrom(const ALeft: TMorASTNode;
+      const AMinPower: Integer): TMorASTNode;
+    function ParseStatement(): TMorASTNode;
+    function ParseProgram(const ATokens: TList<TMorToken>;
+      const AFilename: string = ''): TMorASTNode;
   end;
 
 implementation
 
-{ TGenericParser }
+{ TMorGenericParser }
 
-constructor TGenericParser.Create();
+constructor TMorGenericParser.Create();
 begin
   inherited;
   FTokens := nil;
@@ -81,17 +81,17 @@ begin
   FInterp := nil;
 end;
 
-destructor TGenericParser.Destroy();
+destructor TMorGenericParser.Destroy();
 begin
   inherited;
 end;
 
-procedure TGenericParser.Configure(const AInterp: TMorInterpreter);
+procedure TMorGenericParser.Configure(const AInterp: TMorInterpreter);
 begin
   FInterp := AInterp;
 end;
 
-function TGenericParser.Current(): TToken;
+function TMorGenericParser.Current(): TMorToken;
 begin
   if (FPos >= 0) and (FPos < FTokens.Count) then
     Result := FTokens[FPos]
@@ -104,7 +104,7 @@ begin
   end;
 end;
 
-function TGenericParser.Peek(): TToken;
+function TMorGenericParser.Peek(): TMorToken;
 begin
   if (FPos + 1 >= 0) and (FPos + 1 < FTokens.Count) then
     Result := FTokens[FPos + 1]
@@ -117,17 +117,17 @@ begin
   end;
 end;
 
-function TGenericParser.AtEnd(): Boolean;
+function TMorGenericParser.AtEnd(): Boolean;
 begin
   Result := Current().Kind = 'eof';
 end;
 
-function TGenericParser.Check(const AKind: string): Boolean;
+function TMorGenericParser.Check(const AKind: string): Boolean;
 begin
   Result := Current().Kind = AKind;
 end;
 
-function TGenericParser.Match(const AKind: string): Boolean;
+function TMorGenericParser.Match(const AKind: string): Boolean;
 begin
   if Current().Kind = AKind then
   begin
@@ -138,43 +138,43 @@ begin
     Result := False;
 end;
 
-procedure TGenericParser.DoAdvance();
+procedure TMorGenericParser.DoAdvance();
 begin
   if FPos < FTokens.Count then
     Inc(FPos);
 end;
 
-procedure TGenericParser.Expect(const AKind: string);
+procedure TMorGenericParser.Expect(const AKind: string);
 begin
   if Current().Kind = AKind then
     DoAdvance()
   else if Assigned(FErrors) then
     FErrors.Add(FFilename, Current().Line, Current().Col,
-      esError, ERR_USERPARSER_EXPECTED_TOKEN,
+      esError, MOR_ERR_USERPARSER_EXPECTED_TOKEN,
       RSUserParserExpectedToken, [AKind, Current().Text]);
 end;
 
-function TGenericParser.GetPos(): Integer;
+function TMorGenericParser.GetPos(): Integer;
 begin
   Result := FPos;
 end;
 
-procedure TGenericParser.SetPos(const APos: Integer);
+procedure TMorGenericParser.SetPos(const APos: Integer);
 begin
   FPos := APos;
 end;
 
-function TGenericParser.ParseExpression(const AMinPower: Integer): TASTNode;
+function TMorGenericParser.ParseExpression(const AMinPower: Integer): TMorASTNode;
 var
-  LPrefixRule: TASTNode;
-  LInfixEntry: TInfixEntry;
-  LNativePrefixHandler: TNativePrefixHandler;
-  LNativeInfixEntry: TNativeInfixEntry;
-  LLeft: TASTNode;
-  LPrefixRules: TDictionary<string, TASTNode>;
-  LInfixRules: TDictionary<string, TInfixEntry>;
-  LNativePrefixRules: TDictionary<string, TNativePrefixHandler>;
-  LNativeInfixRules: TDictionary<string, TNativeInfixEntry>;
+  LPrefixRule: TMorASTNode;
+  LInfixEntry: TMorInfixEntry;
+  LNativePrefixHandler: TMorNativePrefixHandler;
+  LNativeInfixEntry: TMorNativeInfixEntry;
+  LLeft: TMorASTNode;
+  LPrefixRules: TDictionary<string, TMorASTNode>;
+  LInfixRules: TDictionary<string, TMorInfixEntry>;
+  LNativePrefixRules: TDictionary<string, TMorNativePrefixHandler>;
+  LNativeInfixRules: TDictionary<string, TMorNativeInfixEntry>;
   LCurrentKind: string;
   LSavedParser: TObject;
   LSavedPos: Integer;
@@ -201,9 +201,9 @@ begin
     begin
       if Assigned(FErrors) then
         FErrors.Add(FFilename, Current().Line, Current().Col,
-          esError, ERR_USERPARSER_NO_PREFIX,
+          esError, MOR_ERR_USERPARSER_NO_PREFIX,
           RSUserParserNoPrefixHandler, [Current().Text]);
-      Result := TASTNode.Create();
+      Result := TMorASTNode.Create();
       Result.SetKind('error');
       DoAdvance();
       Exit;
@@ -258,14 +258,14 @@ begin
   end;
 end;
 
-function TGenericParser.ParseExpressionFrom(const ALeft: TASTNode;
-  const AMinPower: Integer): TASTNode;
+function TMorGenericParser.ParseExpressionFrom(const ALeft: TMorASTNode;
+  const AMinPower: Integer): TMorASTNode;
 var
-  LInfixEntry: TInfixEntry;
-  LNativeInfixEntry: TNativeInfixEntry;
-  LLeft: TASTNode;
-  LInfixRules: TDictionary<string, TInfixEntry>;
-  LNativeInfixRules: TDictionary<string, TNativeInfixEntry>;
+  LInfixEntry: TMorInfixEntry;
+  LNativeInfixEntry: TMorNativeInfixEntry;
+  LLeft: TMorASTNode;
+  LInfixRules: TDictionary<string, TMorInfixEntry>;
+  LNativeInfixRules: TDictionary<string, TMorNativeInfixEntry>;
   LCurrentKind: string;
   LSavedParser: TObject;
   LSavedPos: Integer;
@@ -324,12 +324,12 @@ begin
   end;
 end;
 
-function TGenericParser.ParseStatement(): TASTNode;
+function TMorGenericParser.ParseStatement(): TMorASTNode;
 var
-  LStmtRules: TDictionary<string, TList<TASTNode>>;
-  LNativeStmtRules: TDictionary<string, TNativeStmtHandler>;
-  LStmtRuleList: TList<TASTNode>;
-  LNativeStmtHandler: TNativeStmtHandler;
+  LStmtRules: TDictionary<string, TList<TMorASTNode>>;
+  LNativeStmtRules: TDictionary<string, TMorNativeStmtHandler>;
+  LStmtRuleList: TList<TMorASTNode>;
+  LNativeStmtHandler: TMorNativeStmtHandler;
   LCurrentKind: string;
   LSavedParser: TObject;
   LI: Integer;
@@ -388,18 +388,18 @@ begin
   end;
 end;
 
-function TGenericParser.ParseProgram(const ATokens: TList<TToken>;
-  const AFilename: string): TASTNode;
+function TMorGenericParser.ParseProgram(const ATokens: TList<TMorToken>;
+  const AFilename: string): TMorASTNode;
 var
-  LRoot: TASTNode;
+  LRoot: TMorASTNode;
   LSavedPos: Integer;
-  LToken: TToken;
+  LToken: TMorToken;
 begin
   FTokens := ATokens;
   FPos := 0;
   FFilename := AFilename;
 
-  LRoot := TASTNode.Create();
+  LRoot := TMorASTNode.Create();
   LRoot.SetKind('program.root');
   LToken.Kind := 'program.root';
   LToken.Text := '';
@@ -419,7 +419,7 @@ begin
     begin
       if Assigned(FErrors) then
         FErrors.Add(FFilename, Current().Line, Current().Col,
-          esError, ERR_USERPARSER_UNEXPECTED_STMT,
+          esError, MOR_ERR_USERPARSER_UNEXPECTED_STMT,
           'Parser stuck at token: ''%s''', [Current().Text]);
       DoAdvance();
     end;

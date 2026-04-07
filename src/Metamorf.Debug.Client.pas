@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -25,10 +25,8 @@ uses
   Metamorf.Utils;
 
 type
-  //============================================================================
-  // TDAPClientState - Client-side debug session states
-  //============================================================================
-  TDAPClientState = (
+  { TMorDAPClientState }
+  TMorDAPClientState = (
     dcsDisconnected,   // Not connected to server
     dcsConnected,      // TCP connected, not yet initialized
     dcsInitialized,    // Initialize handshake done
@@ -37,52 +35,39 @@ type
     dcsExited          // Program exited
   );
 
-  //============================================================================
-  // TDAPClientVariable - Variable info returned from server
-  //============================================================================
-  TDAPClientVariable = record
+  { TMorDAPClientVariable }
+  TMorDAPClientVariable = record
     VarName: string;
     VarValue: string;
     VarType: string;
     VariablesReference: Integer;
   end;
 
-  //============================================================================
-  // TDAPClientStackFrame - Stack frame info returned from server
-  //============================================================================
-  TDAPClientStackFrame = record
+  { TMorDAPClientStackFrame }
+  TMorDAPClientStackFrame = record
     FrameID: Integer;
     FunctionName: string;
     SourceFile: string;
     SourceLine: Integer;
   end;
 
-  //============================================================================
-  // TDAPClientScope - Scope info returned from server
-  //============================================================================
-  TDAPClientScope = record
+  { TMorDAPClientScope }
+  TMorDAPClientScope = record
     ScopeName: string;
     VariablesReference: Integer;
     Expensive: Boolean;
   end;
 
-  //============================================================================
-  // Callback types
-  //============================================================================
-  TDAPClientStoppedCallback = reference to procedure(const AReason: string; const AThreadId: Integer);
-  TDAPClientOutputCallback = reference to procedure(const AOutput: string);
-  TDAPClientExitedCallback = reference to procedure(const AExitCode: Integer);
+  { Callback types }
+  TMorDAPClientStoppedCallback = reference to procedure(const AReason: string; const AThreadId: Integer);
+  TMorDAPClientOutputCallback = reference to procedure(const AOutput: string);
+  TMorDAPClientExitedCallback = reference to procedure(const AExitCode: Integer);
 
-  //============================================================================
-  // TMetamorfDebugClient - DAP client that connects to a Metamorf DAP server
-  // over TCP. Sends DAP requests, receives responses and events.
-  //============================================================================
-
-  { TMetamorfDebugClient }
-  TMetamorfDebugClient = class(TBaseObject)
+  { TMorDebugClient }
+  TMorDebugClient = class(TMorBaseObject)
   private
     FSocket: TSocket;
-    FState: TDAPClientState;
+    FState: TMorDAPClientState;
     FNextSeq: Integer;
     FLastError: string;
     FCurrentThreadId: Integer;
@@ -91,9 +76,9 @@ type
     FReadBufferLen: Integer;   // Valid bytes in FReadBuffer
 
     // Callbacks
-    FOnStopped: TDAPClientStoppedCallback;
-    FOnOutput: TDAPClientOutputCallback;
-    FOnExited: TDAPClientExitedCallback;
+    FOnStopped: TMorDAPClientStoppedCallback;
+    FOnOutput: TMorDAPClientOutputCallback;
+    FOnExited: TMorDAPClientExitedCallback;
 
     // Internal helpers
     function GetNextSeq(): Integer;
@@ -135,9 +120,9 @@ type
     function StepOut(): Boolean;
 
     // Inspection
-    function GetCallStack(const AThreadId: Integer = 0): TArray<TDAPClientStackFrame>;
-    function GetScopes(const AFrameId: Integer): TArray<TDAPClientScope>;
-    function GetVariables(const AVariablesReference: Integer): TArray<TDAPClientVariable>;
+    function GetCallStack(const AThreadId: Integer = 0): TArray<TMorDAPClientStackFrame>;
+    function GetScopes(const AFrameId: Integer): TArray<TMorDAPClientScope>;
+    function GetVariables(const AVariablesReference: Integer): TArray<TMorDAPClientVariable>;
     function Evaluate(const AExpression: string;
       const AFrameId: Integer = 0): string;
 
@@ -150,24 +135,21 @@ type
     // State
     function HasError(): Boolean;
     function GetLastError(): string;
-    function GetState(): TDAPClientState;
+    function GetState(): TMorDAPClientState;
     function GetCurrentThreadId(): Integer;
 
     // Properties
-    property State: TDAPClientState read FState;
+    property State: TMorDAPClientState read FState;
     property VerboseLogging: Boolean read FVerboseLogging write FVerboseLogging;
-    property OnStopped: TDAPClientStoppedCallback read FOnStopped write FOnStopped;
-    property OnOutput: TDAPClientOutputCallback read FOnOutput write FOnOutput;
-    property OnExited: TDAPClientExitedCallback read FOnExited write FOnExited;
+    property OnStopped: TMorDAPClientStoppedCallback read FOnStopped write FOnStopped;
+    property OnOutput: TMorDAPClientOutputCallback read FOnOutput write FOnOutput;
+    property OnExited: TMorDAPClientExitedCallback read FOnExited write FOnExited;
   end;
 
 implementation
 
-//==============================================================================
-// TMetamorfDebugClient
-//==============================================================================
-
-constructor TMetamorfDebugClient.Create();
+{ TMorDebugClient }
+constructor TMorDebugClient.Create();
 begin
   inherited Create();
   FSocket := INVALID_SOCKET;
@@ -183,48 +165,44 @@ begin
   FOnExited := nil;
 end;
 
-destructor TMetamorfDebugClient.Destroy();
+destructor TMorDebugClient.Destroy();
 begin
   Disconnect();
   inherited Destroy();
 end;
 
-function TMetamorfDebugClient.GetNextSeq(): Integer;
+function TMorDebugClient.GetNextSeq(): Integer;
 begin
   Result := FNextSeq;
   Inc(FNextSeq);
 end;
 
-procedure TMetamorfDebugClient.SetError(const AError: string);
+procedure TMorDebugClient.SetError(const AError: string);
 begin
   FLastError := AError;
 end;
 
-function TMetamorfDebugClient.HasError(): Boolean;
+function TMorDebugClient.HasError(): Boolean;
 begin
   Result := FLastError <> '';
 end;
 
-function TMetamorfDebugClient.GetLastError(): string;
+function TMorDebugClient.GetLastError(): string;
 begin
   Result := FLastError;
 end;
 
-function TMetamorfDebugClient.GetState(): TDAPClientState;
+function TMorDebugClient.GetState(): TMorDAPClientState;
 begin
   Result := FState;
 end;
 
-function TMetamorfDebugClient.GetCurrentThreadId(): Integer;
+function TMorDebugClient.GetCurrentThreadId(): Integer;
 begin
   Result := FCurrentThreadId;
 end;
 
-//------------------------------------------------------------------------------
-// TCP Transport
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.Connect(const AHost: string; const APort: Integer): Boolean;
+function TMorDebugClient.Connect(const AHost: string; const APort: Integer): Boolean;
 var
   LWSAData: TWSAData;
   LAddr: TSockAddrIn;
@@ -280,7 +258,7 @@ begin
   Result := True;
 end;
 
-procedure TMetamorfDebugClient.Disconnect();
+procedure TMorDebugClient.Disconnect();
 begin
   if FSocket <> INVALID_SOCKET then
   begin
@@ -292,7 +270,7 @@ begin
   FReadBufferLen := 0;
 end;
 
-function TMetamorfDebugClient.SendRaw(const AData: string): Boolean;
+function TMorDebugClient.SendRaw(const AData: string): Boolean;
 var
   LBytes: TBytes;
   LSent: Integer;
@@ -320,18 +298,18 @@ begin
   Result := True;
 end;
 
-procedure TMetamorfDebugClient.SendDAPMessage(const AJson: string);
+procedure TMorDebugClient.SendDAPMessage(const AJson: string);
 var
   LMsg: string;
 begin
   LMsg := Format('Content-Length: %d'#13#10#13#10'%s',
     [Length(TEncoding.UTF8.GetBytes(AJson)), AJson]);
   if FVerboseLogging then
-    TUtils.PrintLn('[DAP-C] >> ' + AJson);
+    TMorUtils.PrintLn('[DAP-C] >> ' + AJson);
   SendRaw(LMsg);
 end;
 
-function TMetamorfDebugClient.ReadDAPMessage(out AJson: string;
+function TMorDebugClient.ReadDAPMessage(out AJson: string;
   const ATimeoutMS: Integer): Boolean;
 var
   LHeaderEnd: Integer;
@@ -393,7 +371,7 @@ begin
         Dec(FReadBufferLen, LNeeded);
 
         if FVerboseLogging then
-          TUtils.PrintLn('[DAP-C] << ' + AJson);
+          TMorUtils.PrintLn('[DAP-C] << ' + AJson);
 
         Result := True;
         Exit;
@@ -432,11 +410,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// DAP Protocol -- SendRequest + Event Processing
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.SendRequest(const ACommand: string;
+function TMorDebugClient.SendRequest(const ACommand: string;
   const AArgs: TJSONObject): TJSONObject;
 var
   LRequest: TJSONObject;
@@ -527,7 +501,7 @@ begin
   end;
 end;
 
-procedure TMetamorfDebugClient.ProcessEvent(const AEvent: TJSONObject);
+procedure TMorDebugClient.ProcessEvent(const AEvent: TJSONObject);
 var
   LEventName: string;
   LBody: TJSONObject;
@@ -581,7 +555,7 @@ begin
   end;
 end;
 
-procedure TMetamorfDebugClient.ProcessPendingEvents(const ATimeoutMS: Integer);
+procedure TMorDebugClient.ProcessPendingEvents(const ATimeoutMS: Integer);
 var
   LJson: string;
   LObj: TJSONObject;
@@ -604,11 +578,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// DAP Session Lifecycle
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.Initialize(): Boolean;
+function TMorDebugClient.Initialize(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -631,7 +601,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.Launch(const AProgram: string;
+function TMorDebugClient.Launch(const AProgram: string;
   const AStopOnEntry: Boolean): Boolean;
 var
   LArgs: TJSONObject;
@@ -652,7 +622,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.ConfigurationDone(): Boolean;
+function TMorDebugClient.ConfigurationDone(): Boolean;
 var
   LResponse: TJSONObject;
 begin
@@ -665,11 +635,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Breakpoints
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.SetBreakpoints(const ASourcePath: string;
+function TMorDebugClient.SetBreakpoints(const ASourcePath: string;
   const ALines: array of Integer): Boolean;
 var
   LArgs: TJSONObject;
@@ -705,7 +671,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.SetBreakpoints(const ASourcePath: string;
+function TMorDebugClient.SetBreakpoints(const ASourcePath: string;
   const ALines: array of Integer;
   const AHitConditions: array of Integer): Boolean;
 var
@@ -745,11 +711,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Execution Control
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.DoContinue(): Boolean;
+function TMorDebugClient.DoContinue(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -767,7 +729,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.StepOver(): Boolean;
+function TMorDebugClient.StepOver(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -784,7 +746,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.StepIn(): Boolean;
+function TMorDebugClient.StepIn(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -801,7 +763,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.StepOut(): Boolean;
+function TMorDebugClient.StepOut(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -818,11 +780,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Inspection
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.GetCallStack(const AThreadId: Integer): TArray<TDAPClientStackFrame>;
+function TMorDebugClient.GetCallStack(const AThreadId: Integer): TArray<TMorDAPClientStackFrame>;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -880,7 +838,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.GetScopes(const AFrameId: Integer): TArray<TDAPClientScope>;
+function TMorDebugClient.GetScopes(const AFrameId: Integer): TArray<TMorDAPClientScope>;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -918,7 +876,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.GetVariables(const AVariablesReference: Integer): TArray<TDAPClientVariable>;
+function TMorDebugClient.GetVariables(const AVariablesReference: Integer): TArray<TMorDAPClientVariable>;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;
@@ -957,7 +915,7 @@ begin
   end;
 end;
 
-function TMetamorfDebugClient.Evaluate(const AExpression: string;
+function TMorDebugClient.Evaluate(const AExpression: string;
   const AFrameId: Integer): string;
 var
   LArgs: TJSONObject;
@@ -986,11 +944,7 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Shutdown
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugClient.DisconnectDAP(): Boolean;
+function TMorDebugClient.DisconnectDAP(): Boolean;
 var
   LArgs: TJSONObject;
   LResponse: TJSONObject;

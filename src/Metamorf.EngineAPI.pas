@@ -29,10 +29,10 @@ uses
 
 const
   // EngineAPI Error Codes (EA001-EA099)
-  ERR_ENGINEAPI_MOR_NOT_LOADED = 'EA001';
-  ERR_ENGINEAPI_SRC_NOT_PARSED = 'EA002';
-  ERR_ENGINEAPI_SEM_NOT_RUN    = 'EA003';
-  ERR_ENGINEAPI_EMIT_NOT_RUN   = 'EA004';
+  MOR_ERR_ENGINEAPI_MOR_NOT_LOADED = 'EA001';
+  MOR_ERR_ENGINEAPI_SRC_NOT_PARSED = 'EA002';
+  MOR_ERR_ENGINEAPI_SEM_NOT_RUN    = 'EA003';
+  MOR_ERR_ENGINEAPI_EMIT_NOT_RUN   = 'EA004';
 
   // Run mode constants for DLL surface
   MOR_RUN_NONE    = 0;
@@ -52,7 +52,7 @@ type
     const AUserData: Pointer);
 
   { TMorEngineAPI }
-  TMorEngineAPI = class(TBaseObject)
+  TMorEngineAPI = class(TMorBaseObject)
   private
     FEngine: TMorEngine;
     FLastResultUTF8: UTF8String;
@@ -60,14 +60,14 @@ type
     // .mor lexer/parser (owned, for LoadMor and imports)
     FMorLexer: TMorLexer;
     FMorParser: TMorParser;
-    FMorMasterRoot: TASTNode;
+    FMorMasterRoot: TMorASTNode;
     FImportedMorFiles: TDictionary<string, Boolean>;
     FMorFileDir: string;
 
     // Stepped pipeline state
-    FMasterRoot: TASTNode;
+    FMasterRoot: TMorASTNode;
     FScopes: TScopeManager;
-    FOutput: TCodeOutput;
+    FOutput: TMorCodeOutput;
     FProcessedFiles: TDictionary<string, Boolean>;
     FSourceDir: string;
     FOutputPath: string;
@@ -95,7 +95,7 @@ type
     function CompileModule(const AModuleName: string): Boolean;
 
     // .mor import callback (called by interpreter during setup)
-    function ImportMorFile(const AMorPath: string): TASTNode;
+    function ImportMorFile(const AMorPath: string): TMorASTNode;
 
   public
     constructor Create(); override;
@@ -126,9 +126,9 @@ type
     procedure Reset();
 
     // AST access (after ParseSource)
-    function GetMasterRoot(): TASTNode;
+    function GetMasterRoot(): TMorASTNode;
     function GetInterpreter(): TMorInterpreter;
-    function GetErrors(): TErrors;
+    function GetErrors(): TMorErrors;
 
     // Native emit handler registration (for external consumers)
     procedure RegisterEmitHandler(const ANodeKind: string;
@@ -241,9 +241,9 @@ function TMorEngineAPI.LoadMor(const AMorFile: string): Boolean;
 var
   LMorFile: string;
   LMorSource: string;
-  LMorTokens: TList<TToken>;
-  LMorAST: TASTNode;
-  LErrors: TErrors;
+  LMorTokens: TList<TMorToken>;
+  LMorAST: TMorASTNode;
+  LErrors: TMorErrors;
   LMorDisplay: string;
   LInterp: TMorInterpreter;
 begin
@@ -260,12 +260,12 @@ begin
   FEmittersRun := False;
 
   LMorFile := TPath.ChangeExtension(AMorFile, MOR_LANG_EXT);
-  LMorDisplay := TUtils.DisplayPath(LMorFile);
+  LMorDisplay := TMorUtils.DisplayPath(LMorFile);
 
   // Check .mor file exists
   if not TFile.Exists(LMorFile) then
   begin
-    LErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
+    LErrors.Add(esFatal, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LMorDisplay]);
     Exit;
   end;
@@ -297,7 +297,7 @@ begin
   FImportedMorFiles.Add(TPath.GetFullPath(LMorFile), True);
 
   // Build .mor master root (owns all .mor ASTs including imports)
-  FMorMasterRoot := TASTNode.Create();
+  FMorMasterRoot := TMorASTNode.Create();
   FMorMasterRoot.SetKind('mor.master');
   FMorMasterRoot.AddChild(LMorAST);
 
@@ -309,7 +309,7 @@ begin
     Exit;
 
   // Register C++ passthrough (AFTER custom lang setup)
-  ConfigCpp(LInterp);
+  MorConfigCpp(LInterp);
   FEngine.Status(RSEngineCppPassthrough);
 
   FMorLoaded := True;
@@ -319,11 +319,11 @@ end;
 function TMorEngineAPI.ParseSource(const ASourceFile: string): Boolean;
 var
   LUserSource: string;
-  LUserTokens: TList<TToken>;
-  LGenLexer: TGenericLexer;
-  LGenParser: TGenericParser;
-  LUserBranch: TASTNode;
-  LErrors: TErrors;
+  LUserTokens: TList<TMorToken>;
+  LGenLexer: TMorGenericLexer;
+  LGenParser: TMorGenericParser;
+  LUserBranch: TMorASTNode;
+  LErrors: TMorErrors;
   LSrcDisplay: string;
 begin
   Result := False;
@@ -331,7 +331,7 @@ begin
 
   if not FMorLoaded then
   begin
-    LErrors.Add(esFatal, ERR_ENGINEAPI_MOR_NOT_LOADED,
+    LErrors.Add(esFatal, MOR_ERR_ENGINEAPI_MOR_NOT_LOADED,
       RSEngineAPIMorNotLoaded);
     Exit;
   end;
@@ -345,12 +345,12 @@ begin
   FSemanticsRun := False;
   FEmittersRun := False;
 
-  LSrcDisplay := TUtils.DisplayPath(ASourceFile);
+  LSrcDisplay := TMorUtils.DisplayPath(ASourceFile);
 
   // Check source file exists
   if not TFile.Exists(ASourceFile) then
   begin
-    LErrors.Add(esFatal, ERR_ENGINE_FILE_NOT_FOUND,
+    LErrors.Add(esFatal, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LSrcDisplay]);
     Exit;
   end;
@@ -359,7 +359,7 @@ begin
 
   // Lex user source via table-driven lexer
   FEngine.Status(RSUserLexerTokenizing, [LSrcDisplay]);
-  LGenLexer := TGenericLexer.Create();
+  LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(LErrors);
     LGenLexer.Configure(FEngine.GetInterpreter());
@@ -372,7 +372,7 @@ begin
 
   // Parse user source into a branch
   FEngine.Status(RSUserParserParsing, [LSrcDisplay]);
-  LGenParser := TGenericParser.Create();
+  LGenParser := TMorGenericParser.Create();
   try
     LGenParser.SetErrors(LErrors);
     LGenParser.Configure(FEngine.GetInterpreter());
@@ -388,7 +388,7 @@ begin
   end;
 
   // Assemble master AST
-  FMasterRoot := TASTNode.Create();
+  FMasterRoot := TMorASTNode.Create();
   FMasterRoot.SetKind('master.root');
   FMasterRoot.AddChild(LUserBranch);
   LUserBranch.SetAttr('source_name',
@@ -402,7 +402,7 @@ end;
 
 function TMorEngineAPI.RunSemantics(): Boolean;
 var
-  LErrors: TErrors;
+  LErrors: TMorErrors;
   LInterp: TMorInterpreter;
 begin
   Result := False;
@@ -410,7 +410,7 @@ begin
 
   if not FSourceParsed then
   begin
-    LErrors.Add(esFatal, ERR_ENGINEAPI_SRC_NOT_PARSED,
+    LErrors.Add(esFatal, MOR_ERR_ENGINEAPI_SRC_NOT_PARSED,
       RSEngineAPISrcNotParsed);
     Exit;
   end;
@@ -418,7 +418,7 @@ begin
   // Create scopes and output for semantic/emit phases
   FScopes := TScopeManager.Create();
   FScopes.SetErrors(LErrors);
-  FOutput := TCodeOutput.Create();
+  FOutput := TMorCodeOutput.Create();
 
   LInterp := FEngine.GetInterpreter();
   LInterp.SetScopes(FScopes);
@@ -446,10 +446,10 @@ end;
 
 function TMorEngineAPI.RunEmitters(): Boolean;
 var
-  LErrors: TErrors;
+  LErrors: TMorErrors;
   LInterp: TMorInterpreter;
-  LBranch: TASTNode;
-  LBranchOutput: TCodeOutput;
+  LBranch: TMorASTNode;
+  LBranchOutput: TMorCodeOutput;
   LGeneratedPath: string;
   LHeaderPath: string;
   LSourcePath: string;
@@ -462,7 +462,7 @@ begin
 
   if not FSemanticsRun then
   begin
-    LErrors.Add(esFatal, ERR_ENGINEAPI_SEM_NOT_RUN,
+    LErrors.Add(esFatal, MOR_ERR_ENGINEAPI_SEM_NOT_RUN,
       RSEngineAPISemNotRun);
     Exit;
   end;
@@ -493,7 +493,7 @@ begin
     if LBranchName = '' then
       LBranchName := 'module_' + IntToStr(LI);
 
-    LBranchOutput := TCodeOutput.Create();
+    LBranchOutput := TMorCodeOutput.Create();
     try
       LInterp.SetOutput(LBranchOutput);
       FEngine.Status(RSUserCodeGenEmitting, [LBranchName]);
@@ -518,7 +518,7 @@ begin
     if LBranchName = '' then
       LBranchName := LProjectName;
 
-    LBranchOutput := TCodeOutput.Create();
+    LBranchOutput := TMorCodeOutput.Create();
     try
       LInterp.SetOutput(LBranchOutput);
       FEngine.Status(RSUserCodeGenEmitting, [LBranchName]);
@@ -544,9 +544,9 @@ end;
 function TMorEngineAPI.Build(const AOutputPath: string;
   const AAutoRun: Boolean; const ADebug: Boolean): Boolean;
 var
-  LErrors: TErrors;
+  LErrors: TMorErrors;
   LExePath: string;
-  LServer: TMetamorfDebugServer;
+  LServer: TMorDebugServer;
   LPort: Integer;
 begin
   Result := False;
@@ -554,7 +554,7 @@ begin
 
   if not FEmittersRun then
   begin
-    LErrors.Add(esFatal, ERR_ENGINEAPI_EMIT_NOT_RUN,
+    LErrors.Add(esFatal, MOR_ERR_ENGINEAPI_EMIT_NOT_RUN,
       RSEngineAPIEmitNotRun);
     Exit;
   end;
@@ -601,7 +601,7 @@ begin
         TPath.Combine('bin',
           FEngine.GetProjectName() + '.exe')));
 
-    LServer := TMetamorfDebugServer.Create();
+    LServer := TMorDebugServer.Create();
     try
       LServer.SetStatusCallback(
         procedure(const AText: string; const AUserData: Pointer)
@@ -664,7 +664,7 @@ begin
   FEmittersRun := False;
 end;
 
-function TMorEngineAPI.GetMasterRoot(): TASTNode;
+function TMorEngineAPI.GetMasterRoot(): TMorASTNode;
 begin
   Result := FMasterRoot;
 end;
@@ -674,7 +674,7 @@ begin
   Result := FEngine.GetInterpreter();
 end;
 
-function TMorEngineAPI.GetErrors(): TErrors;
+function TMorEngineAPI.GetErrors(): TMorErrors;
 begin
   Result := FEngine.GetErrors();
 end;
@@ -688,7 +688,7 @@ begin
   LProc := AProc;
   LUserData := AUserData;
   FEngine.GetInterpreter().RegisterNativeEmit(ANodeKind,
-    procedure(const ANode: TASTNode)
+    procedure(const ANode: TMorASTNode)
     begin
       LProc(UInt64(ANode), LUserData);
     end);
@@ -700,11 +700,11 @@ var
   LModulePath: string;
   LModuleDisplay: string;
   LSource: string;
-  LGenLexer: TGenericLexer;
-  LGenParser: TGenericParser;
-  LTokens: TList<TToken>;
-  LBranch: TASTNode;
-  LErrors: TErrors;
+  LGenLexer: TMorGenericLexer;
+  LGenParser: TMorGenericParser;
+  LTokens: TList<TMorToken>;
+  LBranch: TMorASTNode;
+  LErrors: TMorErrors;
   LInterp: TMorInterpreter;
 begin
   LInterp := FEngine.GetInterpreter();
@@ -713,7 +713,7 @@ begin
   // Resolve filename using module extension
   LModuleFile := AModuleName + '.' + LInterp.GetModuleExtension();
   LModulePath := TPath.Combine(FSourceDir, LModuleFile);
-  LModuleDisplay := TUtils.DisplayPath(LModulePath);
+  LModuleDisplay := TMorUtils.DisplayPath(LModulePath);
 
   // Check dedup
   if FProcessedFiles.ContainsKey(TPath.GetFullPath(LModulePath)) then
@@ -722,7 +722,7 @@ begin
   // Check existence
   if not TFile.Exists(LModulePath) then
   begin
-    LErrors.Add(esError, ERR_ENGINE_MODULE_NOT_FOUND,
+    LErrors.Add(esError, MOR_ERR_ENGINE_MODULE_NOT_FOUND,
       RSFatalFileNotFound, [LModuleDisplay]);
     Exit(False);
   end;
@@ -731,7 +731,7 @@ begin
 
   // Lex module source
   FEngine.Status(RSUserLexerTokenizing, [LModuleDisplay]);
-  LGenLexer := TGenericLexer.Create();
+  LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(LErrors);
     LGenLexer.Configure(LInterp);
@@ -744,7 +744,7 @@ begin
 
   // Parse module source into a branch
   FEngine.Status(RSUserParserParsing, [LModuleDisplay]);
-  LGenParser := TGenericParser.Create();
+  LGenParser := TMorGenericParser.Create();
   try
     LGenParser.SetErrors(LErrors);
     LGenParser.Configure(LInterp);
@@ -767,14 +767,14 @@ begin
   Result := True;
 end;
 
-function TMorEngineAPI.ImportMorFile(const AMorPath: string): TASTNode;
+function TMorEngineAPI.ImportMorFile(const AMorPath: string): TMorASTNode;
 var
   LFullPath: string;
   LDisplay: string;
   LSource: string;
-  LTokens: TList<TToken>;
-  LAST: TASTNode;
-  LErrors: TErrors;
+  LTokens: TList<TMorToken>;
+  LAST: TMorASTNode;
+  LErrors: TMorErrors;
 begin
   Result := nil;
   LErrors := FEngine.GetErrors();
@@ -785,7 +785,7 @@ begin
   else
     LFullPath := TPath.GetFullPath(AMorPath);
 
-  LDisplay := TUtils.DisplayPath(LFullPath);
+  LDisplay := TMorUtils.DisplayPath(LFullPath);
 
   // Dedup check
   if FImportedMorFiles.ContainsKey(LFullPath) then
@@ -794,7 +794,7 @@ begin
   // Check existence
   if not TFile.Exists(LFullPath) then
   begin
-    LErrors.Add(esError, ERR_ENGINE_FILE_NOT_FOUND,
+    LErrors.Add(esError, MOR_ERR_ENGINE_FILE_NOT_FOUND,
       RSFatalFileNotFound, [LDisplay]);
     Exit;
   end;
@@ -931,37 +931,37 @@ function metamorf_node_kind(const AHandle: UInt64;
   const ANode: UInt64): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
-    TASTNode(Pointer(ANode)).GetKind());
+    TMorASTNode(Pointer(ANode)).GetKind());
 end;
 
 function metamorf_node_get_attr(const AHandle: UInt64;
   const ANode: UInt64; const AAttrName: PUTF8Char): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
-    TASTNode(Pointer(ANode)).GetAttr(UTF8ToString(AAttrName)));
+    TMorASTNode(Pointer(ANode)).GetAttr(UTF8ToString(AAttrName)));
 end;
 
 function metamorf_node_has_attr(const ANode: UInt64;
   const AAttrName: PUTF8Char): Boolean;
 begin
-  Result := TASTNode(Pointer(ANode)).HasAttr(UTF8ToString(AAttrName));
+  Result := TMorASTNode(Pointer(ANode)).HasAttr(UTF8ToString(AAttrName));
 end;
 
 function metamorf_node_child_count(const ANode: UInt64): Integer;
 begin
-  Result := TASTNode(Pointer(ANode)).ChildCount();
+  Result := TMorASTNode(Pointer(ANode)).ChildCount();
 end;
 
 function metamorf_node_child(const ANode: UInt64;
   const AIndex: Integer): UInt64;
 begin
-  Result := UInt64(TASTNode(Pointer(ANode)).GetChild(AIndex));
+  Result := UInt64(TMorASTNode(Pointer(ANode)).GetChild(AIndex));
 end;
 
 procedure metamorf_node_set_attr(const ANode: UInt64;
   const AAttrName: PUTF8Char; const AValue: PUTF8Char);
 begin
-  TASTNode(Pointer(ANode)).SetAttr(
+  TMorASTNode(Pointer(ANode)).SetAttr(
     UTF8ToString(AAttrName), UTF8ToString(AValue));
 end;
 

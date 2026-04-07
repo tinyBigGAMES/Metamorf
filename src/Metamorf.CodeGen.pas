@@ -25,14 +25,14 @@ uses
 
 type
 
-  { TOutputTarget }
-  TOutputTarget = (otHeader, otSource);
+  { TMorOutputTarget }
+  TMorOutputTarget = (otHeader, otSource);
 
-  { TEmitNodeProc - callback to interpreter for node dispatch }
-  TEmitNodeProc = procedure(const ANode: TASTNode) of object;
+  { TMorEmitNodeProc }
+  TMorEmitNodeProc = procedure(const ANode: TMorASTNode) of object;
 
-  { TCodeOutput }
-  TCodeOutput = class(TBaseObject)
+  { TMorCodeOutput }
+  TMorCodeOutput = class(TMorBaseObject)
   private
     FHeaderBuffer: TStringBuilder;
     FSourceBuffer: TStringBuilder;
@@ -45,9 +45,9 @@ type
     FPendingLineFile: string;
     FPendingLineNum: Integer;
     FCaptureStack: TList<TStringBuilder>;
-    FEmitNodeCallback: TEmitNodeProc;
+    FEmitNodeCallback: TMorEmitNodeProc;
 
-    function GetBuffer(const ATarget: TOutputTarget): TStringBuilder;
+    function GetBuffer(const ATarget: TMorOutputTarget): TStringBuilder;
     {$HINTS OFF}
     function GetActiveBuffer(): TStringBuilder;
     {$HINTS ON}
@@ -64,37 +64,37 @@ type
     function EndCapture(): string;
 
     // Delegation to interpreter for node dispatch
-    procedure SetEmitNodeCallback(const ACallback: TEmitNodeProc);
-    procedure EmitNode(const ANode: TASTNode);
-    procedure EmitChildren(const ANode: TASTNode);
+    procedure SetEmitNodeCallback(const ACallback: TMorEmitNodeProc);
+    procedure EmitNode(const ANode: TMorASTNode);
+    procedure EmitChildren(const ANode: TMorASTNode);
 
     // Line directives
     procedure SetLineDirectives(const AEnabled: Boolean);
-    procedure EmitLineDirective(const ANode: TASTNode);
+    procedure EmitLineDirective(const ANode: TMorASTNode);
 
     // Low-level output
-    procedure EmitLine(const AText: string; const ATarget: TOutputTarget = otSource); overload;
-    procedure EmitLine(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget = otSource); overload;
-    procedure Emit(const AText: string; const ATarget: TOutputTarget = otSource); overload;
-    procedure Emit(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget = otSource); overload;
-    procedure EmitRaw(const AText: string; const ATarget: TOutputTarget = otSource); overload;
-    procedure EmitRaw(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget = otSource); overload;
+    procedure EmitLine(const AText: string; const ATarget: TMorOutputTarget = otSource); overload;
+    procedure EmitLine(const AText: string; const AArgs: array of const; const ATarget: TMorOutputTarget = otSource); overload;
+    procedure Emit(const AText: string; const ATarget: TMorOutputTarget = otSource); overload;
+    procedure Emit(const AText: string; const AArgs: array of const; const ATarget: TMorOutputTarget = otSource); overload;
+    procedure EmitRaw(const AText: string; const ATarget: TMorOutputTarget = otSource); overload;
+    procedure EmitRaw(const AText: string; const AArgs: array of const; const ATarget: TMorOutputTarget = otSource); overload;
 
     // Indentation
     procedure IndentIn();
     procedure IndentOut();
 
     // Top-level declarations
-    procedure IncludeHeader(const AHeaderName: string; const ATarget: TOutputTarget = otHeader);
-    procedure StructBegin(const AStructName: string; const ATarget: TOutputTarget = otHeader);
+    procedure IncludeHeader(const AHeaderName: string; const ATarget: TMorOutputTarget = otHeader);
+    procedure StructBegin(const AStructName: string; const ATarget: TMorOutputTarget = otHeader);
     procedure AddField(const AFieldName: string; const AFieldType: string);
     procedure StructEnd();
-    procedure DeclConst(const AConstName: string; const AConstType: string; const AValueExpr: string; const ATarget: TOutputTarget = otHeader);
-    procedure GlobalVar(const AGlobalName: string; const AGlobalType: string; const AInitExpr: string; const ATarget: TOutputTarget = otSource);
-    procedure UsingDecl(const AAlias: string; const AOriginal: string; const ATarget: TOutputTarget = otHeader);
-    procedure NamespaceBegin(const ANamespaceName: string; const ATarget: TOutputTarget = otHeader);
-    procedure NamespaceEnd(const ATarget: TOutputTarget = otHeader);
-    procedure ExternCDecl(const AFuncName: string; const AReturnType: string; const AParams: string; const ATarget: TOutputTarget = otHeader);
+    procedure DeclConst(const AConstName: string; const AConstType: string; const AValueExpr: string; const ATarget: TMorOutputTarget = otHeader);
+    procedure GlobalVar(const AGlobalName: string; const AGlobalType: string; const AInitExpr: string; const ATarget: TMorOutputTarget = otSource);
+    procedure UsingDecl(const AAlias: string; const AOriginal: string; const ATarget: TMorOutputTarget = otHeader);
+    procedure NamespaceBegin(const ANamespaceName: string; const ATarget: TMorOutputTarget = otHeader);
+    procedure NamespaceEnd(const ATarget: TMorOutputTarget = otHeader);
+    procedure ExternCDecl(const AFuncName: string; const AReturnType: string; const AParams: string; const ATarget: TMorOutputTarget = otHeader);
 
     // Function builder
     procedure Func(const AFuncName: string; const AReturnType: string);
@@ -121,7 +121,7 @@ type
     procedure EndFor();
     procedure BreakStmt();
     procedure ContinueStmt();
-    procedure BlankLine(const ATarget: TOutputTarget = otSource);
+    procedure BlankLine(const ATarget: TMorOutputTarget = otSource);
 
     // Expression builders (return C++ text fragments)
     function Lit(const AValue: Integer): string; overload;
@@ -181,9 +181,9 @@ type
 
 implementation
 
-{ TCodeOutput }
+{ TMorCodeOutput }
 
-constructor TCodeOutput.Create();
+constructor TMorCodeOutput.Create();
 begin
   inherited;
   FHeaderBuffer := TStringBuilder.Create();
@@ -200,7 +200,7 @@ begin
   FEmitNodeCallback := nil;
 end;
 
-destructor TCodeOutput.Destroy();
+destructor TMorCodeOutput.Destroy();
 var
   LI: Integer;
 begin
@@ -213,7 +213,7 @@ begin
   inherited;
 end;
 
-function TCodeOutput.GetBuffer(const ATarget: TOutputTarget): TStringBuilder;
+function TMorCodeOutput.GetBuffer(const ATarget: TMorOutputTarget): TStringBuilder;
 begin
   // If capturing, redirect ALL output to capture buffer
   if FCaptureStack.Count > 0 then
@@ -224,17 +224,17 @@ begin
     Result := FSourceBuffer;
 end;
 
-function TCodeOutput.GetActiveBuffer(): TStringBuilder;
+function TMorCodeOutput.GetActiveBuffer(): TStringBuilder;
 begin
   Result := GetBuffer(otSource);
 end;
 
-function TCodeOutput.GetIndent(): string;
+function TMorCodeOutput.GetIndent(): string;
 begin
   Result := StringOfChar(' ', FIndentLevel * 2);
 end;
 
-procedure TCodeOutput.CloseFuncSignature();
+procedure TMorCodeOutput.CloseFuncSignature();
 begin
   if FInFuncSignature then
   begin
@@ -246,12 +246,12 @@ end;
 
 { Capture mode }
 
-procedure TCodeOutput.BeginCapture();
+procedure TMorCodeOutput.BeginCapture();
 begin
   FCaptureStack.Add(TStringBuilder.Create());
 end;
 
-function TCodeOutput.EndCapture(): string;
+function TMorCodeOutput.EndCapture(): string;
 var
   LBuf: TStringBuilder;
 begin
@@ -265,12 +265,12 @@ end;
 
 { Node dispatch delegation }
 
-procedure TCodeOutput.SetEmitNodeCallback(const ACallback: TEmitNodeProc);
+procedure TMorCodeOutput.SetEmitNodeCallback(const ACallback: TMorEmitNodeProc);
 begin
   FEmitNodeCallback := ACallback;
 end;
 
-procedure TCodeOutput.EmitNode(const ANode: TASTNode);
+procedure TMorCodeOutput.EmitNode(const ANode: TMorASTNode);
 begin
   if ANode = nil then
     Exit;
@@ -281,7 +281,7 @@ begin
     EmitChildren(ANode);
 end;
 
-procedure TCodeOutput.EmitChildren(const ANode: TASTNode);
+procedure TMorCodeOutput.EmitChildren(const ANode: TMorASTNode);
 var
   LI: Integer;
 begin
@@ -291,14 +291,14 @@ begin
     EmitNode(ANode.GetChild(LI));
 end;
 
-procedure TCodeOutput.SetLineDirectives(const AEnabled: Boolean);
+procedure TMorCodeOutput.SetLineDirectives(const AEnabled: Boolean);
 begin
   FLineDirectives := AEnabled;
 end;
 
-procedure TCodeOutput.EmitLineDirective(const ANode: TASTNode);
+procedure TMorCodeOutput.EmitLineDirective(const ANode: TMorASTNode);
 var
-  LRange: TSourceRange;
+  LRange: TMorSourceRange;
 begin
   if not FLineDirectives then
     Exit;
@@ -314,7 +314,7 @@ begin
   end;
 end;
 
-procedure TCodeOutput.FlushPendingLineDirective();
+procedure TMorCodeOutput.FlushPendingLineDirective();
 var
   LFile: string;
 begin
@@ -342,46 +342,46 @@ end;
 
 { Low-level output }
 
-procedure TCodeOutput.EmitLine(const AText: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.EmitLine(const AText: string; const ATarget: TMorOutputTarget);
 begin
   if ATarget = otSource then
     FlushPendingLineDirective();
   GetBuffer(ATarget).AppendLine(GetIndent() + AText);
 end;
 
-procedure TCodeOutput.EmitLine(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.EmitLine(const AText: string; const AArgs: array of const; const ATarget: TMorOutputTarget);
 begin
   EmitLine(Format(AText, AArgs), ATarget);
 end;
 
-procedure TCodeOutput.Emit(const AText: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.Emit(const AText: string; const ATarget: TMorOutputTarget);
 begin
   if ATarget = otSource then
     FlushPendingLineDirective();
   GetBuffer(ATarget).Append(AText);
 end;
 
-procedure TCodeOutput.Emit(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.Emit(const AText: string; const AArgs: array of const; const ATarget: TMorOutputTarget);
 begin
   Emit(Format(AText, AArgs), ATarget);
 end;
 
-procedure TCodeOutput.EmitRaw(const AText: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.EmitRaw(const AText: string; const ATarget: TMorOutputTarget);
 begin
   GetBuffer(ATarget).Append(AText);
 end;
 
-procedure TCodeOutput.EmitRaw(const AText: string; const AArgs: array of const; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.EmitRaw(const AText: string; const AArgs: array of const; const ATarget: TMorOutputTarget);
 begin
   EmitRaw(Format(AText, AArgs), ATarget);
 end;
 
-procedure TCodeOutput.IndentIn();
+procedure TMorCodeOutput.IndentIn();
 begin
   Inc(FIndentLevel);
 end;
 
-procedure TCodeOutput.IndentOut();
+procedure TMorCodeOutput.IndentOut();
 begin
   if FIndentLevel > 0 then
     Dec(FIndentLevel);
@@ -389,7 +389,7 @@ end;
 
 { Top-level declarations }
 
-procedure TCodeOutput.IncludeHeader(const AHeaderName: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.IncludeHeader(const AHeaderName: string; const ATarget: TMorOutputTarget);
 begin
   if (AHeaderName <> '') and (AHeaderName[1] <> '"') and (AHeaderName[1] <> '<') then
     EmitLine('#include <' + AHeaderName + '>', ATarget)
@@ -397,24 +397,24 @@ begin
     EmitLine('#include ' + AHeaderName, ATarget);
 end;
 
-procedure TCodeOutput.StructBegin(const AStructName: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.StructBegin(const AStructName: string; const ATarget: TMorOutputTarget);
 begin
   EmitLine('struct ' + AStructName + ' {', ATarget);
   IndentIn();
 end;
 
-procedure TCodeOutput.AddField(const AFieldName: string; const AFieldType: string);
+procedure TMorCodeOutput.AddField(const AFieldName: string; const AFieldType: string);
 begin
   EmitLine(AFieldType + ' ' + AFieldName + ';', otHeader);
 end;
 
-procedure TCodeOutput.StructEnd();
+procedure TMorCodeOutput.StructEnd();
 begin
   IndentOut();
   EmitLine('};', otHeader);
 end;
 
-procedure TCodeOutput.DeclConst(const AConstName: string; const AConstType: string; const AValueExpr: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.DeclConst(const AConstName: string; const AConstType: string; const AValueExpr: string; const ATarget: TMorOutputTarget);
 begin
   if AConstType = '' then
     EmitLine('constexpr auto ' + AConstName + ' = ' + AValueExpr + ';', ATarget)
@@ -422,7 +422,7 @@ begin
     EmitLine('constexpr ' + AConstType + ' ' + AConstName + ' = ' + AValueExpr + ';', ATarget);
 end;
 
-procedure TCodeOutput.GlobalVar(const AGlobalName: string; const AGlobalType: string; const AInitExpr: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.GlobalVar(const AGlobalName: string; const AGlobalType: string; const AInitExpr: string; const ATarget: TMorOutputTarget);
 begin
   if AInitExpr = '' then
     EmitLine(AGlobalType + ' ' + AGlobalName + ';', ATarget)
@@ -430,37 +430,37 @@ begin
     EmitLine(AGlobalType + ' ' + AGlobalName + ' = ' + AInitExpr + ';', ATarget);
 end;
 
-procedure TCodeOutput.UsingDecl(const AAlias: string; const AOriginal: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.UsingDecl(const AAlias: string; const AOriginal: string; const ATarget: TMorOutputTarget);
 begin
   EmitLine('using ' + AAlias + ' = ' + AOriginal + ';', ATarget);
 end;
 
-procedure TCodeOutput.NamespaceBegin(const ANamespaceName: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.NamespaceBegin(const ANamespaceName: string; const ATarget: TMorOutputTarget);
 begin
   EmitLine('namespace ' + ANamespaceName + ' {', ATarget);
   IndentIn();
 end;
 
-procedure TCodeOutput.NamespaceEnd(const ATarget: TOutputTarget);
+procedure TMorCodeOutput.NamespaceEnd(const ATarget: TMorOutputTarget);
 begin
   IndentOut();
   EmitLine('} // namespace', ATarget);
 end;
 
-procedure TCodeOutput.ExternCDecl(const AFuncName: string; const AReturnType: string; const AParams: string; const ATarget: TOutputTarget);
+procedure TMorCodeOutput.ExternCDecl(const AFuncName: string; const AReturnType: string; const AParams: string; const ATarget: TMorOutputTarget);
 begin
   EmitLine('extern "C" ' + AReturnType + ' ' + AFuncName + '(' + AParams + ');', ATarget);
 end;
 
 { Function builder }
 
-procedure TCodeOutput.Func(const AFuncName: string; const AReturnType: string);
+procedure TMorCodeOutput.Func(const AFuncName: string; const AReturnType: string);
 begin
   FInFuncSignature := True;
   Emit(GetIndent() + AReturnType + ' ' + AFuncName + '(', otSource);
 end;
 
-procedure TCodeOutput.Param(const AParamName: string; const AParamType: string);
+procedure TMorCodeOutput.Param(const AParamName: string; const AParamType: string);
 var
   LBuf: TStringBuilder;
 begin
@@ -474,7 +474,7 @@ begin
   end;
 end;
 
-procedure TCodeOutput.EndFunc();
+procedure TMorCodeOutput.EndFunc();
 begin
   CloseFuncSignature();
   IndentOut();
@@ -484,142 +484,142 @@ end;
 
 { Statement methods }
 
-procedure TCodeOutput.DeclVar(const AVarName: string; const AVarType: string);
+procedure TMorCodeOutput.DeclVar(const AVarName: string; const AVarType: string);
 begin
   CloseFuncSignature();
   EmitLine(AVarType + ' ' + AVarName + ';', otSource);
 end;
 
-procedure TCodeOutput.DeclVar(const AVarName: string; const AVarType: string; const AInitExpr: string);
+procedure TMorCodeOutput.DeclVar(const AVarName: string; const AVarType: string; const AInitExpr: string);
 begin
   CloseFuncSignature();
   EmitLine(AVarType + ' ' + AVarName + ' = ' + AInitExpr + ';', otSource);
 end;
 
-procedure TCodeOutput.Assign(const ALhs: string; const AExpr: string);
+procedure TMorCodeOutput.Assign(const ALhs: string; const AExpr: string);
 begin
   CloseFuncSignature();
   EmitLine(ALhs + ' = ' + AExpr + ';', otSource);
 end;
 
-procedure TCodeOutput.AssignTo(const ATargetExpr: string; const AValueExpr: string);
+procedure TMorCodeOutput.AssignTo(const ATargetExpr: string; const AValueExpr: string);
 begin
   CloseFuncSignature();
   EmitLine(ATargetExpr + ' = ' + AValueExpr + ';', otSource);
 end;
 
-procedure TCodeOutput.CallStmt(const AFuncName: string; const AArgs: string);
+procedure TMorCodeOutput.CallStmt(const AFuncName: string; const AArgs: string);
 begin
   CloseFuncSignature();
   EmitLine(AFuncName + '(' + AArgs + ');', otSource);
 end;
 
-procedure TCodeOutput.Stmt(const ARawText: string);
+procedure TMorCodeOutput.Stmt(const ARawText: string);
 begin
   CloseFuncSignature();
   EmitLine(ARawText, otSource);
 end;
 
-procedure TCodeOutput.Stmt(const ARawText: string; const AArgs: array of const);
+procedure TMorCodeOutput.Stmt(const ARawText: string; const AArgs: array of const);
 begin
   Stmt(Format(ARawText, AArgs));
 end;
 
-procedure TCodeOutput.ReturnStmt();
+procedure TMorCodeOutput.ReturnStmt();
 begin
   CloseFuncSignature();
   EmitLine('return;', otSource);
 end;
 
-procedure TCodeOutput.ReturnStmt(const AExpr: string);
+procedure TMorCodeOutput.ReturnStmt(const AExpr: string);
 begin
   CloseFuncSignature();
   EmitLine('return ' + AExpr + ';', otSource);
 end;
 
-procedure TCodeOutput.IfStmt(const ACondExpr: string);
+procedure TMorCodeOutput.IfStmt(const ACondExpr: string);
 begin
   CloseFuncSignature();
   EmitLine('if (' + ACondExpr + ') {', otSource);
   IndentIn();
 end;
 
-procedure TCodeOutput.ElseIfStmt(const ACondExpr: string);
+procedure TMorCodeOutput.ElseIfStmt(const ACondExpr: string);
 begin
   IndentOut();
   EmitLine('} else if (' + ACondExpr + ') {', otSource);
   IndentIn();
 end;
 
-procedure TCodeOutput.ElseStmt();
+procedure TMorCodeOutput.ElseStmt();
 begin
   IndentOut();
   EmitLine('} else {', otSource);
   IndentIn();
 end;
 
-procedure TCodeOutput.EndIf();
+procedure TMorCodeOutput.EndIf();
 begin
   IndentOut();
   EmitLine('}', otSource);
 end;
 
-procedure TCodeOutput.WhileStmt(const ACondExpr: string);
+procedure TMorCodeOutput.WhileStmt(const ACondExpr: string);
 begin
   CloseFuncSignature();
   EmitLine('while (' + ACondExpr + ') {', otSource);
   IndentIn();
 end;
 
-procedure TCodeOutput.EndWhile();
+procedure TMorCodeOutput.EndWhile();
 begin
   IndentOut();
   EmitLine('}', otSource);
 end;
 
-procedure TCodeOutput.ForStmt(const AVarName: string; const AInitExpr: string; const ACondExpr: string; const AStepExpr: string);
+procedure TMorCodeOutput.ForStmt(const AVarName: string; const AInitExpr: string; const ACondExpr: string; const AStepExpr: string);
 begin
   CloseFuncSignature();
   EmitLine('for (' + AVarName + ' = ' + AInitExpr + '; ' + ACondExpr + '; ' + AStepExpr + ') {', otSource);
   IndentIn();
 end;
 
-procedure TCodeOutput.EndFor();
+procedure TMorCodeOutput.EndFor();
 begin
   IndentOut();
   EmitLine('}', otSource);
 end;
 
-procedure TCodeOutput.BreakStmt();
+procedure TMorCodeOutput.BreakStmt();
 begin
   CloseFuncSignature();
   EmitLine('break;', otSource);
 end;
 
-procedure TCodeOutput.ContinueStmt();
+procedure TMorCodeOutput.ContinueStmt();
 begin
   CloseFuncSignature();
   EmitLine('continue;', otSource);
 end;
 
-procedure TCodeOutput.BlankLine(const ATarget: TOutputTarget);
+procedure TMorCodeOutput.BlankLine(const ATarget: TMorOutputTarget);
 begin
   GetBuffer(ATarget).AppendLine('');
 end;
 
 { Expression builders }
 
-function TCodeOutput.Lit(const AValue: Integer): string;
+function TMorCodeOutput.Lit(const AValue: Integer): string;
 begin
   Result := IntToStr(AValue);
 end;
 
-function TCodeOutput.Lit(const AValue: Int64): string;
+function TMorCodeOutput.Lit(const AValue: Int64): string;
 begin
   Result := IntToStr(AValue) + 'LL';
 end;
 
-function TCodeOutput.FloatLit(const AValue: Double): string;
+function TMorCodeOutput.FloatLit(const AValue: Double): string;
 var
   LFS: TFormatSettings;
 begin
@@ -628,12 +628,12 @@ begin
   Result := FormatFloat('0.0###############', AValue, LFS);
 end;
 
-function TCodeOutput.StrLit(const AValue: string): string;
+function TMorCodeOutput.StrLit(const AValue: string): string;
 begin
   Result := '"' + AValue + '"';
 end;
 
-function TCodeOutput.BoolLit(const AValue: Boolean): string;
+function TMorCodeOutput.BoolLit(const AValue: Boolean): string;
 begin
   if AValue then
     Result := 'true'
@@ -641,159 +641,159 @@ begin
     Result := 'false';
 end;
 
-function TCodeOutput.NullLit(): string;
+function TMorCodeOutput.NullLit(): string;
 begin
   Result := 'nullptr';
 end;
 
-function TCodeOutput.Get(const AVarName: string): string;
+function TMorCodeOutput.Get(const AVarName: string): string;
 begin
   Result := AVarName;
 end;
 
-function TCodeOutput.Field(const AObj: string; const AMember: string): string;
+function TMorCodeOutput.Field(const AObj: string; const AMember: string): string;
 begin
   Result := AObj + '.' + AMember;
 end;
 
-function TCodeOutput.Deref(const APtr: string; const AMember: string): string;
+function TMorCodeOutput.Deref(const APtr: string; const AMember: string): string;
 begin
   Result := APtr + '->' + AMember;
 end;
 
-function TCodeOutput.Deref(const APtr: string): string;
+function TMorCodeOutput.Deref(const APtr: string): string;
 begin
   Result := '*' + APtr;
 end;
 
-function TCodeOutput.AddrOf(const AVarName: string): string;
+function TMorCodeOutput.AddrOf(const AVarName: string): string;
 begin
   Result := '&' + AVarName;
 end;
 
-function TCodeOutput.IndexExpr(const AArr: string; const AIndexExpr: string): string;
+function TMorCodeOutput.IndexExpr(const AArr: string; const AIndexExpr: string): string;
 begin
   Result := AArr + '[' + AIndexExpr + ']';
 end;
 
-function TCodeOutput.CastExpr(const ATypeName: string; const AExpr: string): string;
+function TMorCodeOutput.CastExpr(const ATypeName: string; const AExpr: string): string;
 begin
   Result := '(' + ATypeName + ')(' + AExpr + ')';
 end;
 
-function TCodeOutput.Invoke(const AFuncName: string; const AArgs: string): string;
+function TMorCodeOutput.Invoke(const AFuncName: string; const AArgs: string): string;
 begin
   Result := AFuncName + '(' + AArgs + ')';
 end;
 
-function TCodeOutput.Add(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Add(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' + ' + ARight;
 end;
 
-function TCodeOutput.Sub(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Sub(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' - ' + ARight;
 end;
 
-function TCodeOutput.Mul(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Mul(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' * ' + ARight;
 end;
 
-function TCodeOutput.DivExpr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.DivExpr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' / ' + ARight;
 end;
 
-function TCodeOutput.ModExpr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.ModExpr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' % ' + ARight;
 end;
 
-function TCodeOutput.Neg(const AExpr: string): string;
+function TMorCodeOutput.Neg(const AExpr: string): string;
 begin
   Result := '-' + AExpr;
 end;
 
-function TCodeOutput.Eq(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Eq(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' == ' + ARight;
 end;
 
-function TCodeOutput.Ne(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Ne(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' != ' + ARight;
 end;
 
-function TCodeOutput.Lt(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Lt(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' < ' + ARight;
 end;
 
-function TCodeOutput.Le(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Le(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' <= ' + ARight;
 end;
 
-function TCodeOutput.Gt(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Gt(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' > ' + ARight;
 end;
 
-function TCodeOutput.Ge(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.Ge(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' >= ' + ARight;
 end;
 
-function TCodeOutput.AndExpr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.AndExpr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' && ' + ARight;
 end;
 
-function TCodeOutput.OrExpr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.OrExpr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' || ' + ARight;
 end;
 
-function TCodeOutput.NotExpr(const AExpr: string): string;
+function TMorCodeOutput.NotExpr(const AExpr: string): string;
 begin
   Result := '!' + AExpr;
 end;
 
-function TCodeOutput.BitAnd(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.BitAnd(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' & ' + ARight;
 end;
 
-function TCodeOutput.BitOr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.BitOr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' | ' + ARight;
 end;
 
-function TCodeOutput.BitXor(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.BitXor(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' ^ ' + ARight;
 end;
 
-function TCodeOutput.BitNot(const AExpr: string): string;
+function TMorCodeOutput.BitNot(const AExpr: string): string;
 begin
   Result := '~' + AExpr;
 end;
 
-function TCodeOutput.ShlExpr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.ShlExpr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' << ' + ARight;
 end;
 
-function TCodeOutput.ShrExpr(const ALeft: string; const ARight: string): string;
+function TMorCodeOutput.ShrExpr(const ALeft: string; const ARight: string): string;
 begin
   Result := ALeft + ' >> ' + ARight;
 end;
 
 { Output }
 
-procedure TCodeOutput.SaveToFiles(const AHeaderPath: string; const ASourcePath: string);
+procedure TMorCodeOutput.SaveToFiles(const AHeaderPath: string; const ASourcePath: string);
 var
   LHeaderDir: string;
   LSourceDir: string;
@@ -815,30 +815,30 @@ begin
     FSourceBuffer.ToString(), TEncoding.UTF8);
 end;
 
-function TCodeOutput.GetHeaderContent(): string;
+function TMorCodeOutput.GetHeaderContent(): string;
 begin
   Result := FHeaderBuffer.ToString();
 end;
 
-function TCodeOutput.GetSourceContent(): string;
+function TMorCodeOutput.GetSourceContent(): string;
 begin
   Result := FSourceBuffer.ToString();
 end;
 
 { Context store }
 
-procedure TCodeOutput.SetContext(const AKey: string; const AValue: string);
+procedure TMorCodeOutput.SetContext(const AKey: string; const AValue: string);
 begin
   FContext.AddOrSetValue(AKey, AValue);
 end;
 
-function TCodeOutput.GetContext(const AKey: string; const ADefault: string): string;
+function TMorCodeOutput.GetContext(const AKey: string; const ADefault: string): string;
 begin
   if not FContext.TryGetValue(AKey, Result) then
     Result := ADefault;
 end;
 
-procedure TCodeOutput.Clear();
+procedure TMorCodeOutput.Clear();
 begin
   FHeaderBuffer.Clear();
   FSourceBuffer.Clear();

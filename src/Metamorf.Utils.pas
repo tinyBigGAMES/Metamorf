@@ -41,21 +41,21 @@ const
 
 type
 
-  { TCallback }
-  TCallback<T> = record
+  { TMorCallback }
+  TMorCallback<T> = record
     Callback: T;
     UserData: Pointer;
     function IsAssigned(): Boolean;
   end;
 
-  { TCaptureConsoleCallback }
-  TCaptureConsoleCallback = reference to procedure(const ALine: string; const AUserData: Pointer);
+  { TMorCaptureConsoleCallback }
+  TMorCaptureConsoleCallback = reference to procedure(const ALine: string; const AUserData: Pointer);
 
-  { TStatusCallback }
-  TStatusCallback = reference to procedure(const AText: string; const AUserData: Pointer);
+  { TMorStatusCallback }
+  TMorStatusCallback = reference to procedure(const AText: string; const AUserData: Pointer);
 
-  { TVersionInfo }
-  TVersionInfo = record
+  { TMorVersionInfo }
+  TMorVersionInfo = record
     Major: Word;
     Minor: Word;
     Patch: Word;
@@ -68,8 +68,8 @@ type
     URL: string;
   end;
 
-  { TUtils }
-  TUtils = class
+  { TMorUtils }
+  TMorUtils = class
   private class var
     FMarshaller: TMarshaller;
   private
@@ -101,12 +101,12 @@ type
     class function  RunPE(const AExe, AParams, AWorkDir: string; const AWait: Boolean = True; const AShowCmd: Word = SW_SHOWNORMAL): Cardinal; static;
     class function  RunElf(const AElf, AWorkDir: string): Cardinal; static;
     class function  WindowsPathToWSL(const APath: string): string; static;
-    class procedure CaptureConsoleOutput(const ATitle: string; const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TCaptureConsoleCallback); static;
-    class procedure CaptureZigConsolePTY(const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TCaptureConsoleCallback); static;
+    class procedure CaptureConsoleOutput(const ATitle: string; const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TMorCaptureConsoleCallback); static;
+    class procedure CaptureZigConsolePTY(const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TMorCaptureConsoleCallback); static;
     class function  CreateProcessWithPipes(const AExe, AParams, AWorkDir: string; out AStdinWrite: THandle; out AStdoutRead: THandle; out AProcessHandle: THandle; out AThreadHandle: THandle): Boolean; static;
 
     class function  CreateDirInPath(const AFilename: string): Boolean;
-    class function  GetVersionInfo(out AVersionInfo: TVersionInfo; const AFilePath: string = ''): Boolean; static;
+    class function  GetVersionInfo(out AVersionInfo: TMorVersionInfo; const AFilePath: string = ''): Boolean; static;
 
     class procedure CopyFilePreservingEncoding(const ASourceFile, ADestFile: string); static;
     class function  DetectFileEncoding(const AFilePath: string): TEncoding; static;
@@ -135,8 +135,8 @@ type
 
   end;
 
-  { TBaseObject }
-  TBaseObject = class
+  { TMorBaseObject }
+  TMorBaseObject = class
   public
     constructor Create(); virtual;
     destructor Destroy(); override;
@@ -146,8 +146,8 @@ type
     procedure SaveConfig(); virtual;
   end;
 
-  { TCommandBuilder }
-  TCommandBuilder = class(TBaseObject)
+  { TMorCommandBuilder }
+  TMorCommandBuilder = class(TMorBaseObject)
   private
     FParams: TStringList;
   public
@@ -165,16 +165,16 @@ type
     function GetParamCount(): Integer;
   end;
 
-  { TErrorSeverity }
-  TErrorSeverity = (
+  { TMorErrorSeverity }
+  TMorErrorSeverity = (
     esHint,
     esWarning,
     esError,
     esFatal
   );
 
-  { TSourceRange }
-  TSourceRange = record
+  { TMorSourceRange }
+  TMorSourceRange = record
     Filename: string;
     StartLine: Integer;
     StartColumn: Integer;
@@ -189,29 +189,29 @@ type
     function ToRangeString(): string;
   end;
 
-  { TErrorRelated }
-  TErrorRelated = record
-    Range: TSourceRange;
+  { TMorErrorRelated }
+  TMorErrorRelated = record
+    Range: TMorSourceRange;
     Message: string;
   end;
 
-  { TError }
-  TError = record
-    Range: TSourceRange;
-    Severity: TErrorSeverity;
+  { TMorError }
+  TMorError = record
+    Range: TMorSourceRange;
+    Severity: TMorErrorSeverity;
     Code: string;
     Message: string;
-    Related: TArray<TErrorRelated>;
+    Related: TArray<TMorErrorRelated>;
 
     function GetSeverityString(): string;
     function ToIDEString(): string;
     function ToFullString(): string;
   end;
 
-  { TErrors }
-  TErrors = class(TBaseObject)
+  { TMorErrors }
+  TMorErrors = class(TMorBaseObject)
   private
-    FItems: TList<TError>;
+    FItems: TList<TMorError>;
     FMaxErrors: Integer;
 
     function CountErrors(): Integer;
@@ -222,15 +222,15 @@ type
 
     // Full location with range
     procedure Add(
-      const ARange: TSourceRange;
-      const ASeverity: TErrorSeverity;
+      const ARange: TMorSourceRange;
+      const ASeverity: TMorErrorSeverity;
       const ACode: string;
       const AMessage: string
     ); overload;
 
     procedure Add(
-      const ARange: TSourceRange;
-      const ASeverity: TErrorSeverity;
+      const ARange: TMorSourceRange;
+      const ASeverity: TMorErrorSeverity;
       const ACode: string;
       const AMessage: string;
       const AArgs: array of const
@@ -241,7 +241,7 @@ type
       const AFilename: string;
       const ALine: Integer;
       const AColumn: Integer;
-      const ASeverity: TErrorSeverity;
+      const ASeverity: TMorErrorSeverity;
       const ACode: string;
       const AMessage: string
     ); overload;
@@ -250,7 +250,7 @@ type
       const AFilename: string;
       const ALine: Integer;
       const AColumn: Integer;
-      const ASeverity: TErrorSeverity;
+      const ASeverity: TMorErrorSeverity;
       const ACode: string;
       const AMessage: string;
       const AArgs: array of const
@@ -258,13 +258,13 @@ type
 
     // No location
     procedure Add(
-      const ASeverity: TErrorSeverity;
+      const ASeverity: TMorErrorSeverity;
       const ACode: string;
       const AMessage: string
     ); overload;
 
     procedure Add(
-      const ASeverity: TErrorSeverity;
+      const ASeverity: TMorErrorSeverity;
       const ACode: string;
       const AMessage: string;
       const AArgs: array of const
@@ -272,12 +272,12 @@ type
 
     // Add related info to most recent error
     procedure AddRelated(
-      const ARange: TSourceRange;
+      const ARange: TMorSourceRange;
       const AMessage: string
     ); overload;
 
     procedure AddRelated(
-      const ARange: TSourceRange;
+      const ARange: TMorSourceRange;
       const AMessage: string;
       const AArgs: array of const
     ); overload;
@@ -293,42 +293,42 @@ type
     procedure Clear();
     procedure TruncateTo(const ACount: Integer);
 
-    function GetItems(): TList<TError>;
+    function GetItems(): TList<TMorError>;
     function GetMaxErrors(): Integer;
     procedure SetMaxErrors(const AMaxErrors: Integer);
     function Dump(const AId: Integer = 0): string; override;
   end;
 
-  { TStatusObject }
-  TStatusObject = class(TBaseObject)
+  { TMorStatusObject }
+  TMorStatusObject = class(TMorBaseObject)
   protected
-    FStatusCallback: TCallback<TStatusCallback>;
+    FStatusCallback: TMorCallback<TMorStatusCallback>;
   public
     constructor Create(); override;
     destructor Destroy(); override;
     procedure Status(const AText: string); overload;
     procedure Status(const AText: string; const AArgs: array of const); overload;
-    function  GetStatusCallback(): TStatusCallback;
-    procedure SetStatusCallback(const ACallback: TStatusCallback; const AUserData: Pointer = nil); virtual;
+    function  GetStatusCallback(): TMorStatusCallback;
+    procedure SetStatusCallback(const ACallback: TMorStatusCallback; const AUserData: Pointer = nil); virtual;
   end;
 
-  { TErrorsObject }
-  TErrorsObject = class(TStatusObject)
+  { TMorErrorsObject }
+  TMorErrorsObject = class(TMorStatusObject)
   protected
-    FErrors: TErrors;
+    FErrors: TMorErrors;
   public
-    procedure SetErrors(const AErrors: TErrors); virtual;
-    function GetErrors(): TErrors;
+    procedure SetErrors(const AErrors: TMorErrors); virtual;
+    function GetErrors(): TMorErrors;
   end;
 
-  { TOutputObject }
-  TOutputObject = class(TStatusObject)
+  { TMorOutputObject }
+  TMorOutputObject = class(TMorStatusObject)
   protected
-    FOutput: TCallback<TCaptureConsoleCallback>;
+    FOutput: TMorCallback<TMorCaptureConsoleCallback>;
   public
-    procedure SetOutputCallback(const ACallback: TCaptureConsoleCallback;
+    procedure SetOutputCallback(const ACallback: TMorCaptureConsoleCallback;
       const AUserData: Pointer = nil); virtual;
-    function GetOutputCallback(): TCaptureConsoleCallback;
+    function GetOutputCallback(): TMorCaptureConsoleCallback;
   end;
 
 implementation
@@ -367,16 +367,16 @@ function InitializeProcThreadAttributeList(lpAttributeList: Pointer; dwAttribute
 function UpdateProcThreadAttribute(lpAttributeList: Pointer; dwFlags: DWORD; Attribute: DWORD_PTR; lpValue: Pointer; cbSize: SIZE_T; lpPreviousValue: Pointer; lpReturnSize: PSIZE_T): BOOL; stdcall; external kernel32 name 'UpdateProcThreadAttribute';
 procedure DeleteProcThreadAttributeList(lpAttributeList: Pointer); stdcall; external kernel32 name 'DeleteProcThreadAttributeList';
 
-{ TCallback<T> }
+{ TMorCallback<T> }
 
-function TCallback<T>.IsAssigned(): Boolean;
+function TMorCallback<T>.IsAssigned(): Boolean;
 begin
   Result := PPointer(@Callback)^ <> nil;
 end;
 
-{ TUtils }
+{ TMorUtils }
 
-class function TUtils.EnableVirtualTerminalProcessing(): Boolean;
+class function TMorUtils.EnableVirtualTerminalProcessing(): Boolean;
 var
   HOut: THandle;
   LMode: DWORD;
@@ -393,80 +393,80 @@ begin
   Result := True;
 end;
 
-class procedure TUtils.InitConsole();
+class procedure TMorUtils.InitConsole();
 begin
   EnableVirtualTerminalProcessing();
   SetConsoleCP(CP_UTF8);
   SetConsoleOutputCP(CP_UTF8);
 end;
 
-class procedure TUtils.FailIf(const Cond: Boolean; const Msg: string; const AArgs: array of const);
+class procedure TMorUtils.FailIf(const Cond: Boolean; const Msg: string; const AArgs: array of const);
 begin
   if Cond then
     raise Exception.CreateFmt(Msg, AArgs);
 end;
 
-class function TUtils.GetTickCount(): DWORD;
+class function TMorUtils.GetTickCount(): DWORD;
 begin
   Result := WinApi.Windows.GetTickCount();
 end;
 
-class function TUtils.GetTickCount64(): UInt64;
+class function TMorUtils.GetTickCount64(): UInt64;
 begin
   Result := WinApi.Windows.GetTickCount64();
 end;
 
-class function TUtils.HasConsole(): Boolean;
+class function TMorUtils.HasConsole(): Boolean;
 begin
   Result := Boolean(GetConsoleWindow() <> 0);
 end;
 
-class procedure TUtils.ClearToEOL();
+class procedure TMorUtils.ClearToEOL();
 begin
   if not HasConsole() then Exit;
   Write(#27'[0K');
 end;
 
-class procedure TUtils.Print();
+class procedure TMorUtils.Print();
 begin
   Print('');
 end;
 
-class procedure TUtils.PrintLn();
+class procedure TMorUtils.PrintLn();
 begin
   PrintLn('');
 end;
 
-class procedure TUtils.Print(const AText: string);
+class procedure TMorUtils.Print(const AText: string);
 begin
   if not HasConsole() then Exit;
   Write(AText + COLOR_RESET);
 end;
 
-class procedure TUtils.Print(const AText: string; const AArgs: array of const);
+class procedure TMorUtils.Print(const AText: string; const AArgs: array of const);
 begin
   if not HasConsole() then Exit;
   Write(Format(AText, AArgs) + COLOR_RESET);
 end;
 
-class procedure TUtils.PrintLn(const AText: string);
+class procedure TMorUtils.PrintLn(const AText: string);
 begin
   if not HasConsole() then Exit;
   WriteLn(AText + COLOR_RESET);
 end;
 
-class procedure TUtils.PrintLn(const AText: string; const AArgs: array of const);
+class procedure TMorUtils.PrintLn(const AText: string; const AArgs: array of const);
 begin
   if not HasConsole() then Exit;
   WriteLn(Format(AText, AArgs) + COLOR_RESET);
 end;
 
-class function TUtils.RGB(const AR, AG, AB: Byte): string;
+class function TMorUtils.RGB(const AR, AG, AB: Byte): string;
 begin
   Result := #27'[38;2;' + IntToStr(AR) + ';' + IntToStr(AG) + ';' + IntToStr(AB) + 'm';
 end;
 
-class function TUtils.Pause(const AMsg, AQuit: string): Boolean;
+class function TMorUtils.Pause(const AMsg, AQuit: string): Boolean;
 var
   LInput: string;
 begin
@@ -485,14 +485,14 @@ begin
   PrintLn('');
 end;
 
-class function TUtils.AsUTF8(const AValue: string; ALength: PCardinal): Pointer;
+class function TMorUtils.AsUTF8(const AValue: string; ALength: PCardinal): Pointer;
 begin
   Result := FMarshaller.AsUtf8(AValue).ToPointer;
   if Assigned(ALength) then
     ALength^ := System.AnsiStrings.StrLen(PAnsiChar(Result));
 end;
 
-class function TUtils.ToAnsi(const AValue: string): AnsiString;
+class function TMorUtils.ToAnsi(const AValue: string): AnsiString;
 var
   LBytes: TBytes;
 begin
@@ -502,7 +502,7 @@ begin
   SetString(Result, PAnsiChar(@LBytes[0]), Length(LBytes));
 end;
 
-class procedure TUtils.ProcessMessages();
+class procedure TMorUtils.ProcessMessages();
 var
   LMsg: TMsg;
 begin
@@ -513,7 +513,7 @@ begin
   end;
 end;
 
-class function TUtils.RunPE(const AExe, AParams, AWorkDir: string; const AWait: Boolean; const AShowCmd: Word): Cardinal;
+class function TMorUtils.RunPE(const AExe, AParams, AWorkDir: string; const AWait: Boolean; const AShowCmd: Word): Cardinal;
 var
   LAppPath: string;
   LCmd: UnicodeString;
@@ -591,7 +591,7 @@ begin
   end;
 end;
 
-class function TUtils.WindowsPathToWSL(const APath: string): string;
+class function TMorUtils.WindowsPathToWSL(const APath: string): string;
 var
   LFullPath: string;
   LDrive: Char;
@@ -609,7 +609,7 @@ begin
     raise Exception.CreateFmt('WindowsPathToWSL: Expected absolute Windows path: %s', [LFullPath]);
 end;
 
-class function TUtils.RunElf(const AElf, AWorkDir: string): Cardinal;
+class function TMorUtils.RunElf(const AElf, AWorkDir: string): Cardinal;
 var
   LWslPath: string;
   LCmd: UnicodeString;
@@ -694,7 +694,7 @@ begin
   end;
 end;
 
-class procedure TUtils.CaptureConsoleOutput(const ATitle: string; const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TCaptureConsoleCallback);
+class procedure TMorUtils.CaptureConsoleOutput(const ATitle: string; const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TMorCaptureConsoleCallback);
 const
   CReadBuffer = 1024 * 2;
 var
@@ -816,7 +816,7 @@ begin
     end;
 end;
 
-class procedure TUtils.CaptureZigConsolePTY(const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TCaptureConsoleCallback);
+class procedure TMorUtils.CaptureZigConsolePTY(const ACommand: PChar; const AParameters: PChar; const AWorkDir: string; var AExitCode: DWORD; const AUserData: Pointer; const ACallback: TMorCaptureConsoleCallback);
 const
   CReadBuffer = 4096;
 var
@@ -1005,7 +1005,7 @@ begin
   end;
 end;
 
-class function TUtils.CreateProcessWithPipes(const AExe, AParams, AWorkDir: string; out AStdinWrite: THandle; out AStdoutRead: THandle; out AProcessHandle: THandle; out AThreadHandle: THandle): Boolean;
+class function TMorUtils.CreateProcessWithPipes(const AExe, AParams, AWorkDir: string; out AStdinWrite: THandle; out AStdoutRead: THandle; out AProcessHandle: THandle; out AThreadHandle: THandle): Boolean;
 var
   LSA: TSecurityAttributes;
   LStdinReadChild: THandle;
@@ -1099,7 +1099,7 @@ begin
   Result := True;
 end;
 
-class function TUtils.CreateDirInPath(const AFilename: string): Boolean;
+class function TMorUtils.CreateDirInPath(const AFilename: string): Boolean;
 var
   LPath: string;
 begin
@@ -1118,7 +1118,7 @@ begin
   Result := True;
 end;
 
-class procedure TUtils.CopyFilePreservingEncoding(const ASourceFile, ADestFile: string);
+class procedure TMorUtils.CopyFilePreservingEncoding(const ASourceFile, ADestFile: string);
 var
   LSourceBytes: TBytes;
 begin
@@ -1136,7 +1136,7 @@ begin
   TFile.WriteAllBytes(ADestFile, LSourceBytes);
 end;
 
-class function TUtils.DetectFileEncoding(const AFilePath: string): TEncoding;
+class function TMorUtils.DetectFileEncoding(const AFilePath: string): TEncoding;
 var
   LBytes: TBytes;
   LEncoding: TEncoding;
@@ -1158,7 +1158,7 @@ begin
   Result := LEncoding;
 end;
 
-class function TUtils.EnsureBOM(const AText: string): string;
+class function TMorUtils.EnsureBOM(const AText: string): string;
 const
   UTF16_BOM = #$FEFF;
 begin
@@ -1167,7 +1167,7 @@ begin
     Result := UTF16_BOM + Result;
 end;
 
-class function TUtils.EscapeString(const AText: string): string;
+class function TMorUtils.EscapeString(const AText: string): string;
 var
   LI: Integer;
   LChar: Char;
@@ -1226,7 +1226,7 @@ begin
   end;
 end;
 
-class function TUtils.StripAnsi(const AText: string): string;
+class function TMorUtils.StripAnsi(const AText: string): string;
 var
   LResult: TStringBuilder;
   LIdx: Integer;
@@ -1257,7 +1257,7 @@ begin
   end;
 end;
 
-class function TUtils.ExtractAnsiCodes(const AText: string): string;
+class function TMorUtils.ExtractAnsiCodes(const AText: string): string;
 var
   LResult: TStringBuilder;
   LIdx: Integer;
@@ -1290,7 +1290,7 @@ begin
   end;
 end;
 
-class function TUtils.GetVersionInfo(out AVersionInfo: TVersionInfo; const AFilePath: string): Boolean;
+class function TMorUtils.GetVersionInfo(out AVersionInfo: TMorVersionInfo; const AFilePath: string): Boolean;
 var
   LFileName: string;
   LInfoSize: DWORD;
@@ -1366,7 +1366,7 @@ begin
   end;
 end;
 
-class function TUtils.IsValidWin64PE(const AFilePath: string): Boolean;
+class function TMorUtils.IsValidWin64PE(const AFilePath: string): Boolean;
 var
   LFile: TFileStream;
   LDosHeader: TImageDosHeader;
@@ -1419,7 +1419,7 @@ begin
   end;
 end;
 
-class procedure TUtils.UpdateIconResource(const AExeFilePath, AIconFilePath: string);
+class procedure TMorUtils.UpdateIconResource(const AExeFilePath, AIconFilePath: string);
 type
   TIconDir = packed record
     idReserved: Word;
@@ -1541,7 +1541,7 @@ begin
   end;
 end;
 
-class procedure TUtils.UpdateVersionInfoResource(const PEFilePath: string; const AMajor, AMinor, APatch: Word; const AProductName, ADescription, AFilename, ACompanyName, ACopyright: string; const AURL: string);
+class procedure TMorUtils.UpdateVersionInfoResource(const PEFilePath: string; const AMajor, AMinor, APatch: Word; const AProductName, ADescription, AFilename, ACompanyName, ACopyright: string; const AURL: string);
 type
   TVSFixedFileInfo = packed record
     dwSignature: DWORD;
@@ -1786,12 +1786,12 @@ begin
   end;
 end;
 
-class function TUtils.ResourceExist(const AResName: string): Boolean;
+class function TMorUtils.ResourceExist(const AResName: string): Boolean;
 begin
   Result := Boolean((FindResource(HInstance, PChar(AResName), RT_RCDATA) <> 0));
 end;
 
-class function TUtils.AddResManifestFromResource(const AResName: string; const AModuleFile: string; ALanguage: Integer): Boolean;
+class function TMorUtils.AddResManifestFromResource(const AResName: string; const AModuleFile: string; ALanguage: Integer): Boolean;
 var
   LHandle: THandle;
   LManifestStream: TResourceStream;
@@ -1815,7 +1815,7 @@ begin
   end;
 end;
 
-class procedure TUtils.UpdateRCDataResource(const AExeFilePath: string;
+class procedure TMorUtils.UpdateRCDataResource(const AExeFilePath: string;
   const AResourceName: string; const AData: TStream);
 var
   LHandleUpdate: THandle;
@@ -1848,12 +1848,12 @@ begin
   end;
 end;
 
-class function TUtils.GetFileSHA256(const APath: string): string;
+class function TMorUtils.GetFileSHA256(const APath: string): string;
 begin
   Result := THashSHA2.GetHashStringFromFile(APath).ToLower();
 end;
 
-class function TUtils.GetRelativePath(const ABasePath, AFullPath: string): string;
+class function TMorUtils.GetRelativePath(const ABasePath, AFullPath: string): string;
 var
   LBasePath: string;
   LFullPath: string;
@@ -1876,37 +1876,37 @@ begin
     Result := LFullPath; // Can't make relative, return with forward slashes
 end;
 
-class function TUtils.NormalizePath(const APath: string): string;
+class function TMorUtils.NormalizePath(const APath: string): string;
 begin
   Result := APath.Replace(PathDelim, '/');
 end;
 
-class function TUtils.DisplayPath(const APath: string): string;
+class function TMorUtils.DisplayPath(const APath: string): string;
 begin
   Result := TPath.GetFullPath(APath).Replace('\', '/');
 end;
 
-class function TUtils.GetEnv(const AName: string): string;
+class function TMorUtils.GetEnv(const AName: string): string;
 begin
   Result := GetEnvironmentVariable(AName);
 end;
 
-class procedure TUtils.SetEnv(const AName: string; const AValue: string);
+class procedure TMorUtils.SetEnv(const AName: string; const AValue: string);
 begin
   SetEnvironmentVariable(PChar(AName), PChar(AValue));
 end;
 
-class function TUtils.HasEnv(const AName: string): Boolean;
+class function TMorUtils.HasEnv(const AName: string): Boolean;
 begin
   Result := not GetEnv(AName).IsEmpty();
 end;
 
-class function TUtils.RunFromIDE(): Boolean;
+class function TMorUtils.RunFromIDE(): Boolean;
 begin
   Result := HasEnv('BDS');
 end;
 
-class function TUtils.CountLines(
+class function TMorUtils.CountLines(
   const APath, APattern: string;
   const ARecursive: Boolean): Int64;
 var
@@ -1930,38 +1930,38 @@ begin
   end;
 end;
 
-{ TBaseObject }
+{ TMorBaseObject }
 
-constructor TBaseObject.Create();
+constructor TMorBaseObject.Create();
 begin
   inherited;
 end;
 
-destructor TBaseObject.Destroy();
+destructor TMorBaseObject.Destroy();
 begin
   inherited;
 end;
 
-function TBaseObject.Dump(const AId: Integer): string;
+function TMorBaseObject.Dump(const AId: Integer): string;
 begin
   Result := '';
 end;
 
-procedure TBaseObject.InitConfig();
+procedure TMorBaseObject.InitConfig();
 begin
 end;
 
-procedure TBaseObject.LoadConfig();
+procedure TMorBaseObject.LoadConfig();
 begin
 end;
 
-procedure TBaseObject.SaveConfig();
+procedure TMorBaseObject.SaveConfig();
 begin
 end;
 
-{ TCommandBuilder }
+{ TMorCommandBuilder }
 
-constructor TCommandBuilder.Create();
+constructor TMorCommandBuilder.Create();
 begin
   inherited;
 
@@ -1970,25 +1970,25 @@ begin
   FParams.StrictDelimiter := True;
 end;
 
-destructor TCommandBuilder.Destroy();
+destructor TMorCommandBuilder.Destroy();
 begin
   FreeAndNil(FParams);
 
   inherited;
 end;
 
-procedure TCommandBuilder.Clear();
+procedure TMorCommandBuilder.Clear();
 begin
   FParams.Clear();
 end;
 
-procedure TCommandBuilder.AddParam(const AParam: string);
+procedure TMorCommandBuilder.AddParam(const AParam: string);
 begin
   if AParam <> '' then
     FParams.Add(AParam);
 end;
 
-procedure TCommandBuilder.AddParam(const AFlag, AValue: string);
+procedure TMorCommandBuilder.AddParam(const AFlag, AValue: string);
 begin
   if AFlag <> '' then
   begin
@@ -2001,7 +2001,7 @@ begin
     FParams.Add(AValue);
 end;
 
-procedure TCommandBuilder.AddQuotedParam(const AFlag, AValue: string);
+procedure TMorCommandBuilder.AddQuotedParam(const AFlag, AValue: string);
 begin
   if AValue = '' then
     Exit;
@@ -2012,18 +2012,18 @@ begin
     FParams.Add('"' + AValue + '"');
 end;
 
-procedure TCommandBuilder.AddQuotedParam(const AValue: string);
+procedure TMorCommandBuilder.AddQuotedParam(const AValue: string);
 begin
   AddQuotedParam('', AValue);
 end;
 
-procedure TCommandBuilder.AddFlag(const AFlag: string);
+procedure TMorCommandBuilder.AddFlag(const AFlag: string);
 begin
   if AFlag <> '' then
     FParams.Add(AFlag);
 end;
 
-function TCommandBuilder.Dump(const AId: Integer): string;
+function TMorCommandBuilder.Dump(const AId: Integer): string;
 var
   LI: Integer;
 begin
@@ -2039,14 +2039,14 @@ begin
     Result := Result + ' ' + FParams[LI];
 end;
 
-function TCommandBuilder.GetParamCount(): Integer;
+function TMorCommandBuilder.GetParamCount(): Integer;
 begin
   Result := FParams.Count;
 end;
 
-{ TSourceRange }
+{ TMorSourceRange }
 
-procedure TSourceRange.Clear();
+procedure TMorSourceRange.Clear();
 begin
   Filename := '';
   StartLine := 0;
@@ -2057,12 +2057,12 @@ begin
   EndByteOffset := 0;
 end;
 
-function TSourceRange.IsEmpty(): Boolean;
+function TMorSourceRange.IsEmpty(): Boolean;
 begin
   Result := (StartLine = 0) and (StartColumn = 0);
 end;
 
-function TSourceRange.ToPointString(): string;
+function TMorSourceRange.ToPointString(): string;
 begin
   if IsEmpty() then
     Result := ''
@@ -2070,7 +2070,7 @@ begin
     Result := Format('%s(%d,%d)', [Filename, StartLine, StartColumn]);
 end;
 
-function TSourceRange.ToRangeString(): string;
+function TMorSourceRange.ToRangeString(): string;
 begin
   if IsEmpty() then
     Result := ''
@@ -2082,9 +2082,9 @@ begin
     Result := Format('%s(%d,%d)-(%d,%d)', [Filename, StartLine, StartColumn, EndLine, EndColumn]);
 end;
 
-{ TError }
+{ TMorError }
 
-function TError.GetSeverityString(): string;
+function TMorError.GetSeverityString(): string;
 begin
   case Severity of
     esHint:    Result := RSSeverityHint;
@@ -2096,7 +2096,7 @@ begin
   end;
 end;
 
-function TError.ToIDEString(): string;
+function TMorError.ToIDEString(): string;
 begin
   if Range.IsEmpty() then
     Result := Format(RSErrorFormatSimple, [GetSeverityString(), Code, Message])
@@ -2104,7 +2104,7 @@ begin
     Result := Format(RSErrorFormatWithLocation, [Range.ToPointString(), GetSeverityString(), Code, Message]);
 end;
 
-function TError.ToFullString(): string;
+function TMorError.ToFullString(): string;
 var
   LBuilder: TStringBuilder;
   LI: Integer;
@@ -2128,26 +2128,26 @@ begin
   end;
 end;
 
-{ TErrors }
+{ TMorErrors }
 
-constructor TErrors.Create();
+constructor TMorErrors.Create();
 begin
   inherited;
 
-  FItems := TList<TError>.Create();
+  FItems := TList<TMorError>.Create();
   FMaxErrors := DEFAULT_MAX_ERRORS;
 end;
 
-destructor TErrors.Destroy();
+destructor TMorErrors.Destroy();
 begin
   FItems.Free();
 
   inherited;
 end;
 
-function TErrors.CountErrors(): Integer;
+function TMorErrors.CountErrors(): Integer;
 var
-  LError: TError;
+  LError: TMorError;
 begin
   Result := 0;
   for LError in FItems do
@@ -2157,15 +2157,15 @@ begin
   end;
 end;
 
-procedure TErrors.Add(
-  const ARange: TSourceRange;
-  const ASeverity: TErrorSeverity;
+procedure TMorErrors.Add(
+  const ARange: TMorSourceRange;
+  const ASeverity: TMorErrorSeverity;
   const ACode: string;
   const AMessage: string
 );
 var
-  LError: TError;
-  LRange: TSourceRange;
+  LError: TMorError;
+  LRange: TMorSourceRange;
 begin
   // Stop adding errors after limit reached (except fatal)
   if (ASeverity = esError) and (CountErrors() >= FMaxErrors) then
@@ -2192,9 +2192,9 @@ begin
   FItems.Add(LError);
 end;
 
-procedure TErrors.Add(
-  const ARange: TSourceRange;
-  const ASeverity: TErrorSeverity;
+procedure TMorErrors.Add(
+  const ARange: TMorSourceRange;
+  const ASeverity: TMorErrorSeverity;
   const ACode: string;
   const AMessage: string;
   const AArgs: array of const
@@ -2203,16 +2203,16 @@ begin
   Add(ARange, ASeverity, ACode, Format(AMessage, AArgs));
 end;
 
-procedure TErrors.Add(
+procedure TMorErrors.Add(
   const AFilename: string;
   const ALine: Integer;
   const AColumn: Integer;
-  const ASeverity: TErrorSeverity;
+  const ASeverity: TMorErrorSeverity;
   const ACode: string;
   const AMessage: string
 );
 var
-  LRange: TSourceRange;
+  LRange: TMorSourceRange;
 begin
   LRange.Filename := AFilename;
   LRange.StartLine := ALine;
@@ -2223,11 +2223,11 @@ begin
   Add(LRange, ASeverity, ACode, AMessage);
 end;
 
-procedure TErrors.Add(
+procedure TMorErrors.Add(
   const AFilename: string;
   const ALine: Integer;
   const AColumn: Integer;
-  const ASeverity: TErrorSeverity;
+  const ASeverity: TMorErrorSeverity;
   const ACode: string;
   const AMessage: string;
   const AArgs: array of const
@@ -2236,20 +2236,20 @@ begin
   Add(AFilename, ALine, AColumn, ASeverity, ACode, Format(AMessage, AArgs));
 end;
 
-procedure TErrors.Add(
-  const ASeverity: TErrorSeverity;
+procedure TMorErrors.Add(
+  const ASeverity: TMorErrorSeverity;
   const ACode: string;
   const AMessage: string
 );
 var
-  LRange: TSourceRange;
+  LRange: TMorSourceRange;
 begin
   LRange.Clear();
   Add(LRange, ASeverity, ACode, AMessage);
 end;
 
-procedure TErrors.Add(
-  const ASeverity: TErrorSeverity;
+procedure TMorErrors.Add(
+  const ASeverity: TMorErrorSeverity;
   const ACode: string;
   const AMessage: string;
   const AArgs: array of const
@@ -2258,13 +2258,13 @@ begin
   Add(ASeverity, ACode, Format(AMessage, AArgs));
 end;
 
-procedure TErrors.AddRelated(
-  const ARange: TSourceRange;
+procedure TMorErrors.AddRelated(
+  const ARange: TMorSourceRange;
   const AMessage: string
 );
 var
-  LError: TError;
-  LRelated: TErrorRelated;
+  LError: TMorError;
+  LRelated: TMorErrorRelated;
   LLen: Integer;
 begin
   if FItems.Count = 0 then
@@ -2282,8 +2282,8 @@ begin
   FItems[FItems.Count - 1] := LError;
 end;
 
-procedure TErrors.AddRelated(
-  const ARange: TSourceRange;
+procedure TMorErrors.AddRelated(
+  const ARange: TMorSourceRange;
   const AMessage: string;
   const AArgs: array of const
 );
@@ -2291,9 +2291,9 @@ begin
   AddRelated(ARange, Format(AMessage, AArgs));
 end;
 
-function TErrors.HasHints(): Boolean;
+function TMorErrors.HasHints(): Boolean;
 var
-  LError: TError;
+  LError: TMorError;
 begin
   Result := False;
   for LError in FItems do
@@ -2303,9 +2303,9 @@ begin
   end;
 end;
 
-function TErrors.HasWarnings(): Boolean;
+function TMorErrors.HasWarnings(): Boolean;
 var
-  LError: TError;
+  LError: TMorError;
 begin
   Result := False;
   for LError in FItems do
@@ -2315,9 +2315,9 @@ begin
   end;
 end;
 
-function TErrors.HasErrors(): Boolean;
+function TMorErrors.HasErrors(): Boolean;
 var
-  LError: TError;
+  LError: TMorError;
 begin
   Result := False;
   for LError in FItems do
@@ -2327,9 +2327,9 @@ begin
   end;
 end;
 
-function TErrors.HasFatal(): Boolean;
+function TMorErrors.HasFatal(): Boolean;
 var
-  LError: TError;
+  LError: TMorError;
 begin
   Result := False;
   for LError in FItems do
@@ -2339,19 +2339,19 @@ begin
   end;
 end;
 
-function TErrors.Count(): Integer;
+function TMorErrors.Count(): Integer;
 begin
   Result := FItems.Count;
 end;
 
-function TErrors.ErrorCount(): Integer;
+function TMorErrors.ErrorCount(): Integer;
 begin
   Result := CountErrors();
 end;
 
-function TErrors.WarningCount(): Integer;
+function TMorErrors.WarningCount(): Integer;
 var
-  LError: TError;
+  LError: TMorError;
 begin
   Result := 0;
   for LError in FItems do
@@ -2361,38 +2361,38 @@ begin
   end;
 end;
 
-function TErrors.ReachedMaxErrors(): Boolean;
+function TMorErrors.ReachedMaxErrors(): Boolean;
 begin
   Result := CountErrors() >= FMaxErrors;
 end;
 
-procedure TErrors.Clear();
+procedure TMorErrors.Clear();
 begin
   FItems.Clear();
 end;
 
-procedure TErrors.TruncateTo(const ACount: Integer);
+procedure TMorErrors.TruncateTo(const ACount: Integer);
 begin
   while FItems.Count > ACount do
     FItems.Delete(FItems.Count - 1);
 end;
 
-function TErrors.GetItems(): TList<TError>;
+function TMorErrors.GetItems(): TList<TMorError>;
 begin
   Result := FItems;
 end;
 
-function TErrors.GetMaxErrors(): Integer;
+function TMorErrors.GetMaxErrors(): Integer;
 begin
   Result := FMaxErrors;
 end;
 
-procedure TErrors.SetMaxErrors(const AMaxErrors: Integer);
+procedure TMorErrors.SetMaxErrors(const AMaxErrors: Integer);
 begin
   FMaxErrors := AMaxErrors;
 end;
 
-function TErrors.Dump(const AId: Integer): string;
+function TMorErrors.Dump(const AId: Integer): string;
 var
   LBuilder: TStringBuilder;
   LI: Integer;
@@ -2411,62 +2411,62 @@ begin
   end;
 end;
 
-{ TStatusObject }
+{ TMorStatusObject }
 
-constructor TStatusObject.Create();
+constructor TMorStatusObject.Create();
 begin
   inherited;
 end;
 
-destructor TStatusObject.Destroy();
+destructor TMorStatusObject.Destroy();
 begin
   inherited;
 end;
 
-procedure TStatusObject.Status(const AText: string);
+procedure TMorStatusObject.Status(const AText: string);
 begin
   if FStatusCallback.IsAssigned() then
     FStatusCallback.Callback(AText, FStatusCallback.UserData);
 end;
 
-procedure TStatusObject.Status(const AText: string; const AArgs: array of const);
+procedure TMorStatusObject.Status(const AText: string; const AArgs: array of const);
 begin
   Status(Format(AText, AArgs));
 end;
 
-function TStatusObject.GetStatusCallback(): TStatusCallback;
+function TMorStatusObject.GetStatusCallback(): TMorStatusCallback;
 begin
   Result := FStatusCallback.Callback;
 end;
 
-procedure TStatusObject.SetStatusCallback(const ACallback: TStatusCallback; const AUserData: Pointer);
+procedure TMorStatusObject.SetStatusCallback(const ACallback: TMorStatusCallback; const AUserData: Pointer);
 begin
   FStatusCallback.Callback := ACallback;
   FStatusCallback.UserData := AUserData;
 end;
 
-{ TErrorsObject }
+{ TMorErrorsObject }
 
-procedure TErrorsObject.SetErrors(const AErrors: TErrors);
+procedure TMorErrorsObject.SetErrors(const AErrors: TMorErrors);
 begin
   FErrors := AErrors;
 end;
 
-function TErrorsObject.GetErrors(): TErrors;
+function TMorErrorsObject.GetErrors(): TMorErrors;
 begin
   Result := FErrors;
 end;
 
-{ TOutputObject }
+{ TMorOutputObject }
 
-procedure TOutputObject.SetOutputCallback(
-  const ACallback: TCaptureConsoleCallback; const AUserData: Pointer);
+procedure TMorOutputObject.SetOutputCallback(
+  const ACallback: TMorCaptureConsoleCallback; const AUserData: Pointer);
 begin
   FOutput.Callback := ACallback;
   FOutput.UserData := AUserData;
 end;
 
-function TOutputObject.GetOutputCallback(): TCaptureConsoleCallback;
+function TMorOutputObject.GetOutputCallback(): TMorCaptureConsoleCallback;
 begin
   Result := FOutput.Callback;
 end;
@@ -2476,7 +2476,7 @@ end;
 procedure Startup();
 begin
   ReportMemoryLeaksOnShutdown := True;
-  TUtils.InitConsole();
+  TMorUtils.InitConsole();
 end;
 
 procedure Shutdown();

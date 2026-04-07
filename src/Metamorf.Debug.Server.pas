@@ -1,4 +1,4 @@
-{===============================================================================
+﻿{===============================================================================
   Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
@@ -27,62 +27,48 @@ uses
   Metamorf.Debug.DAP;
 
 type
-  //============================================================================
-  // TDebugMode - Which output mode we're debugging
-  //============================================================================
-  TDebugMode = (
+
+  { TMorDebugMode }
+  TMorDebugMode = (
     dmExe,     // Out-of-process EXE debugging
     dmDll      // Out-of-process DLL debugging
   );
 
-  TMetamorfDebugServer = class;
+  { TMorDebugServer }
+  TMorDebugServer = class;
 
-  //============================================================================
-  // TDAPListenerThread - Runs the DAP message loop on a background thread
-  //============================================================================
-
-  { TDAPListenerThread }
-  TDAPListenerThread = class(TThread)
+  { TMorDAPListenerThread }
+  TMorDAPListenerThread = class(TThread)
   private
-    FServer: TDAPServer;
+    FServer: TMorDAPServer;
   protected
     procedure Execute(); override;
   public
-    constructor Create(const AServer: TDAPServer);
+    constructor Create(const AServer: TMorDAPServer);
   end;
 
-  //============================================================================
-  // TStopWatcherThread - Waits for debug stops and notifies DAP server
-  //============================================================================
-
-  { TStopWatcherThread }
-  TStopWatcherThread = class(TThread)
+  { TMorStopWatcherThread }
+  TMorStopWatcherThread = class(TThread)
   private
-    FDebugger: TMetamorfDebugServer;
+    FDebugger: TMorDebugServer;
   protected
     procedure Execute(); override;
   public
-    constructor Create(const ADebugger: TMetamorfDebugServer);
+    constructor Create(const ADebugger: TMorDebugServer);
   end;
 
-  //============================================================================
-  // TMetamorfDebugServer - Public API for the Metamorf debugger.
-  // Owns TErrors, creates and wires all debug components.
-  // Entry points for EXE and DLL debugging.
-  //============================================================================
-
-  { TMetamorfDebugServer }
-  TMetamorfDebugServer = class(TStatusObject)
+  { TMorDebugServer }
+  TMorDebugServer = class(TMorStatusObject)
   private
-    FErrors: TErrors;
-    FSourceMap: TPDBSourceMap;
-    FTarget: TDebugTarget;
-    FRuntime: TDebugRuntime;
-    FDAPServer: TDAPServer;
-    FDAPThread: TDAPListenerThread;
-    FStopWatcher: TStopWatcherThread;
+    FErrors: TMorErrors;
+    FSourceMap: TMorPDBSourceMap;
+    FTarget: TMorDebugTarget;
+    FRuntime: TMorDebugRuntime;
+    FDAPServer: TMorDAPServer;
+    FDAPThread: TMorDAPListenerThread;
+    FStopWatcher: TMorStopWatcherThread;
     FPort: Integer;
-    FMode: TDebugMode;
+    FMode: TMorDebugMode;
 
   public
     constructor Create(); override;
@@ -106,49 +92,42 @@ type
     function HasFatal(): Boolean;
     function ErrorCount(): Integer;
     function WarningCount(): Integer;
-    function GetErrorItems(): TList<TError>;
+    function GetErrorItems(): TList<TMorError>;
     function GetErrorText(): string;
 
     // Access to internals (for advanced use)
-    function GetRuntime(): TDebugRuntime;
-    function GetDAPServer(): TDAPServer;
-    function GetSourceMap(): TPDBSourceMap;
+    function GetRuntime(): TMorDebugRuntime;
+    function GetDAPServer(): TMorDAPServer;
+    function GetSourceMap(): TMorPDBSourceMap;
 
     // Properties
     property Port: Integer read FPort;
-    property Mode: TDebugMode read FMode;
+    property Mode: TMorDebugMode read FMode;
   end;
 
 implementation
 
-//==============================================================================
-// TDAPListenerThread
-//==============================================================================
-
-constructor TDAPListenerThread.Create(const AServer: TDAPServer);
+{ TMorDAPListenerThread }
+constructor TMorDAPListenerThread.Create(const AServer: TMorDAPServer);
 begin
   inherited Create(True);  // Create suspended
   FreeOnTerminate := False;
   FServer := AServer;
 end;
 
-procedure TDAPListenerThread.Execute();
+procedure TMorDAPListenerThread.Execute();
 begin
   FServer.RunMessageLoop();
 end;
 
-//==============================================================================
-// TStopWatcherThread -- waits for runtime stops, notifies DAP
-//==============================================================================
-
-constructor TStopWatcherThread.Create(const ADebugger: TMetamorfDebugServer);
+constructor TMorStopWatcherThread.Create(const ADebugger: TMorDebugServer);
 begin
   inherited Create(True);
   FreeOnTerminate := False;
   FDebugger := ADebugger;
 end;
 
-procedure TStopWatcherThread.Execute();
+procedure TMorStopWatcherThread.Execute();
 begin
   while not Terminated do
   begin
@@ -165,14 +144,11 @@ begin
   end;
 end;
 
-//==============================================================================
-// TMetamorfDebugServer
-//==============================================================================
-
-constructor TMetamorfDebugServer.Create();
+{ TMorDebugServer }
+constructor TMorDebugServer.Create();
 begin
   inherited Create();
-  FErrors := TErrors.Create();
+  FErrors := TMorErrors.Create();
   FSourceMap := nil;
   FTarget := nil;
   FRuntime := nil;
@@ -183,21 +159,17 @@ begin
   FMode := dmExe;
 end;
 
-destructor TMetamorfDebugServer.Destroy();
+destructor TMorDebugServer.Destroy();
 begin
   StopDebugging();
   FErrors.Free();
   inherited Destroy();
 end;
 
-//------------------------------------------------------------------------------
-// DebugExe -- PE EXE mode entry point
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugServer.DebugExe(const AExePath: string;
+function TMorDebugServer.DebugExe(const AExePath: string;
   const APort: Integer): Boolean;
 var
-  LPETarget: TPEDebugTarget;
+  LPETarget: TMorPEDebugTarget;
   LPDBPath: string;
 begin
   Result := False;
@@ -222,21 +194,21 @@ begin
   end;
 
   // Create PE debug target
-  LPETarget := TPEDebugTarget.Create();
+  LPETarget := TMorPEDebugTarget.Create();
   LPETarget.SetErrors(FErrors);
   LPETarget.SetExePath(AExePath);
   FTarget := LPETarget;
 
   // Create debug runtime (breakpoints, stepping, stack walker)
-  FRuntime := TDebugRuntime.Create();
+  FRuntime := TMorDebugRuntime.Create();
   FRuntime.SetErrors(FErrors);
   FRuntime.SetTarget(FTarget);
 
   // Create PDB source map (initialized after process launch)
-  FSourceMap := TPDBSourceMap.Create();
+  FSourceMap := TMorPDBSourceMap.Create();
 
   // Create DAP server
-  FDAPServer := TDAPServer.Create();
+  FDAPServer := TMorDAPServer.Create();
   FDAPServer.SetErrors(FErrors);
   FDAPServer.SetRuntime(FRuntime);
   FDAPServer.SetSourceMap(FSourceMap);
@@ -271,11 +243,11 @@ begin
 
   // Start DAP message loop on background thread (must be running before
   // WaitUntilReady/PDB init so client can complete DAP handshake)
-  FDAPThread := TDAPListenerThread.Create(FDAPServer);
+  FDAPThread := TMorDAPListenerThread.Create(FDAPServer);
   FDAPThread.Start();
 
   // Start stop watcher thread (bridges runtime stops -> DAP events)
-  FStopWatcher := TStopWatcherThread.Create(Self);
+  FStopWatcher := TMorStopWatcherThread.Create(Self);
   FStopWatcher.Start();
 
   // Wait for initial breakpoint so process handle is valid
@@ -296,14 +268,10 @@ begin
   Result := True;
 end;
 
-//------------------------------------------------------------------------------
-// DebugDll -- DLL mode entry point
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugServer.DebugDll(const ADllPath: string;
+function TMorDebugServer.DebugDll(const ADllPath: string;
   const AHostExe: string; const APort: Integer): Boolean;
 var
-  LPETarget: TPEDebugTarget;
+  LPETarget: TMorPEDebugTarget;
   LPDBPath: string;
 begin
   Result := False;
@@ -342,21 +310,21 @@ begin
   end;
 
   // Create PE debug target in DLL mode
-  LPETarget := TPEDebugTarget.Create();
+  LPETarget := TMorPEDebugTarget.Create();
   LPETarget.SetErrors(FErrors);
   LPETarget.SetDllMode(ADllPath, AHostExe);
   FTarget := LPETarget;
 
   // Create debug runtime (breakpoints, stepping, stack walker)
-  FRuntime := TDebugRuntime.Create();
+  FRuntime := TMorDebugRuntime.Create();
   FRuntime.SetErrors(FErrors);
   FRuntime.SetTarget(FTarget);
 
   // Create PDB source map (initialized after process launch)
-  FSourceMap := TPDBSourceMap.Create();
+  FSourceMap := TMorPDBSourceMap.Create();
 
   // Create DAP server
-  FDAPServer := TDAPServer.Create();
+  FDAPServer := TMorDAPServer.Create();
   FDAPServer.SetErrors(FErrors);
   FDAPServer.SetRuntime(FRuntime);
   FDAPServer.SetSourceMap(FSourceMap);
@@ -392,12 +360,12 @@ begin
 
   // Start DAP message loop on background thread (must be running before
   // WaitUntilReady/PDB init so client can complete DAP handshake)
-  FDAPThread := TDAPListenerThread.Create(FDAPServer);
+  FDAPThread := TMorDAPListenerThread.Create(FDAPServer);
   FDAPThread.Start();
 
   // Start stop watcher thread (bridges runtime stops -> DAP events)
   // The runtime handles dsrDllLoad internally (applies breakpoints + resumes)
-  FStopWatcher := TStopWatcherThread.Create(Self);
+  FStopWatcher := TMorStopWatcherThread.Create(Self);
   FStopWatcher.Start();
 
   // Wait for initial breakpoint so process handle is valid
@@ -418,11 +386,7 @@ begin
   Result := True;
 end;
 
-//------------------------------------------------------------------------------
-// Shutdown
-//------------------------------------------------------------------------------
-
-procedure TMetamorfDebugServer.StopDebugging();
+procedure TMorDebugServer.StopDebugging();
 begin
   // Stop watcher thread first (it reads from runtime)
   if FStopWatcher <> nil then
@@ -469,60 +433,52 @@ begin
   end;
 end;
 
-//------------------------------------------------------------------------------
-// Error Reporting -- delegates to FErrors
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugServer.HasErrors(): Boolean;
+function TMorDebugServer.HasErrors(): Boolean;
 begin
   Result := FErrors.HasErrors();
 end;
 
-function TMetamorfDebugServer.HasWarnings(): Boolean;
+function TMorDebugServer.HasWarnings(): Boolean;
 begin
   Result := FErrors.HasWarnings();
 end;
 
-function TMetamorfDebugServer.HasFatal(): Boolean;
+function TMorDebugServer.HasFatal(): Boolean;
 begin
   Result := FErrors.HasFatal();
 end;
 
-function TMetamorfDebugServer.ErrorCount(): Integer;
+function TMorDebugServer.ErrorCount(): Integer;
 begin
   Result := FErrors.ErrorCount();
 end;
 
-function TMetamorfDebugServer.WarningCount(): Integer;
+function TMorDebugServer.WarningCount(): Integer;
 begin
   Result := FErrors.WarningCount();
 end;
 
-function TMetamorfDebugServer.GetErrorItems(): TList<TError>;
+function TMorDebugServer.GetErrorItems(): TList<TMorError>;
 begin
   Result := FErrors.GetItems();
 end;
 
-function TMetamorfDebugServer.GetErrorText(): string;
+function TMorDebugServer.GetErrorText(): string;
 begin
   Result := FErrors.Dump();
 end;
 
-//------------------------------------------------------------------------------
-// Accessors
-//------------------------------------------------------------------------------
-
-function TMetamorfDebugServer.GetRuntime(): TDebugRuntime;
+function TMorDebugServer.GetRuntime(): TMorDebugRuntime;
 begin
   Result := FRuntime;
 end;
 
-function TMetamorfDebugServer.GetDAPServer(): TDAPServer;
+function TMorDebugServer.GetDAPServer(): TMorDAPServer;
 begin
   Result := FDAPServer;
 end;
 
-function TMetamorfDebugServer.GetSourceMap(): TPDBSourceMap;
+function TMorDebugServer.GetSourceMap(): TMorPDBSourceMap;
 begin
   Result := FSourceMap;
 end;

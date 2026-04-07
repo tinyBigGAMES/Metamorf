@@ -25,8 +25,8 @@ uses
   Metamorf.TOML;
 
 type
-  { TConfig }
-  TConfig = class(TBaseObject)
+  { TMorConfig }
+  TMorConfig = class(TMorBaseObject)
   private
     FToml:      TToml;
     FLastError: string;
@@ -130,9 +130,9 @@ type
 
 implementation
 
-{ TConfig }
+{ TMorConfig }
 
-constructor TConfig.Create();
+constructor TMorConfig.Create();
 begin
   inherited;
   FToml      := nil;
@@ -140,13 +140,13 @@ begin
   FFilename  := '';
 end;
 
-destructor TConfig.Destroy();
+destructor TMorConfig.Destroy();
 begin
   Clear();
   inherited;
 end;
 
-procedure TConfig.Clear();
+procedure TMorConfig.Clear();
 begin
   if Assigned(FToml) then
   begin
@@ -157,12 +157,12 @@ begin
   FFilename  := '';
 end;
 
-function TConfig.GetLastError(): string;
+function TMorConfig.GetLastError(): string;
 begin
   Result := FLastError;
 end;
 
-function TConfig.NavigateToTable(const AKeyPath: string;
+function TMorConfig.NavigateToTable(const AKeyPath: string;
   const ACreateMissing: Boolean; out ATable: TToml;
   out AFinalKey: string): Boolean;
 var
@@ -203,7 +203,7 @@ begin
   Result := True;
 end;
 
-function TConfig.GetValueAtPath(const AKeyPath: string;
+function TMorConfig.GetValueAtPath(const AKeyPath: string;
   out AValue: TTomlValue): Boolean;
 var
   LTable:    TToml;
@@ -217,7 +217,7 @@ begin
   Result := LTable.TryGetValue(LFinalKey, AValue);
 end;
 
-function TConfig.LoadFromFile(const AFilename: string): Boolean;
+function TMorConfig.LoadFromFile(const AFilename: string): Boolean;
 begin
   Result := False;
   Clear();
@@ -241,7 +241,7 @@ begin
   end;
 end;
 
-function TConfig.LoadFromString(const ASource: string): Boolean;
+function TMorConfig.LoadFromString(const ASource: string): Boolean;
 begin
   Result := False;
   Clear();
@@ -258,7 +258,7 @@ begin
   end;
 end;
 
-function TConfig.EscapeString(const AValue: string): string;
+function TMorConfig.EscapeString(const AValue: string): string;
 begin
   Result := AValue;
   Result := Result.Replace('\', '\\');
@@ -268,7 +268,7 @@ begin
   Result := Result.Replace(#13, '\r');
 end;
 
-procedure TConfig.SerializeValue(const AValue: TTomlValue;
+procedure TMorConfig.SerializeValue(const AValue: TTomlValue;
   const ABuilder: TStringBuilder);
 var
   LArray: TTomlArray;
@@ -317,7 +317,7 @@ begin
   end;
 end;
 
-procedure TConfig.SerializeToml(const AToml: TToml;
+procedure TMorConfig.SerializeToml(const AToml: TToml;
   const ABuilder: TStringBuilder; const AIndent: Integer;
   const ATablePath: string);
 var
@@ -398,7 +398,7 @@ begin
   end;
 end;
 
-function TConfig.SaveToFile(const AFilename: string): Boolean;
+function TMorConfig.SaveToFile(const AFilename: string): Boolean;
 var
   LBuilder: TStringBuilder;
 begin
@@ -415,7 +415,7 @@ begin
     SerializeToml(FToml, LBuilder, 0, '');
 
     try
-      TUtils.CreateDirInPath(AFilename);
+      TMorUtils.CreateDirInPath(AFilename);
       TFile.WriteAllText(AFilename,
         LBuilder.ToString().Trim() + #10, TEncoding.UTF8);
       FFilename := AFilename;
@@ -429,7 +429,7 @@ begin
   end;
 end;
 
-function TConfig.HasKey(const AKeyPath: string): Boolean;
+function TMorConfig.HasKey(const AKeyPath: string): Boolean;
 var
   LValue: TTomlValue;
 begin
@@ -438,7 +438,7 @@ end;
 
 // -- String -------------------------------------------------------------------
 
-function TConfig.GetString(const AKeyPath: string;
+function TMorConfig.GetString(const AKeyPath: string;
   const ADefault: string): string;
 var
   LValue: TTomlValue;
@@ -449,7 +449,7 @@ begin
     Result := ADefault;
 end;
 
-procedure TConfig.SetString(const AKeyPath: string;
+procedure TMorConfig.SetString(const AKeyPath: string;
   const AValue: string);
 var
   LTable:    TToml;
@@ -464,7 +464,7 @@ end;
 
 // -- Integer ------------------------------------------------------------------
 
-function TConfig.GetInteger(const AKeyPath: string;
+function TMorConfig.GetInteger(const AKeyPath: string;
   const ADefault: Int64): Int64;
 var
   LValue: TTomlValue;
@@ -475,7 +475,7 @@ begin
     Result := ADefault;
 end;
 
-procedure TConfig.SetInteger(const AKeyPath: string;
+procedure TMorConfig.SetInteger(const AKeyPath: string;
   const AValue: Int64);
 var
   LTable:    TToml;
@@ -490,7 +490,7 @@ end;
 
 // -- Float --------------------------------------------------------------------
 
-function TConfig.GetFloat(const AKeyPath: string;
+function TMorConfig.GetFloat(const AKeyPath: string;
   const ADefault: Double): Double;
 var
   LValue: TTomlValue;
@@ -501,7 +501,7 @@ begin
     Result := ADefault;
 end;
 
-procedure TConfig.SetFloat(const AKeyPath: string;
+procedure TMorConfig.SetFloat(const AKeyPath: string;
   const AValue: Double);
 var
   LTable:    TToml;
@@ -516,7 +516,7 @@ end;
 
 // -- Boolean ------------------------------------------------------------------
 
-function TConfig.GetBoolean(const AKeyPath: string;
+function TMorConfig.GetBoolean(const AKeyPath: string;
   const ADefault: Boolean): Boolean;
 var
   LValue: TTomlValue;
@@ -527,7 +527,7 @@ begin
     Result := ADefault;
 end;
 
-procedure TConfig.SetBoolean(const AKeyPath: string;
+procedure TMorConfig.SetBoolean(const AKeyPath: string;
   const AValue: Boolean);
 var
   LTable:    TToml;
@@ -542,7 +542,7 @@ end;
 
 // -- DateTime -----------------------------------------------------------------
 
-function TConfig.GetDateTime(const AKeyPath: string;
+function TMorConfig.GetDateTime(const AKeyPath: string;
   const ADefault: TDateTime): TDateTime;
 var
   LValue: TTomlValue;
@@ -553,7 +553,7 @@ begin
     Result := ADefault;
 end;
 
-procedure TConfig.SetDateTime(const AKeyPath: string;
+procedure TMorConfig.SetDateTime(const AKeyPath: string;
   const AValue: TDateTime);
 var
   LTable:    TToml;
@@ -568,7 +568,7 @@ end;
 
 // -- String Array -------------------------------------------------------------
 
-function TConfig.GetStringArray(const AKeyPath: string): TArray<string>;
+function TMorConfig.GetStringArray(const AKeyPath: string): TArray<string>;
 var
   LValue: TTomlValue;
   LArray: TTomlArray;
@@ -590,7 +590,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetStringArray(const AKeyPath: string;
+procedure TMorConfig.SetStringArray(const AKeyPath: string;
   const AValues: TArray<string>);
 var
   LTable:    TToml;
@@ -614,7 +614,7 @@ end;
 
 // -- Integer Array ------------------------------------------------------------
 
-function TConfig.GetIntegerArray(const AKeyPath: string): TArray<Int64>;
+function TMorConfig.GetIntegerArray(const AKeyPath: string): TArray<Int64>;
 var
   LValue: TTomlValue;
   LArray: TTomlArray;
@@ -636,7 +636,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetIntegerArray(const AKeyPath: string;
+procedure TMorConfig.SetIntegerArray(const AKeyPath: string;
   const AValues: TArray<Int64>);
 var
   LTable:    TToml;
@@ -658,7 +658,7 @@ end;
 
 // -- Float Array --------------------------------------------------------------
 
-function TConfig.GetFloatArray(const AKeyPath: string): TArray<Double>;
+function TMorConfig.GetFloatArray(const AKeyPath: string): TArray<Double>;
 var
   LValue: TTomlValue;
   LArray: TTomlArray;
@@ -680,7 +680,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetFloatArray(const AKeyPath: string;
+procedure TMorConfig.SetFloatArray(const AKeyPath: string;
   const AValues: TArray<Double>);
 var
   LTable:    TToml;
@@ -702,7 +702,7 @@ end;
 
 // -- Array of Tables (read) ---------------------------------------------------
 
-function TConfig.GetTableCount(const AKeyPath: string): Integer;
+function TMorConfig.GetTableCount(const AKeyPath: string): Integer;
 var
   LValue: TTomlValue;
 begin
@@ -712,7 +712,7 @@ begin
     Result := LValue.AsArray().Count;
 end;
 
-function TConfig.GetTableString(const AKeyPath: string;
+function TMorConfig.GetTableString(const AKeyPath: string;
   const AIndex: Integer; const AField: string;
   const ADefault: string): string;
 var
@@ -737,7 +737,7 @@ begin
   end;
 end;
 
-function TConfig.GetTableInteger(const AKeyPath: string;
+function TMorConfig.GetTableInteger(const AKeyPath: string;
   const AIndex: Integer; const AField: string;
   const ADefault: Int64): Int64;
 var
@@ -762,7 +762,7 @@ begin
   end;
 end;
 
-function TConfig.GetTableFloat(const AKeyPath: string;
+function TMorConfig.GetTableFloat(const AKeyPath: string;
   const AIndex: Integer; const AField: string;
   const ADefault: Double): Double;
 var
@@ -787,7 +787,7 @@ begin
   end;
 end;
 
-function TConfig.GetTableBoolean(const AKeyPath: string;
+function TMorConfig.GetTableBoolean(const AKeyPath: string;
   const AIndex: Integer; const AField: string;
   const ADefault: Boolean): Boolean;
 var
@@ -814,7 +814,7 @@ end;
 
 // -- Array of Tables (write) --------------------------------------------------
 
-function TConfig.AddTableEntry(const AKeyPath: string): Integer;
+function TMorConfig.AddTableEntry(const AKeyPath: string): Integer;
 var
   LTable:    TToml;
   LFinalKey: string;
@@ -835,7 +835,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetTableString(const AKeyPath: string;
+procedure TMorConfig.SetTableString(const AKeyPath: string;
   const AIndex: Integer; const AField: string; const AValue: string);
 var
   LValue: TTomlValue;
@@ -854,7 +854,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetTableInteger(const AKeyPath: string;
+procedure TMorConfig.SetTableInteger(const AKeyPath: string;
   const AIndex: Integer; const AField: string; const AValue: Int64);
 var
   LValue: TTomlValue;
@@ -873,7 +873,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetTableFloat(const AKeyPath: string;
+procedure TMorConfig.SetTableFloat(const AKeyPath: string;
   const AIndex: Integer; const AField: string; const AValue: Double);
 var
   LValue: TTomlValue;
@@ -892,7 +892,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetTableBoolean(const AKeyPath: string;
+procedure TMorConfig.SetTableBoolean(const AKeyPath: string;
   const AIndex: Integer; const AField: string; const AValue: Boolean);
 var
   LValue: TTomlValue;
@@ -913,7 +913,7 @@ end;
 
 // -- Array of Tables — string array field ------------------------------------
 
-function TConfig.GetTableStringArray(const AKeyPath: string;
+function TMorConfig.GetTableStringArray(const AKeyPath: string;
   const AIndex: Integer; const AField: string): TArray<string>;
 var
   LValue:      TTomlValue;
@@ -949,7 +949,7 @@ begin
   end;
 end;
 
-procedure TConfig.SetTableStringArray(const AKeyPath: string;
+procedure TMorConfig.SetTableStringArray(const AKeyPath: string;
   const AIndex: Integer; const AField: string;
   const AValues: TArray<string>);
 var

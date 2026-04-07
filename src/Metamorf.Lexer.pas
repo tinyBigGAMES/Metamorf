@@ -25,11 +25,11 @@ uses
 
 const
   // .mor Lexer Error Codes (ML001-ML099)
-  ERR_MORLEXER_UNEXPECTED_CHAR     = 'ML001';
-  ERR_MORLEXER_UNTERMINATED_STRING = 'ML002';
-  ERR_MORLEXER_UNTERMINATED_COMMENT= 'ML003';
-  ERR_MORLEXER_INVALID_NUMBER      = 'ML004';
-  ERR_MORLEXER_UNTERMINATED_TRIPLE = 'ML005';
+  MOR_ERR_MORLEXER_UNEXPECTED_CHAR     = 'ML001';
+  MOR_ERR_MORLEXER_UNTERMINATED_STRING = 'ML002';
+  MOR_ERR_MORLEXER_UNTERMINATED_COMMENT= 'ML003';
+  MOR_ERR_MORLEXER_INVALID_NUMBER      = 'ML004';
+  MOR_ERR_MORLEXER_UNTERMINATED_TRIPLE = 'ML005';
 
 type
 
@@ -40,7 +40,7 @@ type
   end;
 
   { TMorLexer }
-  TMorLexer = class(TErrorsObject)
+  TMorLexer = class(TMorErrorsObject)
   private
     FSource: string;
     FFilename: string;
@@ -59,23 +59,23 @@ type
     function PeekAt(const AOffset: Integer): Char;
     function Advance(): Char;
     function MakeToken(const AKind: string; const AText: string;
-      const ALine: Integer; const ACol: Integer): TToken;
+      const ALine: Integer; const ACol: Integer): TMorToken;
 
     procedure SkipWhitespace();
     function SkipLineComment(): Boolean;
     function SkipBlockComment(): Boolean;
-    function TryTripleString(var AToken: TToken): Boolean;
-    function TryString(var AToken: TToken): Boolean;
-    function TryNumber(var AToken: TToken): Boolean;
-    function TryOperator(var AToken: TToken): Boolean;
-    function TryIdentifier(var AToken: TToken): Boolean;
+    function TryTripleString(var AToken: TMorToken): Boolean;
+    function TryString(var AToken: TMorToken): Boolean;
+    function TryNumber(var AToken: TMorToken): Boolean;
+    function TryOperator(var AToken: TMorToken): Boolean;
+    function TryIdentifier(var AToken: TMorToken): Boolean;
 
   public
     constructor Create(); override;
     destructor Destroy(); override;
 
     function Tokenize(const ASource: string;
-      const AFilename: string = ''): TList<TToken>;
+      const AFilename: string = ''): TList<TMorToken>;
   end;
 
 implementation
@@ -267,7 +267,7 @@ begin
 end;
 
 function TMorLexer.MakeToken(const AKind: string; const AText: string;
-  const ALine: Integer; const ACol: Integer): TToken;
+  const ALine: Integer; const ACol: Integer): TMorToken;
 begin
   Result.Kind := AKind;
   Result.Text := AText;
@@ -324,12 +324,12 @@ begin
     // Unterminated block comment
     if Assigned(FErrors) then
       FErrors.Add(FFilename, LStartLine, LStartCol,
-        esError, ERR_MORLEXER_UNTERMINATED_COMMENT,
+        esError, MOR_ERR_MORLEXER_UNTERMINATED_COMMENT,
         RSMorLexerUnterminatedComment);
   end;
 end;
 
-function TMorLexer.TryTripleString(var AToken: TToken): Boolean;
+function TMorLexer.TryTripleString(var AToken: TMorToken): Boolean;
 var
   LStartLine: Integer;
   LStartCol: Integer;
@@ -362,13 +362,13 @@ begin
     // Unterminated triple-quoted string
     if Assigned(FErrors) then
       FErrors.Add(FFilename, LStartLine, LStartCol,
-        esError, ERR_MORLEXER_UNTERMINATED_TRIPLE,
+        esError, MOR_ERR_MORLEXER_UNTERMINATED_TRIPLE,
         RSMorLexerUnterminatedTriple);
     AToken := MakeToken('literal.triplestring', LText, LStartLine, LStartCol);
   end;
 end;
 
-function TMorLexer.TryString(var AToken: TToken): Boolean;
+function TMorLexer.TryString(var AToken: TMorToken): Boolean;
 var
   LStartLine: Integer;
   LStartCol: Integer;
@@ -419,13 +419,13 @@ begin
       Advance() // skip closing "
     else if Assigned(FErrors) then
       FErrors.Add(FFilename, LStartLine, LStartCol,
-        esError, ERR_MORLEXER_UNTERMINATED_STRING,
+        esError, MOR_ERR_MORLEXER_UNTERMINATED_STRING,
         RSMorLexerUnterminatedString);
     AToken := MakeToken('literal.string', LText, LStartLine, LStartCol);
   end;
 end;
 
-function TMorLexer.TryNumber(var AToken: TToken): Boolean;
+function TMorLexer.TryNumber(var AToken: TMorToken): Boolean;
 var
   LStartLine: Integer;
   LStartCol: Integer;
@@ -468,7 +468,7 @@ begin
   end;
 end;
 
-function TMorLexer.TryOperator(var AToken: TToken): Boolean;
+function TMorLexer.TryOperator(var AToken: TMorToken): Boolean;
 var
   LI: Integer;
   LEntry: TOperatorEntry;
@@ -523,7 +523,7 @@ begin
   end;
 end;
 
-function TMorLexer.TryIdentifier(var AToken: TToken): Boolean;
+function TMorLexer.TryIdentifier(var AToken: TMorToken): Boolean;
 var
   LStartLine: Integer;
   LStartCol: Integer;
@@ -553,9 +553,9 @@ begin
 end;
 
 function TMorLexer.Tokenize(const ASource: string;
-  const AFilename: string): TList<TToken>;
+  const AFilename: string): TList<TMorToken>;
 var
-  LToken: TToken;
+  LToken: TMorToken;
   LStartLine: Integer;
   LStartCol: Integer;
   LSkipped: Boolean;
@@ -566,7 +566,7 @@ begin
   FLine := 1;
   FCol := 1;
 
-  Result := TList<TToken>.Create();
+  Result := TList<TMorToken>.Create();
 
   while not AtEnd() do
   begin
@@ -633,7 +633,7 @@ begin
     LStartCol := FCol;
     if Assigned(FErrors) then
       FErrors.Add(FFilename, LStartLine, LStartCol,
-        esError, ERR_MORLEXER_UNEXPECTED_CHAR,
+        esError, MOR_ERR_MORLEXER_UNEXPECTED_CHAR,
         RSMorLexerUnexpectedChar, [Current()]);
     Advance();
   end;

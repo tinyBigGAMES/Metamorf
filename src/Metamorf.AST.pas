@@ -25,8 +25,8 @@ uses
 
 type
 
-  { TToken }
-  TToken = record
+  { TMorToken }
+  TMorToken = record
     Kind: string;
     Text: string;
     Filename: string;
@@ -34,15 +34,15 @@ type
     Col: Integer;
   end;
 
-  { TASTNode }
-  TASTNode = class(TBaseObject)
+  { TMorASTNode }
+  TMorASTNode = class(TMorBaseObject)
   private
     FKind: string;
-    FToken: TToken;
+    FToken: TMorToken;
     FAttrs: TDictionary<string, string>;
-    FChildren: TObjectList<TASTNode>;
-    FNamedChildren: TDictionary<string, TASTNode>;
-    FRange: TSourceRange;
+    FChildren: TObjectList<TMorASTNode>;
+    FNamedChildren: TDictionary<string, TMorASTNode>;
+    FRange: TMorSourceRange;
 
   public
     constructor Create(); override;
@@ -54,8 +54,8 @@ type
     procedure SetKind(const AKind: string);
 
     // Token
-    function GetToken(): TToken;
-    procedure SetToken(const AToken: TToken);
+    function GetToken(): TMorToken;
+    procedure SetToken(const AToken: TMorToken);
 
     // Attribute access
     function GetAttr(const AKey: string): string;
@@ -64,23 +64,23 @@ type
 
     // Child management
     function ChildCount(): Integer;
-    function GetChild(const AIndex: Integer): TASTNode;
-    procedure AddChild(const AChild: TASTNode);
+    function GetChild(const AIndex: Integer): TMorASTNode;
+    procedure AddChild(const AChild: TMorASTNode);
 
     // Named child access
-    function GetNamedChild(const AName: string): TASTNode;
-    procedure SetNamedChild(const AName: string; const AChild: TASTNode);
+    function GetNamedChild(const AName: string): TMorASTNode;
+    procedure SetNamedChild(const AName: string; const AChild: TMorASTNode);
     function HasNamedChild(const AName: string): Boolean;
 
     // Source range
-    function GetRange(): TSourceRange;
-    procedure SetRange(const ARange: TSourceRange);
+    function GetRange(): TMorSourceRange;
+    procedure SetRange(const ARange: TMorSourceRange);
 
     // AST serialization
     procedure SaveToStream(const AStream: TStream);
-    class function LoadFromStream(const AStream: TStream): TASTNode; static;
-    class procedure SaveASTToStream(const ARoot: TASTNode; const AStream: TStream); static;
-    class function LoadASTFromStream(const AStream: TStream): TASTNode; static;
+    class function LoadFromStream(const AStream: TStream): TMorASTNode; static;
+    class procedure SaveASTToStream(const ARoot: TMorASTNode; const AStream: TStream); static;
+    class function LoadASTFromStream(const AStream: TStream): TMorASTNode; static;
   end;
 
 // Helper functions for TValue operations
@@ -88,18 +88,18 @@ function MorIsTrue(const AValue: TValue): Boolean;
 function MorToString(const AValue: TValue): string;
 
 // Factory helper
-function MakeToken(const AKind: string; const AText: string;
-  const ALine: Integer; const ACol: Integer): TToken;
+function MorMakeToken(const AKind: string; const AText: string;
+  const ALine: Integer; const ACol: Integer): TMorToken;
 
 implementation
 
 uses
   Metamorf.Common;
 
-{ TToken factory }
+{ TMorToken }
 
-function MakeToken(const AKind: string; const AText: string;
-  const ALine: Integer; const ACol: Integer): TToken;
+function MorMakeToken(const AKind: string; const AText: string;
+  const ALine: Integer; const ACol: Integer): TMorToken;
 begin
   Result.Kind := AKind;
   Result.Text := AText;
@@ -165,17 +165,17 @@ begin
   begin
     if AValue.AsObject() = nil then
       Exit('nil');
-    if AValue.AsObject() is TASTNode then
-      Exit('<node:' + TASTNode(AValue.AsObject()).GetKind() + '>');
+    if AValue.AsObject() is TMorASTNode then
+      Exit('<node:' + TMorASTNode(AValue.AsObject()).GetKind() + '>');
     Exit('<object>');
   end;
 
   Result := '<unknown>';
 end;
 
-{ TASTNode }
+{ TMorASTNode }
 
-constructor TASTNode.Create();
+constructor TMorASTNode.Create();
 begin
   inherited;
   FKind := '';
@@ -185,12 +185,12 @@ begin
   FToken.Line := 0;
   FToken.Col := 0;
   FAttrs := TDictionary<string, string>.Create();
-  FChildren := TObjectList<TASTNode>.Create(True);
-  FNamedChildren := TDictionary<string, TASTNode>.Create();
+  FChildren := TObjectList<TMorASTNode>.Create(True);
+  FNamedChildren := TDictionary<string, TMorASTNode>.Create();
   FRange.Clear();
 end;
 
-destructor TASTNode.Destroy();
+destructor TMorASTNode.Destroy();
 begin
   FreeAndNil(FNamedChildren);
   FreeAndNil(FChildren);
@@ -198,7 +198,7 @@ begin
   inherited;
 end;
 
-function TASTNode.Dump(const AId: Integer): string;
+function TMorASTNode.Dump(const AId: Integer): string;
 var
   LIndent: string;
   LPair: TPair<string, string>;
@@ -218,79 +218,79 @@ begin
     Result := Result + FChildren[LI].Dump(AId + 1);
 end;
 
-function TASTNode.GetKind(): string;
+function TMorASTNode.GetKind(): string;
 begin
   Result := FKind;
 end;
 
-procedure TASTNode.SetKind(const AKind: string);
+procedure TMorASTNode.SetKind(const AKind: string);
 begin
   FKind := AKind;
 end;
 
-function TASTNode.GetToken(): TToken;
+function TMorASTNode.GetToken(): TMorToken;
 begin
   Result := FToken;
 end;
 
-procedure TASTNode.SetToken(const AToken: TToken);
+procedure TMorASTNode.SetToken(const AToken: TMorToken);
 begin
   FToken := AToken;
 end;
 
-function TASTNode.GetAttr(const AKey: string): string;
+function TMorASTNode.GetAttr(const AKey: string): string;
 begin
   if not FAttrs.TryGetValue(AKey, Result) then
     Result := '';
 end;
 
-procedure TASTNode.SetAttr(const AKey: string; const AValue: string);
+procedure TMorASTNode.SetAttr(const AKey: string; const AValue: string);
 begin
   FAttrs.AddOrSetValue(AKey, AValue);
 end;
 
-function TASTNode.HasAttr(const AKey: string): Boolean;
+function TMorASTNode.HasAttr(const AKey: string): Boolean;
 begin
   Result := FAttrs.ContainsKey(AKey);
 end;
 
-function TASTNode.ChildCount(): Integer;
+function TMorASTNode.ChildCount(): Integer;
 begin
   Result := FChildren.Count;
 end;
 
-function TASTNode.GetChild(const AIndex: Integer): TASTNode;
+function TMorASTNode.GetChild(const AIndex: Integer): TMorASTNode;
 begin
   Result := FChildren[AIndex];
 end;
 
-procedure TASTNode.AddChild(const AChild: TASTNode);
+procedure TMorASTNode.AddChild(const AChild: TMorASTNode);
 begin
   FChildren.Add(AChild);
 end;
 
-function TASTNode.GetNamedChild(const AName: string): TASTNode;
+function TMorASTNode.GetNamedChild(const AName: string): TMorASTNode;
 begin
   if not FNamedChildren.TryGetValue(AName, Result) then
     Result := nil;
 end;
 
-procedure TASTNode.SetNamedChild(const AName: string; const AChild: TASTNode);
+procedure TMorASTNode.SetNamedChild(const AName: string; const AChild: TMorASTNode);
 begin
   FNamedChildren.AddOrSetValue(AName, AChild);
 end;
 
-function TASTNode.HasNamedChild(const AName: string): Boolean;
+function TMorASTNode.HasNamedChild(const AName: string): Boolean;
 begin
   Result := FNamedChildren.ContainsKey(AName);
 end;
 
-function TASTNode.GetRange(): TSourceRange;
+function TMorASTNode.GetRange(): TMorSourceRange;
 begin
   Result := FRange;
 end;
 
-procedure TASTNode.SetRange(const ARange: TSourceRange);
+procedure TMorASTNode.SetRange(const ARange: TMorSourceRange);
 begin
   FRange := ARange;
 end;
@@ -327,7 +327,7 @@ end;
 
 { AST Serialization Methods }
 
-procedure TASTNode.SaveToStream(const AStream: TStream);
+procedure TMorASTNode.SaveToStream(const AStream: TStream);
 var
   LI: Integer;
   LCount: Integer;
@@ -372,15 +372,15 @@ begin
     FChildren[LI].SaveToStream(AStream);
 end;
 
-class function TASTNode.LoadFromStream(const AStream: TStream): TASTNode;
+class function TMorASTNode.LoadFromStream(const AStream: TStream): TMorASTNode;
 var
   LI: Integer;
   LCount: Integer;
   LKey: string;
   LValue: string;
-  LChild: TASTNode;
+  LChild: TMorASTNode;
 begin
-  Result := TASTNode.Create();
+  Result := TMorASTNode.Create();
   try
     // 1. FKind
     Result.FKind := ReadString(AStream);
@@ -418,7 +418,7 @@ begin
     AStream.ReadData<Integer>(LCount);
     for LI := 0 to LCount - 1 do
     begin
-      LChild := TASTNode.LoadFromStream(AStream);
+      LChild := TMorASTNode.LoadFromStream(AStream);
       Result.FChildren.Add(LChild);
     end;
   except
@@ -427,7 +427,7 @@ begin
   end;
 end;
 
-class procedure TASTNode.SaveASTToStream(const ARoot: TASTNode; const AStream: TStream);
+class procedure TMorASTNode.SaveASTToStream(const ARoot: TMorASTNode; const AStream: TStream);
 var
   LReserved: Integer;
 begin
@@ -441,7 +441,7 @@ begin
   ARoot.SaveToStream(AStream);
 end;
 
-class function TASTNode.LoadASTFromStream(const AStream: TStream): TASTNode;
+class function TMorASTNode.LoadASTFromStream(const AStream: TStream): TMorASTNode;
 var
   LMagic: Cardinal;
   LVersion: Integer;
@@ -460,7 +460,7 @@ begin
   AStream.ReadData<Integer>(LReserved);
 
   // Load the AST tree
-  Result := TASTNode.LoadFromStream(AStream);
+  Result := TMorASTNode.LoadFromStream(AStream);
 end;
 
 end.

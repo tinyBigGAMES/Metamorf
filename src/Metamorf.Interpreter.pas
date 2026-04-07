@@ -31,44 +31,44 @@ uses
 
 const
   // .mor Interpreter Error Codes (MI001-MI099)
-  ERR_MORINTERP_UNDEFINED_VAR    = 'MI001';
-  ERR_MORINTERP_UNDEFINED_ROUTINE= 'MI002';
-  ERR_MORINTERP_UNKNOWN_BUILTIN  = 'MI003';
-  ERR_MORINTERP_TYPE_MISMATCH    = 'MI004';
-  ERR_MORINTERP_NIL_NODE         = 'MI005';
-  ERR_MORINTERP_CHILD_BOUNDS     = 'MI006';
-  ERR_MORINTERP_DIV_ZERO         = 'MI007';
-  ERR_MORINTERP_ATTR_NOT_FOUND   = 'MI008';
-  ERR_MORINTERP_UNKNOWN_NODE     = 'MI009';
-  ERR_MORINTERP_EMITTER_CRASH    = 'MI010';
-  ERR_MORINTERP_BUILTIN_CRASH    = 'MI011';
-  ERR_MORINTERP_BAD_INDEX_TYPE   = 'MI012';
+  MOR_ERR_MORINTERP_UNDEFINED_VAR    = 'MI001';
+  MOR_ERR_MORINTERP_UNDEFINED_ROUTINE= 'MI002';
+  MOR_ERR_MORINTERP_UNKNOWN_BUILTIN  = 'MI003';
+  MOR_ERR_MORINTERP_TYPE_MISMATCH    = 'MI004';
+  MOR_ERR_MORINTERP_NIL_NODE         = 'MI005';
+  MOR_ERR_MORINTERP_CHILD_BOUNDS     = 'MI006';
+  MOR_ERR_MORINTERP_DIV_ZERO         = 'MI007';
+  MOR_ERR_MORINTERP_ATTR_NOT_FOUND   = 'MI008';
+  MOR_ERR_MORINTERP_UNKNOWN_NODE     = 'MI009';
+  MOR_ERR_MORINTERP_EMITTER_CRASH    = 'MI010';
+  MOR_ERR_MORINTERP_BUILTIN_CRASH    = 'MI011';
+  MOR_ERR_MORINTERP_BAD_INDEX_TYPE   = 'MI012';
 
 type
 
-  { EReturnSignal - exception used to unwind stack on 'return' }
-  EReturnSignal = class(Exception)
+  { EMorReturnSignal }
+  EMorReturnSignal = class(Exception)
   public
     ReturnValue: TValue;
     constructor Create(const AValue: TValue);
   end;
 
-  { TOperatorEntryInterp }
-  TOperatorEntryInterp = record
+  { TMorOperatorEntryInterp }
+  TMorOperatorEntryInterp = record
     Text: string;
     Kind: string;
   end;
 
-  { TStringStyleEntry }
-  TStringStyleEntry = record
+  { TMorStringStyleEntry }
+  TMorStringStyleEntry = record
     OpenText: string;
     CloseText: string;
     Kind: string;
     Flags: string;
   end;
 
-  { TLexerConfig }
-  TLexerConfig = record
+  { TMorLexerConfig }
+  TMorLexerConfig = record
     CaseSensitive: Boolean;
     Terminator: string;
     BlockOpen: string;
@@ -76,134 +76,134 @@ type
     DirectivePrefix: string;
   end;
 
-  { TInfixEntry }
-  TInfixEntry = record
+  { TMorInfixEntry }
+  TMorInfixEntry = record
     Power: Integer;
     Assoc: string;
-    RuleAST: TASTNode;
+    RuleAST: TMorASTNode;
   end;
 
-  { TSemanticPass }
-  TSemanticPass = record
+  { TMorSemanticPass }
+  TMorSemanticPass = record
     PassNumber: Integer;
     PassName: string;
-    Handlers: TDictionary<string, TASTNode>;
+    Handlers: TDictionary<string, TMorASTNode>;
   end;
 
-  { TSectionEntry }
-  TSectionEntry = record
+  { TMorSectionEntry }
+  TMorSectionEntry = record
     SectionName: string;
-    SectionAST: TASTNode;
+    SectionAST: TMorASTNode;
   end;
 
-  { TCompatEntry }
-  TCompatEntry = record
+  { TMorCompatEntry }
+  TMorCompatEntry = record
     FromType: string;
     ToType: string;
     CoerceExpr: string;
   end;
 
   { Native handler types for C++ passthrough and external registration }
-  TNativePrefixHandler = reference to function: TASTNode;
-  TNativeInfixHandler = reference to function(const ALeft: TASTNode): TASTNode;
-  TNativeStmtHandler = reference to function: TASTNode;
-  TNativeEmitHandler = reference to procedure(const ANode: TASTNode);
+  TMorNativePrefixHandler = reference to function: TMorASTNode;
+  TMorNativeInfixHandler = reference to function(const ALeft: TMorASTNode): TMorASTNode;
+  TMorNativeStmtHandler = reference to function: TMorASTNode;
+  TMorNativeEmitHandler = reference to procedure(const ANode: TMorASTNode);
 
-  { TNativeInfixEntry }
-  TNativeInfixEntry = record
+  { TMorNativeInfixEntry }
+  TMorNativeInfixEntry = record
     Power: Integer;
     Assoc: string;
-    Handler: TNativeInfixHandler;
+    Handler: TMorNativeInfixHandler;
   end;
 
-  { TCompileModuleFunc - callback to engine for module compilation }
-  TCompileModuleFunc = function(const AModuleName: string): Boolean of object;
+  { TMorCompileModuleFunc - callback to engine for module compilation }
+  TMorCompileModuleFunc = function(const AModuleName: string): Boolean of object;
 
-  { TImportMorFunc - callback to engine for .mor file import }
-  TImportMorFunc = function(const AMorPath: string): TASTNode of object;
+  { TMorImportMorFunc - callback to engine for .mor file import }
+  TMorImportMorFunc = function(const AMorPath: string): TMorASTNode of object;
 
   { TMorInterpreter }
-  TMorInterpreter = class(TErrorsObject)
+  TMorInterpreter = class(TMorErrorsObject)
   private
     // From tokens {} block
     FKeywords: TDictionary<string, string>;
-    FOperators: TList<TOperatorEntryInterp>;
-    FStringStyles: TList<TStringStyleEntry>;
+    FOperators: TList<TMorOperatorEntryInterp>;
+    FStringStyles: TList<TMorStringStyleEntry>;
     FLineComments: TList<string>;
     FBlockComments: TList<TPair<string, string>>;
     FDirectives: TDictionary<string, string>;
     FDirectiveFlags: TDictionary<string, string>;
-    FLexerConfig: TLexerConfig;
+    FLexerConfig: TMorLexerConfig;
 
     // From types {} block
     FTypeKeywords: TDictionary<string, string>;
     FTypeMappings: TDictionary<string, string>;
     FLiteralTypes: TDictionary<string, string>;
-    FCompatRules: TList<TCompatEntry>;
+    FCompatRules: TList<TMorCompatEntry>;
     FDeclKinds: TList<string>;
     FCallKinds: TList<string>;
     FCallNameAttr: string;
 
     // From grammar {} block
-    FPrefixRules: TDictionary<string, TASTNode>;
-    FInfixRules: TDictionary<string, TInfixEntry>;
-    FStmtRules: TDictionary<string, TList<TASTNode>>;
+    FPrefixRules: TDictionary<string, TMorASTNode>;
+    FInfixRules: TDictionary<string, TMorInfixEntry>;
+    FStmtRules: TDictionary<string, TList<TMorASTNode>>;
 
     // From semantics {} block
-    FSemanticHandlers: TDictionary<string, TASTNode>;
-    FSemanticPasses: TList<TSemanticPass>;
+    FSemanticHandlers: TDictionary<string, TMorASTNode>;
+    FSemanticPasses: TList<TMorSemanticPass>;
 
     // From emitters {} block
-    FEmitHandlers: TDictionary<string, TASTNode>;
-    FBeforeBlock: TASTNode;
-    FAfterBlock: TASTNode;
-    FSections: TList<TSectionEntry>;
+    FEmitHandlers: TDictionary<string, TMorASTNode>;
+    FBeforeBlock: TMorASTNode;
+    FAfterBlock: TMorASTNode;
+    FSections: TList<TMorSectionEntry>;
 
     // From routine/const/enum/fragment declarations
-    FRoutines: TDictionary<string, TASTNode>;
+    FRoutines: TDictionary<string, TMorASTNode>;
     FConstants: TDictionary<string, TValue>;
-    FFragments: TDictionary<string, TASTNode>;
+    FFragments: TDictionary<string, TMorASTNode>;
 
     // Runtime state
-    FEnv: TEnvironment;
-    FCurrentNode: TASTNode;
-    FResultNode: TASTNode;
+    FEnv: TMorEnvironment;
+    FCurrentNode: TMorASTNode;
+    FResultNode: TMorASTNode;
 
     // Subcomponents wired by TMorEngine
     FScopes: TScopeManager;
-    FOutput: TCodeOutput;
+    FOutput: TMorCodeOutput;
     FBuild: TObject;
     FActiveParser: TObject;
     FRuleErrorSnapshot: Integer;
     FCurrentInfixPower: Integer;
     FModuleExtension: string;
-    FCompileModuleFunc: TCompileModuleFunc;
-    FImportMorFunc: TImportMorFunc;
+    FCompileModuleFunc: TMorCompileModuleFunc;
+    FImportMorFunc: TMorImportMorFunc;
 
     // Native handler dictionaries (for C++ passthrough)
-    FNativePrefixRules: TDictionary<string, TNativePrefixHandler>;
-    FNativeInfixRules: TDictionary<string, TNativeInfixEntry>;
-    FNativeStmtRules: TDictionary<string, TNativeStmtHandler>;
-    FNativeEmitHandlers: TDictionary<string, TNativeEmitHandler>;
+    FNativePrefixRules: TDictionary<string, TMorNativePrefixHandler>;
+    FNativeInfixRules: TDictionary<string, TMorNativeInfixEntry>;
+    FNativeStmtRules: TDictionary<string, TMorNativeStmtHandler>;
+    FNativeEmitHandlers: TDictionary<string, TMorNativeEmitHandler>;
 
     // Setup pass methods
-    procedure WalkMorRoot(const ARoot: TASTNode);
-    procedure WalkTokensBlock(const ABlock: TASTNode);
-    procedure WalkTypesBlock(const ABlock: TASTNode);
-    procedure WalkGrammarBlock(const ABlock: TASTNode);
-    procedure WalkSemanticsBlock(const ABlock: TASTNode);
-    procedure WalkEmittersBlock(const ABlock: TASTNode);
-    procedure WalkRoutineDecl(const ANode: TASTNode);
-    procedure WalkConstBlock(const ABlock: TASTNode);
-    procedure WalkEnumDecl(const ANode: TASTNode);
-    procedure WalkFragmentDecl(const ANode: TASTNode);
-    function FindTriggerToken(const ARuleAST: TASTNode): string;
-    function FindAllTriggerTokens(const ARuleAST: TASTNode): TArray<string>;
+    procedure WalkMorRoot(const ARoot: TMorASTNode);
+    procedure WalkTokensBlock(const ABlock: TMorASTNode);
+    procedure WalkTypesBlock(const ABlock: TMorASTNode);
+    procedure WalkGrammarBlock(const ABlock: TMorASTNode);
+    procedure WalkSemanticsBlock(const ABlock: TMorASTNode);
+    procedure WalkEmittersBlock(const ABlock: TMorASTNode);
+    procedure WalkRoutineDecl(const ANode: TMorASTNode);
+    procedure WalkConstBlock(const ABlock: TMorASTNode);
+    procedure WalkEnumDecl(const ANode: TMorASTNode);
+    procedure WalkFragmentDecl(const ANode: TMorASTNode);
+    function FindTriggerToken(const ARuleAST: TMorASTNode): string;
+    function FindAllTriggerTokens(const ARuleAST: TMorASTNode): TArray<string>;
 
     // Core execution
-    procedure ExecStmt(const ANode: TASTNode);
-    procedure ExecBlock(const ABlock: TASTNode);
-    function EvalExpr(const ANode: TASTNode): TValue;
+    procedure ExecStmt(const ANode: TMorASTNode);
+    procedure ExecBlock(const ABlock: TMorASTNode);
+    function EvalExpr(const ANode: TMorASTNode): TValue;
 
     // Expression helpers
     function ApplyBinaryOp(const AOp: string;
@@ -223,71 +223,71 @@ type
     destructor Destroy(); override;
 
     // Setup pass: populate dispatch tables from .mor AST
-    procedure RunSetup(const AMorRoot: TASTNode);
+    procedure RunSetup(const AMorRoot: TMorASTNode);
 
     // Accessors for dispatch tables (used by GenericLexer/GenericParser)
     function GetKeywords(): TDictionary<string, string>;
-    function GetOperators(): TList<TOperatorEntryInterp>;
-    function GetStringStyles(): TList<TStringStyleEntry>;
+    function GetOperators(): TList<TMorOperatorEntryInterp>;
+    function GetStringStyles(): TList<TMorStringStyleEntry>;
     function GetLineComments(): TList<string>;
     function GetBlockComments(): TList<TPair<string, string>>;
-    function GetLexerConfig(): TLexerConfig;
+    function GetLexerConfig(): TMorLexerConfig;
     function GetDirectives(): TDictionary<string, string>;
     function GetDirectiveFlags(): TDictionary<string, string>;
-    function GetPrefixRules(): TDictionary<string, TASTNode>;
-    function GetInfixRules(): TDictionary<string, TInfixEntry>;
-    function GetStmtRules(): TDictionary<string, TList<TASTNode>>;
-    function GetSemanticHandlers(): TDictionary<string, TASTNode>;
-    function GetEmitHandlers(): TDictionary<string, TASTNode>;
-    function GetRoutines(): TDictionary<string, TASTNode>;
+    function GetPrefixRules(): TDictionary<string, TMorASTNode>;
+    function GetInfixRules(): TDictionary<string, TMorInfixEntry>;
+    function GetStmtRules(): TDictionary<string, TList<TMorASTNode>>;
+    function GetSemanticHandlers(): TDictionary<string, TMorASTNode>;
+    function GetEmitHandlers(): TDictionary<string, TMorASTNode>;
+    function GetRoutines(): TDictionary<string, TMorASTNode>;
     function GetConstants(): TDictionary<string, TValue>;
-    function GetEnvironment(): TEnvironment;
+    function GetEnvironment(): TMorEnvironment;
 
     // Subcomponent setters (called by TMorEngine)
     procedure SetBuild(const ABuild: TObject);
     procedure SetScopes(const AScopes: TScopeManager);
-    procedure SetOutput(const AOutput: TCodeOutput);
+    procedure SetOutput(const AOutput: TMorCodeOutput);
     procedure SetActiveParser(const AParser: TObject);
-    function GetOutput(): TCodeOutput;
+    function GetOutput(): TMorCodeOutput;
     function GetActiveParser(): TObject;
     procedure SetCurrentInfixPower(const APower: Integer);
     function GetCurrentInfixPower(): Integer;
-    procedure SetCompileModuleFunc(const AFunc: TCompileModuleFunc);
-    procedure SetImportMorFunc(const AFunc: TImportMorFunc);
+    procedure SetCompileModuleFunc(const AFunc: TMorCompileModuleFunc);
+    procedure SetImportMorFunc(const AFunc: TMorImportMorFunc);
     function GetModuleExtension(): string;
 
     // Native handler registration (called by Mor.Cpp)
     procedure RegisterNativePrefix(const AKind: string;
-      const AHandler: TNativePrefixHandler);
+      const AHandler: TMorNativePrefixHandler);
     procedure RegisterNativeInfix(const AKind: string;
-      const AEntry: TNativeInfixEntry);
+      const AEntry: TMorNativeInfixEntry);
     procedure RegisterNativeStmt(const AKind: string;
-      const AHandler: TNativeStmtHandler);
+      const AHandler: TMorNativeStmtHandler);
     procedure RegisterNativeEmit(const AKind: string;
-      const AHandler: TNativeEmitHandler);
+      const AHandler: TMorNativeEmitHandler);
 
     // Parser thin wrappers (called by Mor.Cpp closures)
     function ParserCurrentKind(): string;
     function ParserCurrentText(): string;
     procedure ParserAdvance();
     function ParserAtEnd(): Boolean;
-    function ParserCurrentToken(): TToken;
+    function ParserCurrentToken(): TMorToken;
 
     // Grammar rule execution (called by GenericParser)
-    function ExecuteGrammarRule(const ARuleAST: TASTNode;
-      const ALeft: TASTNode = nil): TASTNode;
+    function ExecuteGrammarRule(const ARuleAST: TMorASTNode;
+      const ALeft: TMorASTNode = nil): TMorASTNode;
 
     // Pipeline entry points (called by TMorEngine)
-    procedure RunSemanticHandler(const AUserNode: TASTNode);
-    procedure RunEmitHandler(const AUserNode: TASTNode);
-    procedure RunSemantics(const AMasterRoot: TASTNode);
-    procedure RunEmitters(const AMasterRoot: TASTNode);
+    procedure RunSemanticHandler(const AUserNode: TMorASTNode);
+    procedure RunEmitHandler(const AUserNode: TMorASTNode);
+    procedure RunSemantics(const AMasterRoot: TMorASTNode);
+    procedure RunEmitters(const AMasterRoot: TMorASTNode);
 
     // Native handler accessors (used by GenericParser)
-    function GetNativePrefixRules(): TDictionary<string, TNativePrefixHandler>;
-    function GetNativeInfixRules(): TDictionary<string, TNativeInfixEntry>;
-    function GetNativeStmtRules(): TDictionary<string, TNativeStmtHandler>;
-    function GetNativeEmitHandlers(): TDictionary<string, TNativeEmitHandler>;
+    function GetNativePrefixRules(): TDictionary<string, TMorNativePrefixHandler>;
+    function GetNativeInfixRules(): TDictionary<string, TMorNativeInfixEntry>;
+    function GetNativeStmtRules(): TDictionary<string, TMorNativeStmtHandler>;
+    function GetNativeEmitHandlers(): TDictionary<string, TMorNativeEmitHandler>;
   end;
 
 implementation
@@ -298,9 +298,9 @@ uses
   Metamorf.GenericParser,
   Metamorf.Build;
 
-{ EReturnSignal }
+{ EMorReturnSignal }
 
-constructor EReturnSignal.Create(const AValue: TValue);
+constructor EMorReturnSignal.Create(const AValue: TValue);
 begin
   inherited Create('return');
   ReturnValue := AValue;
@@ -314,8 +314,8 @@ begin
 
   // Tokens block
   FKeywords := TDictionary<string, string>.Create();
-  FOperators := TList<TOperatorEntryInterp>.Create();
-  FStringStyles := TList<TStringStyleEntry>.Create();
+  FOperators := TList<TMorOperatorEntryInterp>.Create();
+  FStringStyles := TList<TMorStringStyleEntry>.Create();
   FLineComments := TList<string>.Create();
   FBlockComments := TList<TPair<string, string>>.Create();
   FDirectives := TDictionary<string, string>.Create();
@@ -330,33 +330,33 @@ begin
   FTypeKeywords := TDictionary<string, string>.Create();
   FTypeMappings := TDictionary<string, string>.Create();
   FLiteralTypes := TDictionary<string, string>.Create();
-  FCompatRules := TList<TCompatEntry>.Create();
+  FCompatRules := TList<TMorCompatEntry>.Create();
   FDeclKinds := TList<string>.Create();
   FCallKinds := TList<string>.Create();
   FCallNameAttr := '';
 
   // Grammar block
-  FPrefixRules := TDictionary<string, TASTNode>.Create();
-  FInfixRules := TDictionary<string, TInfixEntry>.Create();
-  FStmtRules := TDictionary<string, TList<TASTNode>>.Create();
+  FPrefixRules := TDictionary<string, TMorASTNode>.Create();
+  FInfixRules := TDictionary<string, TMorInfixEntry>.Create();
+  FStmtRules := TDictionary<string, TList<TMorASTNode>>.Create();
 
   // Semantics block
-  FSemanticHandlers := TDictionary<string, TASTNode>.Create();
-  FSemanticPasses := TList<TSemanticPass>.Create();
+  FSemanticHandlers := TDictionary<string, TMorASTNode>.Create();
+  FSemanticPasses := TList<TMorSemanticPass>.Create();
 
   // Emitters block
-  FEmitHandlers := TDictionary<string, TASTNode>.Create();
+  FEmitHandlers := TDictionary<string, TMorASTNode>.Create();
   FBeforeBlock := nil;
   FAfterBlock := nil;
-  FSections := TList<TSectionEntry>.Create();
+  FSections := TList<TMorSectionEntry>.Create();
 
   // Routines/consts/fragments
-  FRoutines := TDictionary<string, TASTNode>.Create();
+  FRoutines := TDictionary<string, TMorASTNode>.Create();
   FConstants := TDictionary<string, TValue>.Create();
-  FFragments := TDictionary<string, TASTNode>.Create();
+  FFragments := TDictionary<string, TMorASTNode>.Create();
 
   // Runtime
-  FEnv := TEnvironment.Create();
+  FEnv := TMorEnvironment.Create();
   FCurrentNode := nil;
   FResultNode := nil;
 
@@ -368,16 +368,16 @@ begin
   FModuleExtension := '';
 
   // Native handler dictionaries
-  FNativePrefixRules := TDictionary<string, TNativePrefixHandler>.Create();
-  FNativeInfixRules := TDictionary<string, TNativeInfixEntry>.Create();
-  FNativeStmtRules := TDictionary<string, TNativeStmtHandler>.Create();
-  FNativeEmitHandlers := TDictionary<string, TNativeEmitHandler>.Create();
+  FNativePrefixRules := TDictionary<string, TMorNativePrefixHandler>.Create();
+  FNativeInfixRules := TDictionary<string, TMorNativeInfixEntry>.Create();
+  FNativeStmtRules := TDictionary<string, TMorNativeStmtHandler>.Create();
+  FNativeEmitHandlers := TDictionary<string, TMorNativeEmitHandler>.Create();
 end;
 
 destructor TMorInterpreter.Destroy();
 var
   LI: Integer;
-  LStmtList: TList<TASTNode>;
+  LStmtList: TList<TMorASTNode>;
 begin
   FreeAndNil(FNativeEmitHandlers);
   FreeAndNil(FNativeStmtRules);
@@ -421,18 +421,18 @@ end;
 
 { Setup Pass }
 
-procedure TMorInterpreter.RunSetup(const AMorRoot: TASTNode);
+procedure TMorInterpreter.RunSetup(const AMorRoot: TMorASTNode);
 begin
   WalkMorRoot(AMorRoot);
 end;
 
-procedure TMorInterpreter.WalkMorRoot(const ARoot: TASTNode);
+procedure TMorInterpreter.WalkMorRoot(const ARoot: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
+  LChild: TMorASTNode;
   LKind: string;
-  LImportAST: TASTNode;
-  LFragAST: TASTNode;
+  LImportAST: TMorASTNode;
+  LFragAST: TMorASTNode;
 begin
   for LI := 0 to ARoot.ChildCount() - 1 do
   begin
@@ -487,17 +487,17 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.WalkTokensBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.WalkTokensBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
-  LFragAST: TASTNode;
+  LChild: TMorASTNode;
+  LFragAST: TMorASTNode;
   LKind: string;
   LTokenKind: string;
   LText: string;
   LFlags: string;
-  LEntry: TOperatorEntryInterp;
-  LStyle: TStringStyleEntry;
+  LEntry: TMorOperatorEntryInterp;
+  LStyle: TMorStringStyleEntry;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
@@ -576,22 +576,22 @@ begin
   end;
 
   // Sort operators longest-first for correct matching
-  FOperators.Sort(TComparer<TOperatorEntryInterp>.Construct(
-    function(const ALeft, ARight: TOperatorEntryInterp): Integer
+  FOperators.Sort(TComparer<TMorOperatorEntryInterp>.Construct(
+    function(const ALeft, ARight: TMorOperatorEntryInterp): Integer
     begin
       Result := Length(ARight.Text) - Length(ALeft.Text);
     end));
 end;
 
-procedure TMorInterpreter.WalkTypesBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.WalkTypesBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
-  LFragAST: TASTNode;
+  LChild: TMorASTNode;
+  LFragAST: TMorASTNode;
   LKind: string;
   LKey: string;
   LValue: string;
-  LEntry: TCompatEntry;
+  LEntry: TMorCompatEntry;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
@@ -633,17 +633,17 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.WalkGrammarBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.WalkGrammarBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
-  LFragAST: TASTNode;
+  LChild: TMorASTNode;
+  LFragAST: TMorASTNode;
   LNodeKind: string;
   LTrigger: string;
   LTriggers: TArray<string>;
   LTriggerItem: string;
-  LInfix: TInfixEntry;
-  LRuleList: TList<TASTNode>;
+  LInfix: TMorInfixEntry;
+  LRuleList: TList<TMorASTNode>;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
@@ -687,7 +687,7 @@ begin
     begin
       if not FStmtRules.TryGetValue(LTrigger, LRuleList) then
       begin
-        LRuleList := TList<TASTNode>.Create();
+        LRuleList := TList<TMorASTNode>.Create();
         FStmtRules.Add(LTrigger, LRuleList);
       end;
       LRuleList.Add(LChild);
@@ -697,10 +697,10 @@ begin
   end;
 end;
 
-function TMorInterpreter.FindTriggerToken(const ARuleAST: TASTNode): string;
+function TMorInterpreter.FindTriggerToken(const ARuleAST: TMorASTNode): string;
 var
   LI: Integer;
-  LChild: TASTNode;
+  LChild: TMorASTNode;
   LKind: string;
   LKinds: string;
 begin
@@ -735,10 +735,10 @@ begin
 end;
 
 function TMorInterpreter.FindAllTriggerTokens(
-  const ARuleAST: TASTNode): TArray<string>;
+  const ARuleAST: TMorASTNode): TArray<string>;
 var
   LI: Integer;
-  LChild: TASTNode;
+  LChild: TMorASTNode;
   LKind: string;
   LKinds: string;
   LParts: TArray<string>;
@@ -777,13 +777,13 @@ begin
   Result := TArray<string>.Create(ARuleAST.GetAttr('node_kind'));
 end;
 
-procedure TMorInterpreter.WalkSemanticsBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.WalkSemanticsBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
-  LFragAST: TASTNode;
+  LChild: TMorASTNode;
+  LFragAST: TMorASTNode;
   LKind: string;
-  LPass: TSemanticPass;
+  LPass: TMorSemanticPass;
   LJ: Integer;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
@@ -806,7 +806,7 @@ begin
     begin
       LPass.PassNumber := StrToIntDef(LChild.GetAttr('pass_number'), 0);
       LPass.PassName := LChild.GetAttr('pass_name');
-      LPass.Handlers := TDictionary<string, TASTNode>.Create();
+      LPass.Handlers := TDictionary<string, TMorASTNode>.Create();
       // Collect handlers within this pass
       for LJ := 0 to LChild.ChildCount() - 1 do
       begin
@@ -820,13 +820,13 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.WalkEmittersBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.WalkEmittersBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
-  LFragAST: TASTNode;
+  LChild: TMorASTNode;
+  LFragAST: TMorASTNode;
   LKind: string;
-  LSection: TSectionEntry;
+  LSection: TMorSectionEntry;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
@@ -857,15 +857,15 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.WalkRoutineDecl(const ANode: TASTNode);
+procedure TMorInterpreter.WalkRoutineDecl(const ANode: TMorASTNode);
 begin
   FRoutines.AddOrSetValue(ANode.GetAttr('identifier'), ANode);
 end;
 
-procedure TMorInterpreter.WalkConstBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.WalkConstBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
-  LChild: TASTNode;
+  LChild: TMorASTNode;
 begin
   for LI := 0 to ABlock.ChildCount() - 1 do
   begin
@@ -879,7 +879,7 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.WalkEnumDecl(const ANode: TASTNode);
+procedure TMorInterpreter.WalkEnumDecl(const ANode: TMorASTNode);
 var
   LCount: Integer;
   LI: Integer;
@@ -894,14 +894,14 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.WalkFragmentDecl(const ANode: TASTNode);
+procedure TMorInterpreter.WalkFragmentDecl(const ANode: TMorASTNode);
 begin
   FFragments.AddOrSetValue(ANode.GetAttr('identifier'), ANode);
 end;
 
 { Core Execution }
 
-procedure TMorInterpreter.ExecBlock(const ABlock: TASTNode);
+procedure TMorInterpreter.ExecBlock(const ABlock: TMorASTNode);
 var
   LI: Integer;
 begin
@@ -913,7 +913,7 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.ExecStmt(const ANode: TASTNode);
+procedure TMorInterpreter.ExecStmt(const ANode: TMorASTNode);
 var
   LKind: string;
   LCond: TValue;
@@ -922,20 +922,20 @@ var
   LVarName: string;
   LValue: TValue;
   LMatchVal: TValue;
-  LArm: TASTNode;
+  LArm: TMorASTNode;
   LArmVal: TValue;
   LMatched: Boolean;
   LJ: Integer;
-  LGenParser: TGenericParser;
+  LGenParser: TMorGenericParser;
   LTargetStr: string;
   LScopeName: string;
   LSym: TSymbol;
   LMode: string;
   LAttrName: string;
-  LChildNode: TASTNode;
+  LChildNode: TMorASTNode;
   LTokenKind: string;
-  LExprNode: TASTNode;
-  LBlock: TASTNode;
+  LExprNode: TMorASTNode;
+  LBlock: TMorASTNode;
   LSavedPos: Integer;
   LKindsList: string;
   LKindsArr: TArray<string>;
@@ -1009,7 +1009,7 @@ begin
       if LCount > 100000 then
       begin
         if Assigned(FErrors) then
-          FErrors.Add(esError, ERR_MORINTERP_UNKNOWN_NODE,
+          FErrors.Add(esError, MOR_ERR_MORINTERP_UNKNOWN_NODE,
             'Infinite loop detected (exceeded 100000 iterations)');
         Break;
       end;
@@ -1082,7 +1082,7 @@ begin
       LValue := EvalExpr(ANode.GetChild(0))
     else
       LValue := TValue.Empty;
-    raise EReturnSignal.Create(LValue);
+    raise EMorReturnSignal.Create(LValue);
   end
 
   // try { ... } recover { ... }
@@ -1091,7 +1091,7 @@ begin
     try
       ExecBlock(ANode.GetChild(0));
     except
-      on E: EReturnSignal do
+      on E: EMorReturnSignal do
         raise; // re-raise return signals
       on E: Exception do
       begin
@@ -1148,7 +1148,7 @@ begin
   begin
     if Assigned(FActiveParser) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LTokenKind := ANode.GetAttr('token_kind');
       LGenParser.Expect(LTokenKind);
     end;
@@ -1159,7 +1159,7 @@ begin
   begin
     if Assigned(FActiveParser) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LAttrName := ANode.GetAttr('target_attr');
       LKindsList := ANode.GetAttr('token_kinds');
       if LKindsList <> '' then
@@ -1182,7 +1182,7 @@ begin
           LGenParser.DoAdvance();
         end
         else if Assigned(FErrors) then
-          FErrors.Add(esError, ERR_MORINTERP_TYPE_MISMATCH,
+          FErrors.Add(esError, MOR_ERR_MORINTERP_TYPE_MISMATCH,
             RSMorInterpTypeMismatch, [LKindsList, LGenParser.Current().Kind]);
       end
       else
@@ -1196,7 +1196,7 @@ begin
           LGenParser.DoAdvance();
         end
         else if Assigned(FErrors) then
-          FErrors.Add(esError, ERR_MORINTERP_TYPE_MISMATCH,
+          FErrors.Add(esError, MOR_ERR_MORINTERP_TYPE_MISMATCH,
             RSMorInterpTypeMismatch, [LTokenKind, LGenParser.Current().Kind]);
       end;
     end;
@@ -1207,7 +1207,7 @@ begin
   begin
     if Assigned(FActiveParser) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LMode := ANode.GetAttr('mode');
       LAttrName := ANode.GetAttr('target_attr');
       if LMode = 'expr' then
@@ -1231,7 +1231,7 @@ begin
       end
       else if LMode = 'many' then
       begin
-        LBlock := TASTNode.Create();
+        LBlock := TMorASTNode.Create();
         LBlock.SetKind('meta.block');
         LKindsList := ANode.GetAttr('until_kinds');
         if LKindsList = '' then
@@ -1275,12 +1275,12 @@ begin
   begin
     if Assigned(FActiveParser) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LSavedPos := LGenParser.GetPos();
       try
         ExecBlock(ANode.GetChild(0));
       except
-        on E: EReturnSignal do
+        on E: EMorReturnSignal do
           raise;
         on E: Exception do
         begin
@@ -1294,7 +1294,7 @@ begin
       try
         ExecBlock(ANode.GetChild(0));
       except
-        on E: EReturnSignal do
+        on E: EMorReturnSignal do
           raise;
         on E: Exception do
         begin
@@ -1425,7 +1425,7 @@ begin
     if Assigned(FActiveParser) and Assigned(FErrors) and
        (FErrors.ErrorCount() > FRuleErrorSnapshot) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LTokenKind := ANode.GetAttr('token_kind');
       // Skip tokens until we find the sync point
       while not LGenParser.AtEnd() do
@@ -1516,7 +1516,7 @@ end;
 
 { Expression Evaluator }
 
-function TMorInterpreter.EvalExpr(const ANode: TASTNode): TValue;
+function TMorInterpreter.EvalExpr(const ANode: TMorASTNode): TValue;
 var
   LKind: string;
   LLeft: TValue;
@@ -1525,7 +1525,7 @@ var
   LName: string;
   LArgs: TArray<TValue>;
   LI: Integer;
-  LCallee: TASTNode;
+  LCallee: TMorASTNode;
 begin
   if ANode = nil then
     Exit(TValue.Empty);
@@ -1568,7 +1568,7 @@ begin
     else
     begin
       if Assigned(FErrors) then
-        FErrors.Add(esError, ERR_MORINTERP_UNDEFINED_VAR,
+        FErrors.Add(esError, MOR_ERR_MORINTERP_UNDEFINED_VAR,
           RSMorInterpUndefinedVar, [LName]);
       Result := TValue.Empty;
     end;
@@ -1654,7 +1654,7 @@ begin
         except
           on E: Exception do
           begin
-            ReportNodeError(FErrors, FCurrentNode, ERR_MORINTERP_BUILTIN_CRASH,
+            MorReportNodeError(FErrors, FCurrentNode, MOR_ERR_MORINTERP_BUILTIN_CRASH,
               RSMorInterpBuiltinCrash, [LName, FCurrentNode.GetKind(),
               E.Message]);
             Result := TValue.Empty;
@@ -1789,8 +1789,8 @@ var
   LDepth: Integer;
   LTempLexer: TMorLexer;
   LTempParser: TMorParser;
-  LTempTokens: TList<TToken>;
-  LTempExpr: TASTNode;
+  LTempTokens: TList<TMorToken>;
+  LTempExpr: TMorASTNode;
 begin
   Result := '';
   LI := 1;
@@ -1984,10 +1984,10 @@ end;
 function TMorInterpreter.CallBuiltin(const AName: string;
   const AArgs: TArray<TValue>): TValue;
 var
-  LNode: TASTNode;
+  LNode: TMorASTNode;
   LS: string;
   LIdx: Int64;
-  LGenParser: TGenericParser;
+  LGenParser: TMorGenericParser;
   LTargetStr: string;
   LTokenKind: string;
   LDepth: Int64;
@@ -2000,7 +2000,7 @@ begin
   if AName = 'nodeKind' then
   begin
     if (Length(AArgs) > 0) and AArgs[0].IsObject() then
-      Result := TValue.From<string>(TASTNode(AArgs[0].AsObject()).GetKind())
+      Result := TValue.From<string>(TMorASTNode(AArgs[0].AsObject()).GetKind())
     else if FCurrentNode <> nil then
       Result := TValue.From<string>(FCurrentNode.GetKind())
     else
@@ -2012,7 +2012,7 @@ begin
   begin
     if (Length(AArgs) = 2) and AArgs[0].IsObject() then
       Result := TValue.From<string>(
-        TASTNode(AArgs[0].AsObject()).GetAttr(AArgs[1].AsString()))
+        TMorASTNode(AArgs[0].AsObject()).GetAttr(AArgs[1].AsString()))
     else if (Length(AArgs) = 1) and (FCurrentNode <> nil) then
       Result := TValue.From<string>(FCurrentNode.GetAttr(AArgs[0].AsString()))
     else
@@ -2023,7 +2023,7 @@ begin
   else if AName = 'setAttr' then
   begin
     if (Length(AArgs) = 3) and AArgs[0].IsObject() then
-      TASTNode(AArgs[0].AsObject()).SetAttr(
+      TMorASTNode(AArgs[0].AsObject()).SetAttr(
         AArgs[1].AsString(), MorToString(AArgs[2]))
     else if (Length(AArgs) = 2) and (FCurrentNode <> nil) then
       FCurrentNode.SetAttr(AArgs[0].AsString(), MorToString(AArgs[1]));
@@ -2043,7 +2043,7 @@ begin
   else if AName = 'getNodeFile' then
   begin
     if (Length(AArgs) > 0) and AArgs[0].IsObject() then
-      Result := TValue.From<string>(TASTNode(AArgs[0].AsObject()).GetRange().Filename)
+      Result := TValue.From<string>(TMorASTNode(AArgs[0].AsObject()).GetRange().Filename)
     else if FCurrentNode <> nil then
       Result := TValue.From<string>(FCurrentNode.GetRange().Filename)
     else
@@ -2054,7 +2054,7 @@ begin
   else if AName = 'getNodeLine' then
   begin
     if (Length(AArgs) > 0) and AArgs[0].IsObject() then
-      Result := TValue.From<string>(IntToStr(TASTNode(AArgs[0].AsObject()).GetRange().StartLine))
+      Result := TValue.From<string>(IntToStr(TMorASTNode(AArgs[0].AsObject()).GetRange().StartLine))
     else if FCurrentNode <> nil then
       Result := TValue.From<string>(IntToStr(FCurrentNode.GetRange().StartLine))
     else
@@ -2065,7 +2065,7 @@ begin
   else if (AName = 'childCount') or (AName = 'child_count') then
   begin
     if (Length(AArgs) > 0) and AArgs[0].IsObject() then
-      Result := TValue.From<Int64>(TASTNode(AArgs[0].AsObject()).ChildCount())
+      Result := TValue.From<Int64>(TMorASTNode(AArgs[0].AsObject()).ChildCount())
     else if FCurrentNode <> nil then
       Result := TValue.From<Int64>(FCurrentNode.ChildCount())
     else
@@ -2077,21 +2077,21 @@ begin
   begin
     if (Length(AArgs) = 2) and AArgs[0].IsObject() then
     begin
-      LNode := TASTNode(AArgs[0].AsObject());
+      LNode := TMorASTNode(AArgs[0].AsObject());
       if (AArgs[1].Kind = tkInt64) then
         LIdx := AArgs[1].AsInt64()
       else if (AArgs[1].Kind = tkInteger) then
         LIdx := AArgs[1].AsInteger()
       else
       begin
-        ReportNodeError(FErrors, FCurrentNode, ERR_MORINTERP_BAD_INDEX_TYPE,
+        MorReportNodeError(FErrors, FCurrentNode, MOR_ERR_MORINTERP_BAD_INDEX_TYPE,
           RSMorInterpBadIndexType, [AArgs[1].TypeInfo.Name,
           MorToString(AArgs[1]), FCurrentNode.GetKind()]);
         Result := TValue.Empty;
         Exit;
       end;
       if (LIdx >= 0) and (LIdx < LNode.ChildCount()) then
-        Result := TValue.From<TASTNode>(LNode.GetChild(LIdx))
+        Result := TValue.From<TMorASTNode>(LNode.GetChild(LIdx))
       else
         Result := TValue.Empty;
     end
@@ -2103,14 +2103,14 @@ begin
         LIdx := AArgs[0].AsInteger()
       else
       begin
-        ReportNodeError(FErrors, FCurrentNode, ERR_MORINTERP_BAD_INDEX_TYPE,
+        MorReportNodeError(FErrors, FCurrentNode, MOR_ERR_MORINTERP_BAD_INDEX_TYPE,
           RSMorInterpBadIndexType, [AArgs[0].TypeInfo.Name,
           MorToString(AArgs[0]), FCurrentNode.GetKind()]);
         Result := TValue.Empty;
         Exit;
       end;
       if (LIdx >= 0) and (LIdx < FCurrentNode.ChildCount()) then
-        Result := TValue.From<TASTNode>(FCurrentNode.GetChild(LIdx))
+        Result := TValue.From<TMorASTNode>(FCurrentNode.GetChild(LIdx))
       else
         Result := TValue.Empty;
     end
@@ -2123,9 +2123,9 @@ begin
   begin
     if Length(AArgs) > 0 then
     begin
-      LNode := TASTNode.Create();
+      LNode := TMorASTNode.Create();
       LNode.SetKind(AArgs[0].AsString());
-      Result := TValue.From<TASTNode>(LNode);
+      Result := TValue.From<TMorASTNode>(LNode);
     end
     else
       Result := TValue.Empty;
@@ -2135,13 +2135,13 @@ begin
   else if AName = 'addChild' then
   begin
     if (Length(AArgs) = 2) and AArgs[0].IsObject() and AArgs[1].IsObject() then
-      TASTNode(AArgs[0].AsObject()).AddChild(TASTNode(AArgs[1].AsObject()));
+      TMorASTNode(AArgs[0].AsObject()).AddChild(TMorASTNode(AArgs[1].AsObject()));
     Result := TValue.Empty;
   end
 
   // getResultNode() -> node
   else if AName = 'getResultNode' then
-    Result := TValue.From<TASTNode>(FResultNode)
+    Result := TValue.From<TMorASTNode>(FResultNode)
 
   // concat(a, b, ...) -> string
   else if AName = 'concat' then
@@ -2275,7 +2275,7 @@ begin
   else if AName = 'error' then
   begin
     if Assigned(FErrors) and (Length(AArgs) > 0) then
-      FErrors.Add(esError, ERR_MORINTERP_UNKNOWN_NODE,
+      FErrors.Add(esError, MOR_ERR_MORINTERP_UNKNOWN_NODE,
         MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
@@ -2284,7 +2284,7 @@ begin
   else if AName = 'warning' then
   begin
     if Assigned(FErrors) and (Length(AArgs) > 0) then
-      FErrors.Add(esWarning, ERR_MORINTERP_UNKNOWN_NODE,
+      FErrors.Add(esWarning, MOR_ERR_MORINTERP_UNKNOWN_NODE,
         MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
@@ -2293,7 +2293,7 @@ begin
   else if (AName = 'hint') or (AName = 'note') or (AName = 'info') then
   begin
     if Assigned(FErrors) and (Length(AArgs) > 0) then
-      FErrors.Add(esHint, ERR_MORINTERP_UNKNOWN_NODE,
+      FErrors.Add(esHint, MOR_ERR_MORINTERP_UNKNOWN_NODE,
         MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
@@ -2304,7 +2304,7 @@ begin
   begin
     if Assigned(FActiveParser) and (Length(AArgs) > 0) then
       Result := TValue.From<Boolean>(
-        TGenericParser(FActiveParser).Check(MorToString(AArgs[0])))
+        TMorGenericParser(FActiveParser).Check(MorToString(AArgs[0])))
     else
       Result := TValue.From<Boolean>(False);
   end
@@ -2314,7 +2314,7 @@ begin
   begin
     if Assigned(FActiveParser) and (Length(AArgs) > 0) then
       Result := TValue.From<Boolean>(
-        TGenericParser(FActiveParser).Match(MorToString(AArgs[0])))
+        TMorGenericParser(FActiveParser).Match(MorToString(AArgs[0])))
     else
       Result := TValue.From<Boolean>(False);
   end
@@ -2325,8 +2325,8 @@ begin
     if Assigned(FActiveParser) then
     begin
       Result := TValue.From<string>(
-        TGenericParser(FActiveParser).Current().Text);
-      TGenericParser(FActiveParser).DoAdvance();
+        TMorGenericParser(FActiveParser).Current().Text);
+      TMorGenericParser(FActiveParser).DoAdvance();
     end
     else
       Result := TValue.From<string>('');
@@ -2336,7 +2336,7 @@ begin
   else if AName = 'requireToken' then
   begin
     if Assigned(FActiveParser) and (Length(AArgs) > 0) then
-      TGenericParser(FActiveParser).Expect(MorToString(AArgs[0]));
+      TMorGenericParser(FActiveParser).Expect(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
@@ -2345,7 +2345,7 @@ begin
   begin
     if Assigned(FActiveParser) then
       Result := TValue.From<string>(
-        TGenericParser(FActiveParser).Current().Text)
+        TMorGenericParser(FActiveParser).Current().Text)
     else
       Result := TValue.From<string>('');
   end
@@ -2355,7 +2355,7 @@ begin
   begin
     if Assigned(FActiveParser) then
       Result := TValue.From<string>(
-        TGenericParser(FActiveParser).Current().Kind)
+        TMorGenericParser(FActiveParser).Current().Kind)
     else
       Result := TValue.From<string>('');
   end
@@ -2365,7 +2365,7 @@ begin
   begin
     if Assigned(FActiveParser) then
       Result := TValue.From<string>(
-        TGenericParser(FActiveParser).Peek().Kind)
+        TMorGenericParser(FActiveParser).Peek().Kind)
     else
       Result := TValue.From<string>('');
   end
@@ -2376,11 +2376,11 @@ begin
     if Assigned(FActiveParser) then
     begin
       if Length(AArgs) > 0 then
-        Result := TValue.From<TASTNode>(
-          TGenericParser(FActiveParser).ParseExpression(AArgs[0].AsInt64()))
+        Result := TValue.From<TMorASTNode>(
+          TMorGenericParser(FActiveParser).ParseExpression(AArgs[0].AsInt64()))
       else
-        Result := TValue.From<TASTNode>(
-          TGenericParser(FActiveParser).ParseExpression(0));
+        Result := TValue.From<TMorASTNode>(
+          TMorGenericParser(FActiveParser).ParseExpression(0));
     end
     else
       Result := TValue.Empty;
@@ -2393,9 +2393,9 @@ begin
   begin
     if Assigned(FActiveParser) and (Length(AArgs) >= 2) then
     begin
-      Result := TValue.From<TASTNode>(
-        TGenericParser(FActiveParser).ParseExpressionFrom(
-          AArgs[0].AsType<TASTNode>(),
+      Result := TValue.From<TMorASTNode>(
+        TMorGenericParser(FActiveParser).ParseExpressionFrom(
+          AArgs[0].AsType<TMorASTNode>(),
           AArgs[1].AsInt64()));
     end
     else
@@ -2406,8 +2406,8 @@ begin
   else if AName = 'parseStmt' then
   begin
     if Assigned(FActiveParser) then
-      Result := TValue.From<TASTNode>(
-        TGenericParser(FActiveParser).ParseStatement())
+      Result := TValue.From<TMorASTNode>(
+        TMorGenericParser(FActiveParser).ParseStatement())
     else
       Result := TValue.Empty;
   end
@@ -2417,7 +2417,7 @@ begin
   begin
     if Assigned(FActiveParser) and (Length(AArgs) > 0) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LTargetStr := MorToString(AArgs[0]);
       LRawAccum := '';
       LDepth := 0;
@@ -2465,7 +2465,7 @@ begin
   begin
     if Assigned(FActiveParser) then
     begin
-      LGenParser := TGenericParser(FActiveParser);
+      LGenParser := TMorGenericParser(FActiveParser);
       LRawAccum := '';
       LDepth := 0;
       while not LGenParser.AtEnd() do
@@ -2539,7 +2539,7 @@ begin
   else if AName = 'emitNode' then
   begin
     if (Length(AArgs) > 0) and AArgs[0].IsObject() then
-      RunEmitHandler(TASTNode(AArgs[0].AsObject()));
+      RunEmitHandler(TMorASTNode(AArgs[0].AsObject()));
     Result := TValue.Empty;
   end
 
@@ -2548,7 +2548,7 @@ begin
   begin
     if (Length(AArgs) > 0) and AArgs[0].IsObject() then
     begin
-      LNode := TASTNode(AArgs[0].AsObject());
+      LNode := TMorASTNode(AArgs[0].AsObject());
       for LIdx := 0 to LNode.ChildCount() - 1 do
       begin
         if Assigned(FErrors) and FErrors.ReachedMaxErrors() then Break;
@@ -2565,7 +2565,7 @@ begin
     begin
       FOutput.BeginCapture();
       try
-        RunEmitHandler(TASTNode(AArgs[0].AsObject()));
+        RunEmitHandler(TMorASTNode(AArgs[0].AsObject()));
         Result := TValue.From<string>(FOutput.EndCapture());
       except
         FOutput.EndCapture();
@@ -2824,11 +2824,11 @@ begin
     begin
       LS := LowerCase(MorToString(AArgs[0]));
       if LS = 'exe' then
-        TBuild(FBuild).SetBuildMode(bmExe)
+        TMorBuild(FBuild).SetBuildMode(bmExe)
       else if LS = 'lib' then
-        TBuild(FBuild).SetBuildMode(bmLib)
+        TMorBuild(FBuild).SetBuildMode(bmLib)
       else if LS = 'dll' then
-        TBuild(FBuild).SetBuildMode(bmDll);
+        TMorBuild(FBuild).SetBuildMode(bmDll);
     end;
     Result := TValue.Empty;
   end
@@ -2840,9 +2840,9 @@ begin
     begin
       LS := LowerCase(MorToString(AArgs[0]));
       if LS = 'win64' then
-        TBuild(FBuild).SetTarget(tpWin64)
+        TMorBuild(FBuild).SetTarget(tpWin64)
       else if LS = 'linux64' then
-        TBuild(FBuild).SetTarget(tpLinux64);
+        TMorBuild(FBuild).SetTarget(tpLinux64);
     end;
     Result := TValue.Empty;
   end
@@ -2854,13 +2854,13 @@ begin
     begin
       LS := LowerCase(MorToString(AArgs[0]));
       if LS = 'debug' then
-        TBuild(FBuild).SetOptimizeLevel(olDebug)
+        TMorBuild(FBuild).SetOptimizeLevel(olDebug)
       else if LS = 'releasesafe' then
-        TBuild(FBuild).SetOptimizeLevel(olReleaseSafe)
+        TMorBuild(FBuild).SetOptimizeLevel(olReleaseSafe)
       else if (LS = 'release') or (LS = 'releasefast') then
-        TBuild(FBuild).SetOptimizeLevel(olReleaseFast)
+        TMorBuild(FBuild).SetOptimizeLevel(olReleaseFast)
       else if LS = 'releasesmall' then
-        TBuild(FBuild).SetOptimizeLevel(olReleaseSmall);
+        TMorBuild(FBuild).SetOptimizeLevel(olReleaseSmall);
     end;
     Result := TValue.Empty;
   end
@@ -2872,9 +2872,9 @@ begin
     begin
       LS := LowerCase(MorToString(AArgs[0]));
       if LS = 'console' then
-        TBuild(FBuild).SetSubsystem(stConsole)
+        TMorBuild(FBuild).SetSubsystem(stConsole)
       else if LS = 'gui' then
-        TBuild(FBuild).SetSubsystem(stGUI);
+        TMorBuild(FBuild).SetSubsystem(stGUI);
     end;
     Result := TValue.Empty;
   end
@@ -2898,70 +2898,70 @@ begin
   else if AName = 'setAddVerInfo' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetAddVersionInfo(MorIsTrue(AArgs[0]));
+      TMorBuild(FBuild).SetAddVersionInfo(MorIsTrue(AArgs[0]));
     Result := TValue.Empty;
   end
 
   else if AName = 'setExeIcon' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetExeIcon(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetExeIcon(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
   else if AName = 'setVersionMajor' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIMajor(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
+      TMorBuild(FBuild).SetVIMajor(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
     Result := TValue.Empty;
   end
 
   else if AName = 'setVersionMinor' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIMinor(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
+      TMorBuild(FBuild).SetVIMinor(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
     Result := TValue.Empty;
   end
 
   else if AName = 'setVersionPatch' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIPatch(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
+      TMorBuild(FBuild).SetVIPatch(Word(StrToIntDef(MorToString(AArgs[0]), 0)));
     Result := TValue.Empty;
   end
 
   else if AName = 'setProductName' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIProductName(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetVIProductName(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
   else if AName = 'setFileDescription' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIDescription(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetVIDescription(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
   else if AName = 'setVIFilename' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVIFilename(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetVIFilename(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
   else if AName = 'setCompanyName' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVICompanyName(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetVICompanyName(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
   else if AName = 'setLegalCopyright' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TBuild(FBuild).SetVICopyright(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetVICopyright(MorToString(AArgs[0]));
     Result := TValue.Empty;
   end
 
@@ -2969,7 +2969,7 @@ begin
   else if AName = 'addBreakpoint' then
   begin
     if Assigned(FBuild) and (Length(AArgs) >= 2) then
-      TBuild(FBuild).AddBreakpoint(MorToString(AArgs[0]), StrToIntDef(MorToString(AArgs[1]), 0) + 1);
+      TMorBuild(FBuild).AddBreakpoint(MorToString(AArgs[0]), StrToIntDef(MorToString(AArgs[1]), 0) + 1);
     Result := TValue.Empty;
   end
 
@@ -2987,10 +2987,10 @@ begin
     if Assigned(FErrors) then
     begin
       if Assigned(FCurrentNode) then
-        ReportNodeError(FErrors, FCurrentNode, ERR_MORINTERP_UNKNOWN_BUILTIN,
+        MorReportNodeError(FErrors, FCurrentNode, MOR_ERR_MORINTERP_UNKNOWN_BUILTIN,
           RSMorInterpUnknownBuiltin, [AName])
       else
-        FErrors.Add(esError, ERR_MORINTERP_UNKNOWN_BUILTIN,
+        FErrors.Add(esError, MOR_ERR_MORINTERP_UNKNOWN_BUILTIN,
           RSMorInterpUnknownBuiltin, [AName]);
     end;
     Result := TValue.Empty;
@@ -3002,7 +3002,7 @@ end;
 function TMorInterpreter.CallRoutine(const AName: string;
   const AArgs: TArray<TValue>): TValue;
 var
-  LRoutineAST: TASTNode;
+  LRoutineAST: TMorASTNode;
   LParamCount: Integer;
   LI: Integer;
   LParamName: string;
@@ -3012,7 +3012,7 @@ begin
   if not FRoutines.TryGetValue(AName, LRoutineAST) then
   begin
     if Assigned(FErrors) then
-      FErrors.Add(esError, ERR_MORINTERP_UNDEFINED_ROUTINE,
+      FErrors.Add(esError, MOR_ERR_MORINTERP_UNDEFINED_ROUTINE,
         RSMorInterpUndefinedRoutine, [AName]);
     Exit;
   end;
@@ -3037,7 +3037,7 @@ begin
       if LRoutineAST.ChildCount() > 0 then
         ExecBlock(LRoutineAST.GetChild(0));
     except
-      on E: EReturnSignal do
+      on E: EMorReturnSignal do
         Result := E.ReturnValue;
     end;
   finally
@@ -3052,12 +3052,12 @@ begin
   Result := FKeywords;
 end;
 
-function TMorInterpreter.GetOperators(): TList<TOperatorEntryInterp>;
+function TMorInterpreter.GetOperators(): TList<TMorOperatorEntryInterp>;
 begin
   Result := FOperators;
 end;
 
-function TMorInterpreter.GetStringStyles(): TList<TStringStyleEntry>;
+function TMorInterpreter.GetStringStyles(): TList<TMorStringStyleEntry>;
 begin
   Result := FStringStyles;
 end;
@@ -3072,7 +3072,7 @@ begin
   Result := FBlockComments;
 end;
 
-function TMorInterpreter.GetLexerConfig(): TLexerConfig;
+function TMorInterpreter.GetLexerConfig(): TMorLexerConfig;
 begin
   Result := FLexerConfig;
 end;
@@ -3087,32 +3087,32 @@ begin
   Result := FDirectiveFlags;
 end;
 
-function TMorInterpreter.GetPrefixRules(): TDictionary<string, TASTNode>;
+function TMorInterpreter.GetPrefixRules(): TDictionary<string, TMorASTNode>;
 begin
   Result := FPrefixRules;
 end;
 
-function TMorInterpreter.GetInfixRules(): TDictionary<string, TInfixEntry>;
+function TMorInterpreter.GetInfixRules(): TDictionary<string, TMorInfixEntry>;
 begin
   Result := FInfixRules;
 end;
 
-function TMorInterpreter.GetStmtRules(): TDictionary<string, TList<TASTNode>>;
+function TMorInterpreter.GetStmtRules(): TDictionary<string, TList<TMorASTNode>>;
 begin
   Result := FStmtRules;
 end;
 
-function TMorInterpreter.GetSemanticHandlers(): TDictionary<string, TASTNode>;
+function TMorInterpreter.GetSemanticHandlers(): TDictionary<string, TMorASTNode>;
 begin
   Result := FSemanticHandlers;
 end;
 
-function TMorInterpreter.GetEmitHandlers(): TDictionary<string, TASTNode>;
+function TMorInterpreter.GetEmitHandlers(): TDictionary<string, TMorASTNode>;
 begin
   Result := FEmitHandlers;
 end;
 
-function TMorInterpreter.GetRoutines(): TDictionary<string, TASTNode>;
+function TMorInterpreter.GetRoutines(): TDictionary<string, TMorASTNode>;
 begin
   Result := FRoutines;
 end;
@@ -3122,7 +3122,7 @@ begin
   Result := FConstants;
 end;
 
-function TMorInterpreter.GetEnvironment(): TEnvironment;
+function TMorInterpreter.GetEnvironment(): TMorEnvironment;
 begin
   Result := FEnv;
 end;
@@ -3139,7 +3139,7 @@ begin
   FScopes := AScopes;
 end;
 
-procedure TMorInterpreter.SetOutput(const AOutput: TCodeOutput);
+procedure TMorInterpreter.SetOutput(const AOutput: TMorCodeOutput);
 begin
   FOutput := AOutput;
   if Assigned(FOutput) then
@@ -3151,7 +3151,7 @@ begin
   FActiveParser := AParser;
 end;
 
-function TMorInterpreter.GetOutput(): TCodeOutput;
+function TMorInterpreter.GetOutput(): TMorCodeOutput;
 begin
   Result := FOutput;
 end;
@@ -3171,12 +3171,12 @@ begin
   Result := FCurrentInfixPower;
 end;
 
-procedure TMorInterpreter.SetCompileModuleFunc(const AFunc: TCompileModuleFunc);
+procedure TMorInterpreter.SetCompileModuleFunc(const AFunc: TMorCompileModuleFunc);
 begin
   FCompileModuleFunc := AFunc;
 end;
 
-procedure TMorInterpreter.SetImportMorFunc(const AFunc: TImportMorFunc);
+procedure TMorInterpreter.SetImportMorFunc(const AFunc: TMorImportMorFunc);
 begin
   FImportMorFunc := AFunc;
 end;
@@ -3189,25 +3189,25 @@ end;
 { Native Handler Registration }
 
 procedure TMorInterpreter.RegisterNativePrefix(const AKind: string;
-  const AHandler: TNativePrefixHandler);
+  const AHandler: TMorNativePrefixHandler);
 begin
   FNativePrefixRules.AddOrSetValue(AKind, AHandler);
 end;
 
 procedure TMorInterpreter.RegisterNativeInfix(const AKind: string;
-  const AEntry: TNativeInfixEntry);
+  const AEntry: TMorNativeInfixEntry);
 begin
   FNativeInfixRules.AddOrSetValue(AKind, AEntry);
 end;
 
 procedure TMorInterpreter.RegisterNativeStmt(const AKind: string;
-  const AHandler: TNativeStmtHandler);
+  const AHandler: TMorNativeStmtHandler);
 begin
   FNativeStmtRules.AddOrSetValue(AKind, AHandler);
 end;
 
 procedure TMorInterpreter.RegisterNativeEmit(const AKind: string;
-  const AHandler: TNativeEmitHandler);
+  const AHandler: TMorNativeEmitHandler);
 begin
   FNativeEmitHandlers.AddOrSetValue(AKind, AHandler);
 end;
@@ -3217,7 +3217,7 @@ end;
 function TMorInterpreter.ParserCurrentKind(): string;
 begin
   if Assigned(FActiveParser) then
-    Result := TGenericParser(FActiveParser).Current().Kind
+    Result := TMorGenericParser(FActiveParser).Current().Kind
   else
     Result := '';
 end;
@@ -3225,7 +3225,7 @@ end;
 function TMorInterpreter.ParserCurrentText(): string;
 begin
   if Assigned(FActiveParser) then
-    Result := TGenericParser(FActiveParser).Current().Text
+    Result := TMorGenericParser(FActiveParser).Current().Text
   else
     Result := '';
 end;
@@ -3233,21 +3233,21 @@ end;
 procedure TMorInterpreter.ParserAdvance();
 begin
   if Assigned(FActiveParser) then
-    TGenericParser(FActiveParser).DoAdvance();
+    TMorGenericParser(FActiveParser).DoAdvance();
 end;
 
 function TMorInterpreter.ParserAtEnd(): Boolean;
 begin
   if Assigned(FActiveParser) then
-    Result := TGenericParser(FActiveParser).AtEnd()
+    Result := TMorGenericParser(FActiveParser).AtEnd()
   else
     Result := True;
 end;
 
-function TMorInterpreter.ParserCurrentToken(): TToken;
+function TMorInterpreter.ParserCurrentToken(): TMorToken;
 begin
   if Assigned(FActiveParser) then
-    Result := TGenericParser(FActiveParser).Current()
+    Result := TMorGenericParser(FActiveParser).Current()
   else
   begin
     Result.Kind := '';
@@ -3260,21 +3260,21 @@ end;
 
 { Grammar Rule Execution }
 
-function TMorInterpreter.ExecuteGrammarRule(const ARuleAST: TASTNode;
-  const ALeft: TASTNode): TASTNode;
+function TMorInterpreter.ExecuteGrammarRule(const ARuleAST: TMorASTNode;
+  const ALeft: TMorASTNode): TMorASTNode;
 var
   LNodeKind: string;
-  LSavedResultNode: TASTNode;
+  LSavedResultNode: TMorASTNode;
   LSavedSnapshot: Integer;
   LI: Integer;
-  LStartToken: TToken;
-  LEndToken: TToken;
-  LRange: TSourceRange;
+  LStartToken: TMorToken;
+  LEndToken: TMorToken;
+  LRange: TMorSourceRange;
 begin
   LNodeKind := ARuleAST.GetAttr('node_kind');
 
   // Create the user AST node this rule will build
-  Result := TASTNode.Create();
+  Result := TMorASTNode.Create();
   Result.SetKind(LNodeKind);
   Result.SetToken(ParserCurrentToken());
   LStartToken := ParserCurrentToken();
@@ -3321,10 +3321,10 @@ end;
 
 { Semantic Handler Dispatch }
 
-procedure TMorInterpreter.RunSemanticHandler(const AUserNode: TASTNode);
+procedure TMorInterpreter.RunSemanticHandler(const AUserNode: TMorASTNode);
 var
-  LHandler: TASTNode;
-  LSavedNode: TASTNode;
+  LHandler: TMorASTNode;
+  LSavedNode: TMorASTNode;
   LI: Integer;
 begin
   if AUserNode = nil then Exit;
@@ -3337,7 +3337,7 @@ begin
     FCurrentNode := AUserNode;
     FEnv.Push();
     try
-      FEnv.SetVar('node', TValue.From<TASTNode>(AUserNode));
+      FEnv.SetVar('node', TValue.From<TMorASTNode>(AUserNode));
       ExecBlock(LHandler);
     finally
       FEnv.Pop();
@@ -3357,11 +3357,11 @@ end;
 
 { Emit Handler Dispatch }
 
-procedure TMorInterpreter.RunEmitHandler(const AUserNode: TASTNode);
+procedure TMorInterpreter.RunEmitHandler(const AUserNode: TMorASTNode);
 var
-  LHandler: TASTNode;
-  LNativeHandler: TNativeEmitHandler;
-  LSavedNode: TASTNode;
+  LHandler: TMorASTNode;
+  LNativeHandler: TMorNativeEmitHandler;
+  LSavedNode: TMorASTNode;
   LI: Integer;
 begin
   if AUserNode = nil then Exit;
@@ -3385,14 +3385,14 @@ begin
     FCurrentNode := AUserNode;
     FEnv.Push();
     try
-      FEnv.SetVar('node', TValue.From<TASTNode>(AUserNode));
+      FEnv.SetVar('node', TValue.From<TMorASTNode>(AUserNode));
       try
         ExecBlock(LHandler);
       except
-        on E: EReturnSignal do
+        on E: EMorReturnSignal do
           ; // return exits the emitter handler normally
         on E: Exception do
-          ReportNodeError(FErrors, AUserNode, ERR_MORINTERP_EMITTER_CRASH,
+          MorReportNodeError(FErrors, AUserNode, MOR_ERR_MORINTERP_EMITTER_CRASH,
             RSMorInterpEmitterCrash, [AUserNode.GetKind(), E.Message]);
       end;
     finally
@@ -3422,12 +3422,12 @@ end;
 
 { Pipeline Entry Points }
 
-procedure TMorInterpreter.RunSemantics(const AMasterRoot: TASTNode);
+procedure TMorInterpreter.RunSemantics(const AMasterRoot: TMorASTNode);
 var
   LI: Integer;
-  LPass: TSemanticPass;
+  LPass: TMorSemanticPass;
   LJ: Integer;
-  LSavedHandlers: TDictionary<string, TASTNode>;
+  LSavedHandlers: TDictionary<string, TMorASTNode>;
 begin
   if AMasterRoot = nil then Exit;
 
@@ -3465,7 +3465,7 @@ begin
   end;
 end;
 
-procedure TMorInterpreter.RunEmitters(const AMasterRoot: TASTNode);
+procedure TMorInterpreter.RunEmitters(const AMasterRoot: TMorASTNode);
 var
   LI: Integer;
 begin
@@ -3503,22 +3503,22 @@ end;
 
 { Native Handler Accessors }
 
-function TMorInterpreter.GetNativePrefixRules(): TDictionary<string, TNativePrefixHandler>;
+function TMorInterpreter.GetNativePrefixRules(): TDictionary<string, TMorNativePrefixHandler>;
 begin
   Result := FNativePrefixRules;
 end;
 
-function TMorInterpreter.GetNativeInfixRules(): TDictionary<string, TNativeInfixEntry>;
+function TMorInterpreter.GetNativeInfixRules(): TDictionary<string, TMorNativeInfixEntry>;
 begin
   Result := FNativeInfixRules;
 end;
 
-function TMorInterpreter.GetNativeStmtRules(): TDictionary<string, TNativeStmtHandler>;
+function TMorInterpreter.GetNativeStmtRules(): TDictionary<string, TMorNativeStmtHandler>;
 begin
   Result := FNativeStmtRules;
 end;
 
-function TMorInterpreter.GetNativeEmitHandlers(): TDictionary<string, TNativeEmitHandler>;
+function TMorInterpreter.GetNativeEmitHandlers(): TDictionary<string, TMorNativeEmitHandler>;
 begin
   Result := FNativeEmitHandlers;
 end;

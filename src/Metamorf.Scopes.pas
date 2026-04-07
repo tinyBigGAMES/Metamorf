@@ -72,7 +72,7 @@ type
   end;
 
   { TScopeManager }
-  TScopeManager = class(TErrorsObject)
+  TScopeManager = class(TMorErrorsObject)
   private
     FRoot: TScope;
     FCurrent: TScope;
@@ -341,7 +341,7 @@ function TScopeManager.DemoteCLinkageForPrefix(const APrefix: string): Integer;
 var
   LScope: TScope;
   LPair: TPair<string, TSymbol>;
-  LNode: TASTNode;
+  LNode: TMorASTNode;
 begin
   Result := 0;
   LScope := FCurrent;
@@ -352,7 +352,7 @@ begin
       if LPair.Key.StartsWith(APrefix) and
          (LPair.Value.GetDeclNode() <> nil) then
       begin
-        LNode := TASTNode(LPair.Value.GetDeclNode());
+        LNode := TMorASTNode(LPair.Value.GetDeclNode());
         if LNode.HasAttr('decl.linkage') and
            (LNode.GetAttr('decl.linkage') = '"C"') then
         begin
