@@ -1,6 +1,6 @@
 <div align="center">
 
-![Metamorf](media/logo.png)
+![Metamorf](media/metamorf.png)
 
 <br>
 

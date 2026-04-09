@@ -1,4 +1,4 @@
-![Metamorf](../media/logo.png)
+![Metamorf](../media/metamorf.png)
 
 ## Table of Contents
 
@@ -286,13 +286,41 @@ With dispatch tables populated, the engine compiles user source files:
 
 ### Module Compilation
 
-When a semantic handler calls `compileModule(name)`, the engine resolves the module file (using the extension set by `setModuleExtension()`), lexes and parses it into a new AST branch, attaches that branch to the master root, and runs semantic analysis on it. This can trigger further module compilations recursively.
+When a semantic handler calls `compileModule(name)`, the engine resolves the module file (using the extension set by `setModuleExtension()`), lexes and parses it into a new AST branch, attaches that branch to the master root, and runs semantic analysis on it. This can trigger further module compilations recursively. If the module file is not found in the source directory, the engine searches additional directories registered via `addModulePath()` (see Module Path Search below).
 
 The master AST has a single `master.root` node with one branch per source file. The main program is always branch 0; imported modules are branches 1, 2, etc. Emitters process module branches first, then the main program branch, so that the main program's build settings (exe mode) take effect last.
 
 ### .mor Imports
 
 The `.mor` language supports modular language definitions via `import "file.mor"`. When the interpreter encounters an import, the engine lexes and parses the imported `.mor` file, adds its AST to a .mor master root (for lifetime management), and continues setup. Imported `.mor` files can contain any top-level block: tokens, types, grammar, semantics, emitters, routines, constants, or fragments. This enables splitting large language definitions across multiple files.
+
+### Build State Stack
+
+When importing modules via `compileModule()`, the imported module may set its own build configuration (mode, target, subsystem, version info, icon). Without protection, these settings would overwrite the parent module's configuration. The build state stack solves this: call `pushBuildState()` before compiling an import and `popBuildState()` after. The engine saves and restores all scalar build settings on an internal stack, so imported modules cannot interfere with the parent's build configuration.
+
+### Centralized Conditional Compilation
+
+Conditional compilation defines (set via `setDefine()` and queried via `hasDefine()`) are stored on the build object (`TMorBuild`) rather than on the lexer. This means defines persist across multiple tokenization passes, which is important for multi-file compilation. A `.mor` file can set defines at the top level (e.g., `setDefine("MYRA");`) before tokenization begins, and those defines will be visible to all subsequent lexer passes for user source files.
+
+### Module Path Search
+
+When `compileModule(name)` cannot find a module file in the source directory, it searches additional directories registered via `addModulePath(path)`. This enables `.mor` files to set up library search paths so that imported modules can be located in external directories.
+
+### Top-Level Expressions in .mor
+
+The `.mor` parser handles `identifier` tokens at the top level by calling `ParseStmt()`. This enables `.mor` files to call builtins at the top level outside of any block. For example, `setDefine("MYRA");` can appear at the top level of a `.mor` file, before any `tokens`, `grammar`, or other block.
+
+### Internal Class Hierarchy
+
+The interpreter and generic lexer share a common base class, `TMorBuildObject`, which extends `TMorErrorsObject` and holds a reference to the build object (`TMorBuild`). This means both the interpreter and lexer have direct access to the build object (and therefore to defines, module paths, and build configuration) without separate setter wiring.
+
+### C++ Runtime Library
+
+Every generated binary links against `mor_runtime.cpp` / `mor_runtime.h`, which provides exception handling, test runner infrastructure, and utility macros. All runtime symbols use the `Mor` prefix (e.g., `MorException`, `MorVehHandler`, `MorTryFn`, `MorTestFn`, `MorTestInfo`, `MorVarArgs`). Programs should call `mor_init_exceptions()` at startup to initialize exception handling (VEH on Windows, signal handlers on Linux).
+
+### Lexer Error Codes
+
+The generic lexer reports `UL005` (`MOR_ERR_USERLEXER_UNKNOWN_DIRECTIVE`) for unrecognized directive names, instead of the generic "unexpected character" error. This provides clearer diagnostics when a `.mor` language defines a directive prefix but the user misspells a directive name.
 
 
 ## File Structure
@@ -373,8 +401,8 @@ The Metamorf compiler is built from these Delphi source units:
 | `Metamorf.AST.pas` | `TASTNode`, `TToken`: universal AST nodes with string attributes and named children |
 | `Metamorf.Environment.pas` | `TEnvironment`: variable scope stack for `.mor` interpreter runtime |
 | `Metamorf.Cpp.pas` | `ConfigCpp()`: registers C++ passthrough tokens, grammar, and emitters after `.mor` setup |
-| `Metamorf.Build.pas` | `TBuild`: generates `build.zig`, invokes Zig/Clang, handles version info and post-build resources |
-| `Metamorf.Common.pas` | `ReportNodeError()`: helper for positioned error reporting |
+| `Metamorf.Build.pas` | `TMorBuild`: generates `build.zig`, invokes Zig/Clang, handles version info, post-build resources, build state stack (`PushState`/`PopState`), and conditional compilation defines |
+| `Metamorf.Common.pas` | `TMorBuildObject` base class, `ReportNodeError()`: helper for positioned error reporting |
 | `Metamorf.Utils.pas` | `TBaseObject`, `TErrorsObject`, `TErrors`, `TUtils`: base class hierarchy and utilities |
 | `Metamorf.Resources.pas` | Resource strings for all user-facing messages |
 | `Metamorf.Config.pas` | Configuration constants |
@@ -2369,6 +2397,8 @@ These functions are available inside `grammar { rule ... { } }` bodies for manua
 | `peekKind()` | string | Kind of next token (1-token lookahead) |
 | `parseExpr(power)` | node | Parse expression with minimum binding power |
 | `parseStmt()` | node | Parse next statement |
+| `parserParseExpr(minPower)` | node | Delegate sub-expression parsing to the engine's expression parser at a given minimum binding power. Enables .mor grammar rules to invoke the engine's Pratt parser directly |
+| `parserExpect(kind)` | - | Call the engine's expect function, consuming the current token if it matches the given kind, or reporting an error |
 
 ### Semantic Context
 
@@ -2380,6 +2410,9 @@ These functions are available inside `semantics { on ... { } }` handlers for sym
 | `demoteCLinkageForPrefix(prefix)` | int | Strip `"C"` linkage from matching symbols, return count |
 | `compileModule(name)` | bool | Trigger compilation of module `name` |
 | `setModuleExtension(ext)` | - | Set file extension for module file resolution |
+| `addModulePath(path)` | - | Add a directory to the module search path for import resolution |
+| `getModulePaths()` | string | Returns comma-separated string of all registered module paths |
+| `clearModulePaths()` | - | Clear all registered module paths |
 
 Plus the declarative constructs: `declare`, `lookup`, `scope`, `visit` (see Semantics Block section).
 
@@ -2584,6 +2617,44 @@ A program in that language then configures its build inline:
 
 With the built-in function reference covered, the next section explains how Metamorf automatically handles C++ interop so your `.mor` file does not have to.
 
+### Build State Management
+
+These builtins save and restore build configuration across module imports, preventing imported modules from overwriting the parent module's settings.
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `pushBuildState()` | - | Save the current build configuration (mode, target, subsystem, version info, icon) onto an internal stack |
+| `popBuildState()` | - | Restore the most recently pushed build configuration from the stack |
+
+### Build Query
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `getOptimize()` | string | Returns current optimization level: `debug`, `releasesafe`, `releasefast`, or `releasesmall` |
+
+### Conditional Compilation
+
+These builtins manage conditional compilation symbols. Defines are stored on the build object and persist across multiple tokenization passes, so they are available to all source files in a multi-file compilation.
+
+**Defines:**
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `setDefine(name)` | - | Define a conditional compilation symbol |
+| `setDefine(name, value)` | - | Define a symbol with a value |
+| `removeDefine(name)` | - | Remove a defined symbol |
+| `clearDefines()` | - | Clear all defines |
+| `hasDefine(name)` | bool | True if symbol is defined |
+
+**Undefines:**
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `unsetDefine(name)` | - | Add symbol to the undefine list |
+| `removeUndefine(name)` | - | Remove symbol from the undefine list |
+| `clearUndefines()` | - | Clear all undefines |
+| `hasUndefine(name)` | bool | True if symbol is in the undefine list |
+
 
 ## C++ Passthrough
 
@@ -2602,6 +2673,35 @@ This means your language can freely intermix with C++ without any `.mor` configu
 - Emit handlers that output collected C++ text verbatim
 
 All C++ operators and delimiters are registered unconditionally. C++ keywords are registered only if the custom language has not already claimed them. The operator list is re-sorted longest-first after registration, so multi-character operators like `::` and `->` always match before their single-character components.
+
+### Native C++ Expression Rules
+
+In addition to statement-level passthrough, the engine registers native prefix and infix rules that parse C++ expression constructs and produce typed AST nodes. These enable your language's expression parser to handle C++ idioms transparently.
+
+**Native prefix rules:**
+
+| Token | Parsed As | AST Node | Description |
+|-------|-----------|----------|-------------|
+| `delimiter.lparen` | `(type)expr` | `expr.cpp_cast` | C-style cast. When `(` is followed by a `cpp.keyword.*` token, parses as a C-style cast. Otherwise falls through to grouped expression |
+| `op.multiply` | `*expr` | `expr.cpp_deref` | Pointer dereference in prefix position |
+| `cpp.op.bitand` | `&expr` | `expr.cpp_addrof` | Address-of in prefix position |
+
+**Native statement rule:**
+
+| Token | Parsed As | Description |
+|-------|-----------|-------------|
+| `op.multiply` | `*ptr := value;` | Pointer dereference in statement position, parsed as an expression statement |
+
+**Native emitters:**
+
+| AST Node | C++ Output |
+|----------|------------|
+| `expr.cpp_deref` | `*operand` |
+| `expr.cpp_addrof` | `&operand` |
+
+### Preprocessor Directive Improvements
+
+The `#include` and other preprocessor directive handlers collect tokens until a language keyword, another directive, or a semicolon is reached, rather than stopping at `>` or a second `"`. String tokens in preprocessor lines are properly re-quoted with `"..."` or `'...'` in the emitted output. The scope resolution operator `::` now reads the `name` attribute before falling back to `identifier`.
 
 ### The Golden Rule: Do Not Redeclare C++ Tokens
 
