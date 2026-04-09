@@ -30,6 +30,29 @@ const
   MOR_AST_MAGIC     = $314D4F52; // 'MOR1' as DWORD (little-endian: R, O, M, 1)
   MOR_AST_VERSION   = 1;
 
+  // ResolvePath behavior when no explicit base path is provided
+  // 0 = raw passthrough (no resolution)
+  // 1 = resolve relative to exe directory (ParamStr(0))
+  // 2 = resolve relative to source file directory (FSourceDir)
+  MOR_RESOLVEPATH_BEHAVIOR = 1;
+
+type
+  { TMorRunMode }
+  TMorRunMode = (
+    rmNone,
+    rmExecute,
+    rmDebug
+  );
+
+  { TMorBuildObject }
+  TMorBuildObject = class(TMorErrorsObject)
+  protected
+    FBuild: TObject;
+  public
+    procedure SetBuild(const ABuild: TObject); virtual;
+    function GetBuild(): TObject;
+  end;
+
 // Report an error with position info extracted from an AST node's token.
 procedure MorReportNodeError(
   const AErrors: TMorErrors;
@@ -60,6 +83,18 @@ begin
     LToken := ANode.GetToken();
   AErrors.Add(LToken.Filename, LToken.Line, LToken.Col, esError, ACode,
     AFmt, AArgs);
+end;
+
+{ TMorBuildObject }
+
+procedure TMorBuildObject.SetBuild(const ABuild: TObject);
+begin
+  FBuild := ABuild;
+end;
+
+function TMorBuildObject.GetBuild(): TObject;
+begin
+  Result := FBuild;
 end;
 
 end.

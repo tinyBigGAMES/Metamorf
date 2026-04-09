@@ -21,6 +21,7 @@ uses
   System.TypInfo,
   System.Generics.Defaults,
   System.Generics.Collections,
+  System.Classes,
   Metamorf.Utils,
   Metamorf.Resources,
   Metamorf.AST,
@@ -123,7 +124,7 @@ type
   TMorImportMorFunc = function(const AMorPath: string): TMorASTNode of object;
 
   { TMorInterpreter }
-  TMorInterpreter = class(TMorErrorsObject)
+  TMorInterpreter = class(TMorBuildObject)
   private
     // From tokens {} block
     FKeywords: TDictionary<string, string>;
@@ -172,11 +173,11 @@ type
     // Subcomponents wired by TMorEngine
     FScopes: TScopeManager;
     FOutput: TMorCodeOutput;
-    FBuild: TObject;
     FActiveParser: TObject;
     FRuleErrorSnapshot: Integer;
     FCurrentInfixPower: Integer;
     FModuleExtension: string;
+    FModulePaths: TStringList;
     FCompileModuleFunc: TMorCompileModuleFunc;
     FImportMorFunc: TMorImportMorFunc;
 
@@ -244,7 +245,7 @@ type
     function GetEnvironment(): TMorEnvironment;
 
     // Subcomponent setters (called by TMorEngine)
-    procedure SetBuild(const ABuild: TObject);
+    //procedure SetBuild(const ABuild: TObject);
     procedure SetScopes(const AScopes: TScopeManager);
     procedure SetOutput(const AOutput: TMorCodeOutput);
     procedure SetActiveParser(const AParser: TObject);
@@ -255,6 +256,9 @@ type
     procedure SetCompileModuleFunc(const AFunc: TMorCompileModuleFunc);
     procedure SetImportMorFunc(const AFunc: TMorImportMorFunc);
     function GetModuleExtension(): string;
+    procedure AddModulePath(const APath: string);
+    function GetModulePaths(): TStringList;
+    procedure ClearModulePaths();
 
     // Native handler registration (called by Mor.Cpp)
     procedure RegisterNativePrefix(const AKind: string;
@@ -272,6 +276,8 @@ type
     procedure ParserAdvance();
     function ParserAtEnd(): Boolean;
     function ParserCurrentToken(): TMorToken;
+    function ParserParseExpr(const AMinPower: Integer): TMorASTNode;
+    procedure ParserExpect(const AKind: string);
 
     // Grammar rule execution (called by GenericParser)
     function ExecuteGrammarRule(const ARuleAST: TMorASTNode;
@@ -366,6 +372,8 @@ begin
   FBuild := nil;
   FActiveParser := nil;
   FModuleExtension := '';
+  FModulePaths := TStringList.Create();
+  FModulePaths.Duplicates := dupIgnore;
 
   // Native handler dictionaries
   FNativePrefixRules := TDictionary<string, TMorNativePrefixHandler>.Create();
@@ -379,6 +387,7 @@ var
   LI: Integer;
   LStmtList: TList<TMorASTNode>;
 begin
+  FreeAndNil(FModulePaths);
   FreeAndNil(FNativeEmitHandlers);
   FreeAndNil(FNativeStmtRules);
   FreeAndNil(FNativeInfixRules);
@@ -482,6 +491,12 @@ begin
       if MorIsTrue(EvalExpr(LChild.GetChild(0))) then
         if LChild.ChildCount() > 1 then
           WalkMorRoot(LChild.GetChild(1));
+    end
+    else if LKind = 'meta.expr_stmt' then
+    begin
+      // Top-level expression statement (e.g. setDefine("MYRA");)
+      if LChild.ChildCount() > 0 then
+        EvalExpr(LChild.GetChild(0));
     end
     ;
   end;
@@ -2816,7 +2831,49 @@ begin
     Result := TValue.Empty;
   end
 
+  // addModulePath(path)
+  else if AName = 'addModulePath' then
+  begin
+    if Length(AArgs) > 0 then
+    begin
+      if Assigned(FBuild) then
+        AddModulePath(TMorBuild(FBuild).ResolvePath('', MorToString(AArgs[0])))
+      else
+        AddModulePath(MorToString(AArgs[0]));
+    end;
+    Result := TValue.Empty;
+  end
+
+  // getModulePaths() -> comma-separated string
+  else if AName = 'getModulePaths' then
+  begin
+    Result := TValue.From<string>(FModulePaths.CommaText);
+  end
+
+  // clearModulePaths()
+  else if AName = 'clearModulePaths' then
+  begin
+    ClearModulePaths();
+    Result := TValue.Empty;
+  end
+
   // Compiler control
+  // pushBuildState()
+  else if AName = 'pushBuildState' then
+  begin
+    if Assigned(FBuild) then
+      TMorBuild(FBuild).PushState();
+    Result := TValue.Empty;
+  end
+
+  // popBuildState()
+  else if AName = 'popBuildState' then
+  begin
+    if Assigned(FBuild) then
+      TMorBuild(FBuild).PopState();
+    Result := TValue.Empty;
+  end
+
   // setBuildMode(mode)
   else if AName = 'setBuildMode' then
   begin
@@ -2865,6 +2922,24 @@ begin
     Result := TValue.Empty;
   end
 
+  // getOptimize() -> string
+  else if AName = 'getOptimize' then
+  begin
+    if Assigned(FBuild) then
+    begin
+      case TMorBuild(FBuild).GetOptimizeLevel() of
+        olDebug:        Result := TValue.From<string>('debug');
+        olReleaseSafe:  Result := TValue.From<string>('releasesafe');
+        olReleaseFast:  Result := TValue.From<string>('releasefast');
+        olReleaseSmall: Result := TValue.From<string>('releasesmall');
+      else
+        Result := TValue.From<string>('debug');
+      end;
+    end
+    else
+      Result := TValue.From<string>('debug');
+  end
+
   // setSubsystem(sub)
   else if AName = 'setSubsystem' then
   begin
@@ -2905,7 +2980,8 @@ begin
   else if AName = 'setExeIcon' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
-      TMorBuild(FBuild).SetExeIcon(MorToString(AArgs[0]));
+      TMorBuild(FBuild).SetExeIcon(
+        TMorBuild(FBuild).ResolvePath('', MorToString(AArgs[0])));
     Result := TValue.Empty;
   end
 
@@ -2944,7 +3020,21 @@ begin
     Result := TValue.Empty;
   end
 
+  else if AName = 'setDescription' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).SetVIDescription(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
   else if AName = 'setVIFilename' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).SetVIFilename(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  else if AName = 'setFilename' then
   begin
     if Assigned(FBuild) and (Length(AArgs) > 0) then
       TMorBuild(FBuild).SetVIFilename(MorToString(AArgs[0]));
@@ -2965,6 +3055,48 @@ begin
     Result := TValue.Empty;
   end
 
+  else if AName = 'setCopyright' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).SetVICopyright(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  // addCopyDLL(path)
+  else if AName = 'addCopyDLL' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).AddCopyDLL(
+        TMorBuild(FBuild).ResolvePath('', MorToString(AArgs[0])));
+    Result := TValue.Empty;
+  end
+
+  // addLinkLibrary(name)
+  else if AName = 'addLinkLibrary' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).AddLinkLibrary(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  // addLibraryPath(path)
+  else if AName = 'addLibraryPath' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).AddLibraryPath(
+        TMorBuild(FBuild).ResolvePath('', MorToString(AArgs[0])));
+    Result := TValue.Empty;
+  end
+
+  // addIncludePath(path)
+  else if AName = 'addIncludePath' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).AddIncludePath(
+        TMorBuild(FBuild).ResolvePath('', MorToString(AArgs[0])));
+    Result := TValue.Empty;
+  end
+
   // addBreakpoint(file, line)
   else if AName = 'addBreakpoint' then
   begin
@@ -2979,6 +3111,79 @@ begin
     if Assigned(FOutput) and (Length(AArgs) > 0) then
       FOutput.SetLineDirectives(MorIsTrue(AArgs[0]));
     Result := TValue.Empty;
+  end
+
+  // Defines
+  // setDefine(name) / setDefine(name, value)
+  else if AName = 'setDefine' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+    begin
+      if Length(AArgs) >= 2 then
+        TMorBuild(FBuild).SetDefine(MorToString(AArgs[0]), MorToString(AArgs[1]))
+      else
+        TMorBuild(FBuild).SetDefine(MorToString(AArgs[0]));
+    end;
+    Result := TValue.Empty;
+  end
+
+  // removeDefine(name)
+  else if AName = 'removeDefine' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).RemoveDefine(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  // clearDefines()
+  else if AName = 'clearDefines' then
+  begin
+    if Assigned(FBuild) then
+      TMorBuild(FBuild).ClearDefines();
+    Result := TValue.Empty;
+  end
+
+  // hasDefine(name) -> bool
+  else if AName = 'hasDefine' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      Result := TValue.From<Boolean>(TMorBuild(FBuild).HasDefine(MorToString(AArgs[0])))
+    else
+      Result := TValue.From<Boolean>(False);
+  end
+
+  // Undefines
+  // unsetDefine(name)
+  else if AName = 'unsetDefine' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).UnsetDefine(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  // removeUndefine(name)
+  else if AName = 'removeUndefine' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      TMorBuild(FBuild).RemoveUndefine(MorToString(AArgs[0]));
+    Result := TValue.Empty;
+  end
+
+  // clearUndefines()
+  else if AName = 'clearUndefines' then
+  begin
+    if Assigned(FBuild) then
+      TMorBuild(FBuild).ClearUndefines();
+    Result := TValue.Empty;
+  end
+
+  // hasUndefine(name) -> bool
+  else if AName = 'hasUndefine' then
+  begin
+    if Assigned(FBuild) and (Length(AArgs) > 0) then
+      Result := TValue.From<Boolean>(TMorBuild(FBuild).HasUndefine(MorToString(AArgs[0])))
+    else
+      Result := TValue.From<Boolean>(False);
   end
 
   else
@@ -3127,13 +3332,6 @@ begin
   Result := FEnv;
 end;
 
-{ Subcomponent Setters }
-
-procedure TMorInterpreter.SetBuild(const ABuild: TObject);
-begin
-  FBuild := ABuild;
-end;
-
 procedure TMorInterpreter.SetScopes(const AScopes: TScopeManager);
 begin
   FScopes := AScopes;
@@ -3184,6 +3382,22 @@ end;
 function TMorInterpreter.GetModuleExtension(): string;
 begin
   Result := FModuleExtension;
+end;
+
+procedure TMorInterpreter.AddModulePath(const APath: string);
+begin
+  if FModulePaths.IndexOf(APath) < 0 then
+    FModulePaths.Add(APath);
+end;
+
+function TMorInterpreter.GetModulePaths(): TStringList;
+begin
+  Result := FModulePaths;
+end;
+
+procedure TMorInterpreter.ClearModulePaths();
+begin
+  FModulePaths.Clear();
 end;
 
 { Native Handler Registration }
@@ -3256,6 +3470,21 @@ begin
     Result.Line := 0;
     Result.Col := 0;
   end;
+end;
+
+function TMorInterpreter.ParserParseExpr(
+  const AMinPower: Integer): TMorASTNode;
+begin
+  if Assigned(FActiveParser) then
+    Result := TMorGenericParser(FActiveParser).ParseExpression(AMinPower)
+  else
+    Result := nil;
+end;
+
+procedure TMorInterpreter.ParserExpect(const AKind: string);
+begin
+  if Assigned(FActiveParser) then
+    TMorGenericParser(FActiveParser).Expect(AKind);
 end;
 
 { Grammar Rule Execution }

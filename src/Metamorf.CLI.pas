@@ -720,6 +720,9 @@ begin
   if not ParseArgs() then
     Exit;
 
+  // Resolve output path to absolute (relative to CWD, standard CLI behavior)
+  FOutputPath := TPath.GetFullPath(FOutputPath);
+
   try
     if FBakeFile <> '' then
     begin

@@ -21,6 +21,7 @@ uses
   System.IOUtils,
   System.Classes,
   System.Generics.Collections,
+  Metamorf.Common,
   Metamorf.Utils,
   Metamorf.Config,
   Metamorf.Resources;
@@ -69,6 +70,26 @@ type
   end;
 
 
+  { TMorBuildState }
+  TMorBuildState = record
+    BuildMode: TMorBuildMode;
+    OptimizeLevel: TMorOptimizeLevel;
+    Target: TMorTargetPlatform;
+    Subsystem: TMorSubsystemType;
+    ProjectName: string;
+    AddVersionInfo: Boolean;
+    VIMajor: Word;
+    VIMinor: Word;
+    VIPatch: Word;
+    VIProductName: string;
+    VIDescription: string;
+    VIFilename: string;
+    VICompanyName: string;
+    VICopyright: string;
+    ExeIcon: string;
+  end;
+
+
   { TMorBuild }
   TMorBuild = class(TMorErrorsObject)
   private
@@ -109,6 +130,9 @@ type
 
     // Breakpoints
     FBreakpoints: TList<TMorBreakpointEntry>;
+
+    // State stack for save/restore across imports
+    FStateStack: TStack<TMorBuildState>;
 
     function GenerateBuildZig(): string;
     function BuildFlagsString(): string;
@@ -181,6 +205,10 @@ type
     // Clear all
     procedure Clear();
 
+    // State stack (save/restore scalar settings across module imports)
+    procedure PushState();
+    procedure PopState();
+
     // Actions
     function LoadBuildFile(const AFilename: string): Boolean;
     function SaveBuildFile(): Boolean;
@@ -241,12 +269,15 @@ type
     function GetRuntimePath(const AFilename: string = ''): string;
     function GetLibsPath(const AFilename: string = ''): string;
     function GetAssetsPath(const AFilename: string = ''): string;
+
+    // Centralized path resolution
+    function ResolvePath(const AFilename: string;
+      const ARelativePath: string;
+      const ABasePath: string = '';
+      const ABehavior: Integer = MOR_RESOLVEPATH_BEHAVIOR): string;
   end;
 
 implementation
-
-uses
-  Metamorf.Common;
 
 { TMorBuild }
 
@@ -258,7 +289,6 @@ begin
   FProjectName := 'output';
   FBuildMode := bmExe;
   FOptimizeLevel := olDebug;
-  FTarget := tpWin64;
   FSubsystem := stConsole;
   FSourceFiles := TStringList.Create();
   FIncludePaths := TStringList.Create();
@@ -269,6 +299,9 @@ begin
   FCopyDLLs := TStringList.Create();
   FLastExitCode := 0;
   FRawOutput := False;
+
+  // Set default target (must be after FDefines is created)
+  SetTarget(tpWin64);
 
   // Version info defaults
   FAddVersionInfo := False;
@@ -284,6 +317,9 @@ begin
 
   // Breakpoints
   FBreakpoints := TList<TMorBreakpointEntry>.Create();
+
+  // State stack
+  FStateStack := TStack<TMorBuildState>.Create();
 
   // Toolchain config
   FBuildConfig := TMorConfig.Create();
@@ -325,6 +361,7 @@ begin
   FreeAndNil(FBuildConfig);
 
   FreeAndNil(FBreakpoints);
+  FreeAndNil(FStateStack);
   FreeAndNil(FUndefines);
   FreeAndNil(FCopyDLLs);
   FreeAndNil(FDefines);
@@ -334,6 +371,52 @@ begin
   FreeAndNil(FSourceFiles);
 
   inherited;
+end;
+
+procedure TMorBuild.PushState();
+var
+  LState: TMorBuildState;
+begin
+  LState.BuildMode := FBuildMode;
+  LState.OptimizeLevel := FOptimizeLevel;
+  LState.Target := FTarget;
+  LState.Subsystem := FSubsystem;
+  LState.ProjectName := FProjectName;
+  LState.AddVersionInfo := FAddVersionInfo;
+  LState.VIMajor := FVIMajor;
+  LState.VIMinor := FVIMinor;
+  LState.VIPatch := FVIPatch;
+  LState.VIProductName := FVIProductName;
+  LState.VIDescription := FVIDescription;
+  LState.VIFilename := FVIFilename;
+  LState.VICompanyName := FVICompanyName;
+  LState.VICopyright := FVICopyright;
+  LState.ExeIcon := FExeIcon;
+  FStateStack.Push(LState);
+end;
+
+procedure TMorBuild.PopState();
+var
+  LState: TMorBuildState;
+begin
+  if FStateStack.Count = 0 then
+    Exit;
+  LState := FStateStack.Pop();
+  FBuildMode := LState.BuildMode;
+  FOptimizeLevel := LState.OptimizeLevel;
+  FTarget := LState.Target;
+  FSubsystem := LState.Subsystem;
+  FProjectName := LState.ProjectName;
+  FAddVersionInfo := LState.AddVersionInfo;
+  FVIMajor := LState.VIMajor;
+  FVIMinor := LState.VIMinor;
+  FVIPatch := LState.VIPatch;
+  FVIProductName := LState.VIProductName;
+  FVIDescription := LState.VIDescription;
+  FVIFilename := LState.VIFilename;
+  FVICompanyName := LState.VICompanyName;
+  FVICopyright := LState.VICopyright;
+  FExeIcon := LState.ExeIcon;
 end;
 
 procedure TMorBuild.SetOutputPath(const APath: string);
@@ -1574,9 +1657,7 @@ begin
     LDestDir := TPath.Combine(FOutputPath, TPath.Combine('zig-out', 'bin'));
     for LI := 0 to FCopyDLLs.Count - 1 do
     begin
-      LSrcPath := FCopyDLLs[LI];
-      if not TPath.IsPathRooted(LSrcPath) then
-        LSrcPath := TPath.Combine(TPath.GetDirectoryName(ParamStr(0)), LSrcPath);
+      LSrcPath := ResolvePath('', FCopyDLLs[LI]);
 
       // Skip copy if src is already in dest dir
       if SameText(TPath.GetFullPath(TPath.GetDirectoryName(LSrcPath)), TPath.GetFullPath(LDestDir)) then
@@ -1952,6 +2033,44 @@ end;
 function TMorBuild.GetAssetsPath(const AFilename: string): string;
 begin
   Result := TPath.Combine(FToolchainPath, 'assets');
+  if AFilename <> '' then
+    Result := TPath.Combine(Result, AFilename);
+end;
+
+function TMorBuild.ResolvePath(const AFilename: string;
+  const ARelativePath: string; const ABasePath: string;
+  const ABehavior: Integer): string;
+var
+  LBase: string;
+begin
+  // (a) Absolute path: use as-is
+  if TPath.IsPathRooted(ARelativePath) then
+  begin
+    if AFilename <> '' then
+      Result := TPath.Combine(ARelativePath, AFilename)
+    else
+      Result := ARelativePath;
+    Exit;
+  end;
+
+  // (b) Relative path with explicit base
+  if ABasePath <> '' then
+    LBase := ABasePath
+  // (c) Relative path, no base, use behavior
+  else if ABehavior = 1 then
+    LBase := TPath.GetDirectoryName(ParamStr(0))
+  else
+  begin
+    // (d) Behavior 0 or unknown: raw passthrough
+    if AFilename <> '' then
+      Result := TPath.Combine(ARelativePath, AFilename)
+    else
+      Result := ARelativePath;
+    Exit;
+  end;
+
+  // Combine base + relative + filename
+  Result := TPath.Combine(LBase, ARelativePath);
   if AFilename <> '' then
     Result := TPath.Combine(Result, AFilename);
 end;
