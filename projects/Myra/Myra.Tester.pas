@@ -32,6 +32,14 @@ unit Myra.Tester;
   /* ALLOW_WARNINGS */
     Suppresses the "warnings present" failure. Use when a test intentionally
     produces compiler warnings.
+
+  /* PLATFORMS: <P1>, <P2>, ... */
+    Comma-separated list of platforms on which this test is valid.
+    If the current target platform is not in the list the test is skipped
+    (counted as neither pass nor fail). Omit entirely to run on all platforms.
+    Valid platform names: WIN64, LINUX64
+    Example: /* PLATFORMS: WIN64 */
+    Example: /* PLATFORMS: WIN64, LINUX64 */
 ===============================================================================}
 
 interface
@@ -45,6 +53,8 @@ uses
   Metamorf.Utils,
   Metamorf.Common,
   Metamorf.Build,
+  Metamorf.Config,
+  Metamorf.Resources,
   Metamorf.Engine;
 
 const
@@ -53,6 +63,7 @@ const
   MYRA_DEFAULT_TESTS    = '..\projects\Myra\tests';
   MYRA_COMMENT_OPEN     = '/*';
   MYRA_COMMENT_CLOSE    = '*/';
+  MOR_TESTS_TOML        = 'tests.toml';
 
 type
   { TTestEntry }
@@ -81,10 +92,13 @@ type
     FFailedTests:     TList<string>;
     FRegisteredTests: TDictionary<Integer, TTestEntry>;
     FOutputCallback:  TProc<string>;
+    FConfig:          TMorConfig;
 
     function ExtractExpected(const ASource: string): string;
     function ExtractExpectedExitCode(const ASource: string): Integer;
     function ExtractAllowWarnings(const ASource: string): Boolean;
+    function ExtractPlatforms(const ASource: string): TArray<string>;
+    function PlatformMatchesCurrent(const APlatforms: TArray<string>): Boolean;
     function ExtractTestName(const AFilePath: string): string;
     function RunTestFile(const AFilePath: string;
       const ARunMode: TMorRunMode = rmNone;
@@ -130,6 +144,10 @@ type
     // State
     procedure Reset();
 
+    // TOML persistence
+    procedure SaveTests(const AFilename: string = MOR_TESTS_TOML);
+    function LoadTests(const AFilename: string = MOR_TESTS_TOML): Boolean;
+
     // Properties
     property LangFile:        string          read FLangFile        write FLangFile;
     property TestFolder:      string          read FTestFolder      write FTestFolder;
@@ -170,10 +188,12 @@ begin
   FSubsystem       := stConsole;
   FLangFile        := MYRA_DEFAULT_LANG;
   FTestFolder      := MYRA_DEFAULT_TESTS;
+  FConfig          := nil;
 end;
 
 destructor TMyraTester.Destroy();
 begin
+  FConfig.Free();
   FRegisteredTests.Free();
   FFailedTests.Free();
   inherited;
@@ -333,6 +353,66 @@ begin
     MYRA_COMMENT_OPEN + ' ALLOW_WARNINGS ' + MYRA_COMMENT_CLOSE);
 end;
 
+function TMyraTester.ExtractPlatforms(
+  const ASource: string): TArray<string>;
+var
+  LStart:  Integer;
+  LEnd:    Integer;
+  LBlock:  string;
+  LPrefix: string;
+  LParts:  TArray<string>;
+  LI:      Integer;
+begin
+  SetLength(Result, 0);
+  LPrefix := MYRA_COMMENT_OPEN + ' PLATFORMS:';
+
+  LStart := Pos(LPrefix, ASource);
+  if LStart = 0 then
+    Exit;
+
+  LStart := LStart + Length(LPrefix);
+  LEnd := Pos(MYRA_COMMENT_CLOSE, ASource, LStart);
+  if LEnd = 0 then
+    Exit;
+
+  LBlock := Trim(Copy(ASource, LStart, LEnd - LStart));
+  LParts := LBlock.Split([',']);
+
+  SetLength(Result, Length(LParts));
+  for LI := 0 to High(LParts) do
+    Result[LI] := Trim(LParts[LI]).ToUpper();
+end;
+
+function TMyraTester.PlatformMatchesCurrent(
+  const APlatforms: TArray<string>): Boolean;
+var
+  LCurrentPlatform: string;
+  LPlatform:        string;
+begin
+  // No platforms specified means run everywhere
+  if Length(APlatforms) = 0 then
+    Exit(True);
+
+  // Map current target platform enum to its string name
+  if FTarget = tpWin64 then
+    LCurrentPlatform := 'WIN64'
+  else if FTarget = tpLinux64 then
+    LCurrentPlatform := 'LINUX64'
+  else
+    LCurrentPlatform := '';
+
+  // Check if current platform is in the list
+  Result := False;
+  for LPlatform in APlatforms do
+  begin
+    if SameText(LPlatform, LCurrentPlatform) then
+    begin
+      Result := True;
+      Break;
+    end;
+  end;
+end;
+
 function TMyraTester.ExtractTestName(const AFilePath: string): string;
 begin
   Result := TPath.GetFileNameWithoutExtension(AFilePath);
@@ -375,6 +455,15 @@ begin
 
   Print(COLOR_CYAN + '=== Test: ' + LTestName + ' ===');
   Print('');
+
+  // Check platform requirements before doing any work
+  if not PlatformMatchesCurrent(ExtractPlatforms(LSource)) then
+  begin
+    Print(COLOR_YELLOW + '  Skipped (not supported on current platform).');
+    Print('');
+    FLastTestSkipped := True;
+    Exit;
+  end;
 
   LEngine := TMorEngine.Create();
   try
@@ -424,8 +513,12 @@ begin
     LItems  := LErrors.GetItems();
 
     // Display all messages (hints, warnings, errors, fatal)
+    // Suppress Z005 (execution exit code) when a non-zero exit code is expected
     for LI := 0 to LErrors.Count() - 1 do
     begin
+      if (LExpectedExitCode <> 0) and (LItems[LI].Severity = esError) and
+         (LItems[LI].Code = ERR_ZIGBUILD_BUILD_FAILED) then
+        Continue;
       if LItems[LI].Severity = esHint then
         Print(COLOR_CYAN + '  ' + LItems[LI].ToFullString())
       else if LItems[LI].Severity = esWarning then
@@ -503,21 +596,25 @@ begin
     // Launch debug REPL if requested and build succeeded
     if ARunMode = rmDebug then
     begin
-      LExePath := TPath.Combine(FOutputPath,
-        TPath.Combine('zig-out',
-          TPath.Combine('bin',
-            LEngine.GetProjectName() + '.exe')));
-      if FileExists(LExePath) then
-      begin
-        LREPL := TMorDebugREPL.Create();
-        try
-          LREPL.Run(LExePath);
-        finally
-          LREPL.Free();
-        end;
-      end
+      if LEngine.GetTarget() <> tpWin64 then
+        Print(COLOR_RED + 'Error: ' + RSEngineAPIDebugWin64)
       else
-        Print(COLOR_RED + 'Executable not found: ' + LExePath);
+      begin
+        LExePath := TPath.GetFullPath(
+          TPath.Combine(FOutputPath, 'zig-out\bin\' +
+            LEngine.GetProjectName() + '.exe'));
+        if FileExists(LExePath) then
+        begin
+          LREPL := TMorDebugREPL.Create();
+          try
+            LREPL.Run(LExePath);
+          finally
+            LREPL.Free();
+          end;
+        end
+        else
+          Print(COLOR_RED + 'Executable not found: ' + LExePath);
+      end;
     end;
 
     // Allow ConPTY, WSL, and Zig cache to settle before the next test
@@ -676,8 +773,15 @@ end;
 function TMyraTester.RunTestsMatching(const APattern: string;
   const ARunMode: TMorRunMode): Integer;
 var
-  LFiles: TStringDynArray;
-  LFile:  string;
+  LFiles:    TStringDynArray;
+  LFile:     string;
+  LTestName: string;
+  LEntry:    TTestEntry;
+  LRunMode:  TMorRunMode;
+  LDefine:   string;
+  LDefVal:   string;
+  LFound:    Boolean;
+  LKey:      Integer;
 begin
   Reset();
 
@@ -694,7 +798,27 @@ begin
   begin
     if Pos(APattern, TPath.GetFileName(LFile)) > 0 then
     begin
-      if RunTestFile(LFile, ARunMode) then
+      LTestName := TPath.GetFileNameWithoutExtension(LFile);
+
+      // Look up registered entry to use its RunMode/Define/DefineValue
+      LRunMode := ARunMode;
+      LDefine  := '';
+      LDefVal  := '';
+      LFound   := False;
+      for LKey in FRegisteredTests.Keys do
+      begin
+        LEntry := FRegisteredTests[LKey];
+        if SameText(LEntry.TestName, LTestName) then
+        begin
+          LRunMode := LEntry.RunMode;
+          LDefine  := LEntry.DefineName;
+          LDefVal  := LEntry.DefineValue;
+          LFound   := True;
+          Break;
+        end;
+      end;
+
+      if RunTestFile(LFile, LRunMode, LDefine, LDefVal) then
         Inc(FPassCount)
       else if FLastTestSkipped then
         Inc(FSkipCount)
@@ -739,6 +863,176 @@ begin
     for LI := 0 to FFailedTests.Count - 1 do
       Print(COLOR_RED + '  - ' + FFailedTests[LI]);
   end;
+end;
+
+procedure TMyraTester.SaveTests(const AFilename: string);
+var
+  LNewConfig:   TMorConfig;
+  LPath:        string;
+  LKeys:        TArray<Integer>;
+  LI:           Integer;
+  LIdx:         Integer;
+  LEntry:       TTestEntry;
+  LOldCount:    Integer;
+  LOldName:     string;
+  LOldComment:  string;
+  LComments:    TDictionary<string, string>;
+  LFileComment: string;
+begin
+  LPath := TPath.Combine(FTestFolder, AFilename);
+
+  // Extract comments from current FConfig (if loaded)
+  LComments := TDictionary<string, string>.Create();
+  LFileComment := '';
+  try
+    if Assigned(FConfig) then
+    begin
+      LFileComment := FConfig.GetFileComment();
+      LOldCount := FConfig.GetTableCount('test');
+      for LI := 0 to LOldCount - 1 do
+      begin
+        LOldName    := FConfig.GetTableString('test', LI, 'name');
+        LOldComment := FConfig.GetTableComment('test', LI);
+        if (LOldName <> '') and (LOldComment <> '') then
+          LComments.AddOrSetValue(LOldName, LOldComment);
+      end;
+    end;
+
+    // Build new config from current registrations
+    LKeys := FRegisteredTests.Keys.ToArray();
+    TArray.Sort<Integer>(LKeys);
+
+    LNewConfig := TMorConfig.Create();
+    try
+      if LFileComment <> '' then
+        LNewConfig.SetFileComment(LFileComment);
+
+      for LI := 0 to High(LKeys) do
+      begin
+        LEntry := FRegisteredTests[LKeys[LI]];
+        LIdx := LNewConfig.AddTableEntry('test');
+
+        LNewConfig.SetTableInteger('test', LIdx, 'index', LKeys[LI]);
+        LNewConfig.SetTableString('test', LIdx, 'name', LEntry.TestName);
+
+        if Length(LEntry.Dependencies) > 0 then
+          LNewConfig.SetTableStringArray('test', LIdx, 'deps',
+            LEntry.Dependencies);
+
+        if LEntry.RunMode = rmNone then
+          LNewConfig.SetTableString('test', LIdx, 'run_mode', 'none')
+        else if LEntry.RunMode = rmDebug then
+          LNewConfig.SetTableString('test', LIdx, 'run_mode', 'debug');
+
+        if LEntry.DefineName <> '' then
+          LNewConfig.SetTableString('test', LIdx, 'define',
+            LEntry.DefineName);
+
+        if LEntry.DefineValue <> '' then
+          LNewConfig.SetTableString('test', LIdx, 'define_value',
+            LEntry.DefineValue);
+
+        // Restore comment if name matches
+        if LComments.TryGetValue(LEntry.TestName, LOldComment) then
+          LNewConfig.SetTableComment('test', LIdx, LOldComment);
+      end;
+
+      LNewConfig.SaveToFile(LPath);
+
+      // Replace FConfig with the new state
+      FreeAndNil(FConfig);
+      FConfig := LNewConfig;
+      LNewConfig := nil; // prevent double-free
+    except
+      LNewConfig.Free();
+      raise;
+    end;
+  finally
+    LComments.Free();
+  end;
+end;
+
+function TMyraTester.LoadTests(const AFilename: string): Boolean;
+var
+  LPath:        string;
+  LCount:       Integer;
+  LI:           Integer;
+  LIndex:       Integer;
+  LName:        string;
+  LDeps:        TArray<string>;
+  LRunModeStr:  string;
+  LRunMode:     TMorRunMode;
+  LRunBool:     Boolean;
+  LDefine:      string;
+  LDefineValue: string;
+  LEntry:       TTestEntry;
+begin
+  Result := False;
+  LPath := TPath.Combine(FTestFolder, AFilename);
+
+  if not TFile.Exists(LPath) then
+    Exit;
+
+  // Free previous config, load fresh from disk
+  FreeAndNil(FConfig);
+  FConfig := TMorConfig.Create();
+
+  if not FConfig.LoadFromFile(LPath) then
+  begin
+    FreeAndNil(FConfig);
+    Exit;
+  end;
+
+  LCount := FConfig.GetTableCount('test');
+  if LCount = 0 then
+  begin
+    FreeAndNil(FConfig);
+    Exit;
+  end;
+
+  ClearRegisteredTests();
+
+  for LI := 0 to LCount - 1 do
+  begin
+    LName := FConfig.GetTableString('test', LI, 'name');
+    if LName = '' then
+      Continue;
+
+    LIndex       := FConfig.GetTableInteger('test', LI, 'index', LI);
+    LDeps        := FConfig.GetTableStringArray('test', LI, 'deps');
+    LDefine      := FConfig.GetTableString('test', LI, 'define');
+    LDefineValue := FConfig.GetTableString('test', LI, 'define_value');
+
+    // Determine run mode: prefer run_mode string, fall back to run bool
+    LRunModeStr := FConfig.GetTableString('test', LI, 'run_mode');
+    if LRunModeStr <> '' then
+    begin
+      if SameText(LRunModeStr, 'debug') then
+        LRunMode := rmDebug
+      else if SameText(LRunModeStr, 'none') then
+        LRunMode := rmNone
+      else
+        LRunMode := rmExecute;
+    end
+    else
+    begin
+      LRunBool := FConfig.GetTableBoolean('test', LI, 'run', True);
+      if LRunBool then
+        LRunMode := rmExecute
+      else
+        LRunMode := rmNone;
+    end;
+
+    LEntry.TestName     := LName;
+    LEntry.Dependencies := LDeps;
+    LEntry.RunMode      := LRunMode;
+    LEntry.DefineName   := LDefine;
+    LEntry.DefineValue  := LDefineValue;
+
+    FRegisteredTests.Add(LIndex, LEntry);
+  end;
+
+  Result := FRegisteredTests.Count > 0;
 end;
 
 end.
