@@ -1,0 +1,87 @@
+/*===============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXITCODE: 1 */
+
+/* EXPECT:
+╔══════════════════════════════════════════════════════════════╗
+║                     Unit Test Runner                         ║
+╚══════════════════════════════════════════════════════════════╝
+
+Running 5 test(s)...
+
+✅ PASS: Addition works correctly
+✅ PASS: Multiplication works correctly
+✅ PASS: Boolean assertions
+✅ PASS: Pointer assertions
+❌ FAIL: Deliberate failure
+  🔴 TestAssertEqualInt failed at test_exe_unittest.myra:86: expected 1, got 2
+════════════════════════════════════════════════════════════════
+Results: 4 passed, 1 failed, 5 total
+════════════════════════════════════════════════════════════════
+*/
+
+module exe test_exe_unittest;
+
+@unitTestMode on;
+
+routine add(const A: int32; const B: int32): int32;
+begin
+  return A + B;
+end;
+
+routine multiply(const A: int32; const B: int32): int32;
+begin
+  return A * B;
+end;
+
+routine isPositive(const A: int32): boolean;
+begin
+  return A > 0;
+end;
+
+begin
+  writeln("Hello from test_exe_unittest!");
+end.
+
+test "Addition works correctly"
+begin
+  testAssertEqualInt(5, add(2, 3));
+  testAssertEqualInt(0, add(-1, 1));
+  testAssertEqualInt(0, add(0, 0));
+end;
+
+test "Multiplication works correctly"
+begin
+  testAssertEqualInt(12, multiply(3, 4));
+  testAssertEqualInt(-6, multiply(-2, 3));
+  testAssertEqualInt(0, multiply(0, 100));
+end;
+
+test "Boolean assertions"
+begin
+  testAssertTrue(isPositive(5));
+  testAssertFalse(isPositive(-5));
+  testAssertEqualBool(true, isPositive(1));
+end;
+
+test "Pointer assertions"
+var
+  p: pointer;
+begin
+  p := nil;
+  testAssertNil(p);
+end;
+
+test "Deliberate failure"
+begin
+  testAssertEqualInt(1, 2);
+end;

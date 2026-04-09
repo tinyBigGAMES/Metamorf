@@ -1,5 +1,11 @@
 /* Debug test: two breakpoints - one in routine, one in main */
 
+/* EXITCODE: 0 */
+
+/* EXPECT: Debug test starting...
+The answer is: 42
+Debug test complete. */
+
 module exe test_exe_debug;
 
 var
@@ -10,14 +16,14 @@ var
   LResult: int32;
 begin
   LResult := 40;
-  @breakpoint
+  @breakpoint;
   LResult := LResult + 2;
   return LResult;
 end;
 
 begin
   writeln("Debug test starting...");
-  @breakpoint
+  @breakpoint;
   LValue := ComputeAnswer();
   writeln("The answer is: {}", LValue);
   writeln("Debug test complete.");

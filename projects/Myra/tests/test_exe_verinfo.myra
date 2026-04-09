@@ -34,18 +34,18 @@ module exe test_exe_verinfo;
 #include <windows.h>
 
 // Version info directives - these inject metadata into the built EXE
-@addverinfo on
-@vimajor 1
-@viminor 2
-@vipatch 3
-@viproductname "Myra Version Info Test"
-@videscription "Test executable for version info directives"
-@vifilename "test_exe_verinfo.exe"
-@vicompanyname "tinyBigGAMES LLC"
-@vicopyright "Copyright © 2025 tinyBigGAMES LLC"
+@addverinfo on;
+@vimajor 1;
+@viminor 2;
+@vipatch 3;
+@viproductname "Myra Version Info Test";
+@videscription "Test executable for version info directives";
+@vifilename "test_exe_verinfo.exe";
+@vicompanyname "tinyBigGAMES LLC";
+@vicopyright "Copyright © 2025 tinyBigGAMES LLC";
 
 // Icon embedding
-@exeicon "res/assets/icons/pax.ico"
+@exeicon "toolchain/assets/icons/metamorf.ico";
 
 begin
   writeln("=== Version Info Test ===");

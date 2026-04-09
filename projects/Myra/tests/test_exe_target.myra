@@ -12,7 +12,7 @@ UNIX defined: no
 
 module exe test_exe_target;
 
-@target win64
+@target win64;
 
 begin
   writeln("=== Target Directive Test (win64) ===");

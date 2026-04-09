@@ -1,6 +1,6 @@
 module exe test_exe_raylib;
 
-@modulepath "res/libs/raylib/imports";
+@modulepath "toolchain/libs/raylib/imports";
 
 import
   raylib_import;

@@ -109,7 +109,7 @@ module exe test_exe_mixedmode;
 @vicopyright "Copyright (c) 2026, tinyBigGAMES LLC";
 
 //@exeicon "path" 
-@exeicon "res/assets/icons/pax.ico"; 
+@exeicon "toolchain/assets/icons/metamorf.ico"; 
 
 #include <cmath>
 #include <cstring>
