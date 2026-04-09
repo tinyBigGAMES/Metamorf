@@ -212,6 +212,18 @@ grammar {
     setAttr(nd, "call.name", "mor_exc_msg");
     parseCallArgs(nd);
   }
+  rule expr.call {
+    expect keyword.getmem;
+    let nd = getResultNode();
+    setAttr(nd, "call.name", "mor_getmem");
+    parseCallArgs(nd);
+  }
+  rule expr.call {
+    expect keyword.resizemem;
+    let nd = getResultNode();
+    setAttr(nd, "call.name", "mor_resizemem");
+    parseCallArgs(nd);
+  }
 
   // -----------------------------------------------------------------------
   // INFIX EXPRESSION RULES
@@ -327,89 +339,114 @@ grammar {
   rule stmt.directive_optimize {
     expect directive.optimize;
     consume identifier -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_subsystem {
     expect directive.subsystem;
     consume identifier -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_target {
     expect directive.target;
     consume identifier -> @value;
+    requireToken("delimiter.semicolon");
   }
 
   // Version info
   rule stmt.directive_addverinfo {
     expect directive.addverinfo;
     consume identifier -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_vimajor {
     expect directive.vimajor;
     consume literal.integer -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_viminor {
     expect directive.viminor;
     consume literal.integer -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_vipatch {
     expect directive.vipatch;
     consume literal.integer -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_viproductname {
     expect directive.viproductname;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_videscription {
     expect directive.videscription;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_vifilename {
     expect directive.vifilename;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_vicompanyname {
     expect directive.vicompanyname;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_vicopyright {
     expect directive.vicopyright;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
 
   // Resource and path
   rule stmt.directive_exeicon {
     expect directive.exeicon;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_copydll {
     expect directive.copydll;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_linklibrary {
     expect directive.linklibrary;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_librarypath {
     expect directive.librarypath;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_modulepath {
     expect directive.modulepath;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_includepath {
     expect directive.includepath;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
   }
 
   // Debug and diagnostic
   rule stmt.directive_breakpoint {
     expect directive.breakpoint;
+    requireToken("delimiter.semicolon");
   }
   rule stmt.directive_message {
     expect directive.message;
     // BNF: @message hint|warn|error|fatal "text"
     consume identifier -> @severity;
     consume string.cstring -> @value;
+    requireToken("delimiter.semicolon");
+  }
+  rule stmt.directive_unittestmode {
+    expect directive.unittestmode;
+    consume identifier -> @value;
+    requireToken("delimiter.semicolon");
   }
 
   // Module: module kind name; [directives] [imports] {decls} [begin body end] end.
@@ -449,7 +486,8 @@ grammar {
     // Declarations and C++ passthrough
     while checkToken("keyword.const") or checkToken("keyword.type") or
           checkToken("keyword.var") or checkToken("keyword.routine") or
-          checkToken("keyword.exported") or checkToken("cpp.op.hash") {
+          checkToken("keyword.exported") or checkToken("cpp.op.hash") or
+          startsWith(currentKind(), "directive.") {
       addChild(nd, parseStmt());
     }
 
@@ -466,6 +504,11 @@ grammar {
 
     requireToken("keyword.end");
     requireToken("delimiter.dot");
+
+    // Optional test blocks after end.
+    while checkToken("keyword.test") {
+      addChild(nd, parseStmt());
+    }
   }
 
   // Var block: var { ident : type [= expr]; }
@@ -1237,6 +1280,144 @@ grammar {
         addChild(nd, parseExpr(0));
       }
     }
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+
+  // -----------------------------------------------------------------------
+  // UNIT TESTING
+  // -----------------------------------------------------------------------
+
+  // Test block: test "name" [var ...] begin stmts end;
+  rule stmt.test_block {
+    expect keyword.test;
+    let nd = getResultNode();
+    consume string.cstring -> @testname;
+    // Optional var block
+    if checkToken("keyword.var") {
+      addChild(nd, parseStmt());
+    }
+    requireToken("keyword.begin");
+    while not checkToken("keyword.end") and not checkToken("eof") {
+      let s = parseStmt();
+      if s != nil { addChild(nd, s); }
+    }
+    requireToken("keyword.end");
+    matchToken("delimiter.semicolon");
+  }
+
+  // 1-arg assertions: testAssert, testAssertTrue, testAssertFalse
+  rule stmt.testassert {
+    expect keyword.testassert;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testasserttrue {
+    expect keyword.testasserttrue;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertfalse {
+    expect keyword.testassertfalse;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+
+  // 1-arg assertions: testAssertNil, testAssertNotNil
+  rule stmt.testassertnil {
+    expect keyword.testassertnil;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertnotnil {
+    expect keyword.testassertnotnil;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+
+  // 1-arg: testFail (message)
+  rule stmt.testfail {
+    expect keyword.testfail;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+
+  // 2-arg assertions: testAssertEqualInt/UInt/Float/Str/Bool/Ptr
+  rule stmt.testassertequalint {
+    expect keyword.testassertequalint;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.comma");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertequaluint {
+    expect keyword.testassertequaluint;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.comma");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertequalfloat {
+    expect keyword.testassertequalfloat;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.comma");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertequalstr {
+    expect keyword.testassertequalstr;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.comma");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertequalbool {
+    expect keyword.testassertequalbool;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.comma");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.rparen");
+    matchToken("delimiter.semicolon");
+  }
+  rule stmt.testassertequalptr {
+    expect keyword.testassertequalptr;
+    let nd = getResultNode();
+    requireToken("delimiter.lparen");
+    addChild(nd, parseExpr(0));
+    requireToken("delimiter.comma");
+    addChild(nd, parseExpr(0));
     requireToken("delimiter.rparen");
     matchToken("delimiter.semicolon");
   }

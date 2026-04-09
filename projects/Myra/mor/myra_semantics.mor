@@ -34,8 +34,14 @@ semantics {
 
   // Import item: trigger module compilation
   on stmt.import_item {
+    let iname = getAttr(node, "import.name");
+    setAttr(node, "iname", iname);
+    setAttr(node, "itype", "module");
+    pushBuildState();
     setModuleExtension("myra");
-    compileModule(getAttr(node, "import.name"));
+    compileModule(iname);
+    popBuildState();
+    declare @iname as variable typed @itype;
   }
 
   on stmt.import_clause { visit children; }
@@ -57,10 +63,11 @@ semantics {
   on stmt.directive_copydll     { }
   on stmt.directive_linklibrary { }
   on stmt.directive_librarypath { }
-  on stmt.directive_modulepath  { }
+  on stmt.directive_modulepath  { addModulePath(getAttr(node, "value")); }
   on stmt.directive_includepath { }
   on stmt.directive_breakpoint  { }
   on stmt.directive_message     { }
+  on stmt.directive_unittestmode { }
 
   // Declaration semantics
   on stmt.var_block  { visit children; }
@@ -134,9 +141,14 @@ semantics {
       pi = pi + 1;
     }
     sig = sig + ")";
-    // Overload detection
+    // Overload detection: demote C linkage for all overloads
     if symbolExistsWithPrefix(rname + "(") {
       demoteCLinkageForPrefix(rname + "(");
+      // Also demote current routine (not yet declared)
+      if getAttr(node, "decl.linkage") == "C" {
+        setAttr(node, "decl.linkage", "");
+        warning("C linkage demoted for overloaded routine '" + rname + "'");
+      }
     }
     setAttr(node, "rname", rname);
     setAttr(node, "sig", sig);
@@ -209,7 +221,23 @@ semantics {
   on stmt.raiseexceptioncode  { visit children; }
 
   // Expression handlers
-  on expr.assign       { visit children; }
+  on expr.assign {
+    // Propagate assignment target type to float literals for overload resolution
+    let lhs = getChild(node, 0);
+    let lhsKind = nodeKind(lhs);
+    let targetType = "";
+    if lhsKind == "expr.ident" {
+      targetType = lookupSymbolType(getAttr(lhs, "name"));
+    } else if lhsKind == "expr.field_access" {
+      targetType = lookupSymbolType(getAttr(lhs, "field.name"));
+    }
+    if targetType == "float32" or targetType == "float64" {
+      if child_count() > 1 {
+        stampFloatLiterals(getChild(node, 1), targetType);
+      }
+    }
+    visit children;
+  }
   on expr.call {
     let cname = getAttr(node, "call.name");
     if cname != "" {
@@ -285,5 +313,20 @@ semantics {
   on expr.pointer_cast { visit children; }
   on stmt.self_expr    { visit children; }
   on stmt.parent_expr  { visit children; }
+
+  // Unit testing
+  on stmt.test_block              { visit children; }
+  on stmt.testassert              { visit children; }
+  on stmt.testasserttrue          { visit children; }
+  on stmt.testassertfalse         { visit children; }
+  on stmt.testassertequalint      { visit children; }
+  on stmt.testassertequaluint     { visit children; }
+  on stmt.testassertequalfloat    { visit children; }
+  on stmt.testassertequalstr      { visit children; }
+  on stmt.testassertequalbool     { visit children; }
+  on stmt.testassertequalptr      { visit children; }
+  on stmt.testassertnil           { visit children; }
+  on stmt.testassertnotnil        { visit children; }
+  on stmt.testfail                { visit children; }
 
 } // end semantics

@@ -11,7 +11,12 @@
 //                   raiseexception, raiseexceptioncode, getexceptioncode,
 //                   getexceptionmessage, create, destroy, getmem, freemem,
 //                   resizemem, setlength, write, writeln, len, size, utf8,
-//                   paramcount, paramstr, varargs, exe, dll, lib
+//                   paramcount, paramstr, varargs, exe, dll, lib,
+//                   test, testAssert, testAssertTrue, testAssertFalse,
+//                   testAssertEqualInt, testAssertEqualUInt,
+//                   testAssertEqualFloat, testAssertEqualStr,
+//                   testAssertEqualBool, testAssertEqualPtr,
+//                   testAssertNil, testAssertNotNil, testFail
 //    Operators      :=, +=, -=, *=, /=, <>, <=, >=, ..., .., =, <, >, +,
 //                   -, *, /, ^, |, &
 //    Delimiters     ( ) [ ] , : ; .
@@ -20,7 +25,8 @@
 //    Directives     @ prefix with define/undef/ifdef/ifndef/elseif/else/endif,
 //                   exeicon, copydll, linklibrary, librarypath, modulepath,
 //                   includepath, subsystem, target, optimize, addverinfo,
-//                   vimajor..vicopyright, breakpoint, message
+//                   vimajor..vicopyright, breakpoint, message,
+//                   unitTestMode
 //
 //  Type system:
 //    16 type keywords mapped to C++ types
@@ -133,6 +139,21 @@ tokens {
   token keyword.dll       = "dll";
   token keyword.lib       = "lib";
 
+  // Unit testing
+  token keyword.test                 = "test";
+  token keyword.testassert           = "testAssert";
+  token keyword.testasserttrue       = "testAssertTrue";
+  token keyword.testassertfalse      = "testAssertFalse";
+  token keyword.testassertequalint   = "testAssertEqualInt";
+  token keyword.testassertequaluint  = "testAssertEqualUInt";
+  token keyword.testassertequalfloat = "testAssertEqualFloat";
+  token keyword.testassertequalstr   = "testAssertEqualStr";
+  token keyword.testassertequalbool  = "testAssertEqualBool";
+  token keyword.testassertequalptr   = "testAssertEqualPtr";
+  token keyword.testassertnil        = "testAssertNil";
+  token keyword.testassertnotnil     = "testAssertNotNil";
+  token keyword.testfail             = "testFail";
+
   // Multi-char operators (longest-match order)
   token op.assign         = ":=";
   token op.plus_assign    = "+=";
@@ -209,6 +230,7 @@ tokens {
   token directive.vicopyright   = "vicopyright";
   token directive.breakpoint    = "breakpoint";
   token directive.message       = "message";
+  token directive.unittestmode  = "unitTestMode";
 
   // Structural configuration
   terminator  = delimiter.semicolon;

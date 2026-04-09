@@ -32,6 +32,7 @@ emitters {
     // Stamp module kind for child emitters
     let kind = getAttr(node, "module.kind");
 
+    emitLine("#include <cstdint>", "header");
     emitLine("#include <cstdint>");
     emitLine("#include <string>");
     emitLine("#include <array>");
@@ -42,18 +43,118 @@ emitters {
     emitLine("#include \"mor_runtime.h\"");
     emitLine("");
 
+    // Emit MOR_EXPORT macro for DLL export support
+    if kind == "dll" {
+      emitLine("#ifdef _WIN32", "header");
+      emitLine("#define MOR_EXPORT __declspec(dllexport)", "header");
+      emitLine("#else", "header");
+      emitLine("#define MOR_EXPORT __attribute__((visibility(\"default\")))", "header");
+      emitLine("#endif", "header");
+      emitLine("#ifdef _WIN32");
+      emitLine("#define MOR_EXPORT __declspec(dllexport)");
+      emitLine("#else");
+      emitLine("#define MOR_EXPORT __attribute__((visibility(\"default\")))");
+      emitLine("#endif");
+    } else {
+      emitLine("#define MOR_EXPORT", "header");
+      emitLine("#define MOR_EXPORT");
+    }
+    emitLine("");
+
     // Find module_body and stamp kind on it before emitting
+    // Also detect @unitTestMode and number test blocks
     let ci = 0;
     let cn = child_count();
+    let testIdx = 0;
+    let unitTestMode = "off";
     while ci < cn {
       let ch = getChild(node, ci);
       if nodeKind(ch) == "stmt.module_body" {
         setAttr(ch, "module.kind", kind);
       }
+      if nodeKind(ch) == "stmt.directive_unittestmode" {
+        unitTestMode = getAttr(ch, "value");
+      }
+      if nodeKind(ch) == "stmt.test_block" {
+        setAttr(ch, "test.index", intToStr(testIdx));
+        testIdx = testIdx + 1;
+      }
       ci = ci + 1;
     }
+    // Stamp module_body with test info so it can emit registrations
+    if unitTestMode == "on" {
+      let si = 0;
+      while si < cn {
+        let sch = getChild(node, si);
+        if nodeKind(sch) == "stmt.module_body" {
+          setAttr(sch, "unit_test_mode", "on");
+          setAttr(sch, "test_count", intToStr(testIdx));
+          // Stamp test names for registration
+          let ni = 0;
+          while ni < cn {
+            let nch = getChild(node, ni);
+            if nodeKind(nch) == "stmt.test_block" {
+              setAttr(sch, "test." + getAttr(nch, "test.index") + ".name", getAttr(nch, "testname"));
+            }
+            ni = ni + 1;
+          }
+        }
+        si = si + 1;
+      }
+    }
 
-    emitChildren(node);
+    // Emit preprocessor directives before namespace (must be at file scope)
+    let pi = 0;
+    let pn = child_count();
+    while pi < pn {
+      let pch = getChild(node, pi);
+      if nodeKind(pch) == "stmt.preprocessor" {
+        emitNode(pch);
+      }
+      pi = pi + 1;
+    }
+
+    // For lib modules, wrap in namespace
+    let mname = getAttr(node, "module.name");
+    if kind == "lib" {
+      emitLine("namespace " + mname + " {", "header");
+      emitLine("namespace " + mname + " {");
+    }
+
+    // Emit non-preprocessor children inside namespace
+    // Order: declarations, then test block functions, then module_body (main)
+    let ei = 0;
+    let en = child_count();
+    while ei < en {
+      let ech = getChild(node, ei);
+      if nodeKind(ech) != "stmt.preprocessor" and nodeKind(ech) != "stmt.test_block" and nodeKind(ech) != "stmt.module_body" {
+        emitNode(ech);
+      }
+      ei = ei + 1;
+    }
+    // Emit test block functions (must appear before main for declaration)
+    let ti = 0;
+    while ti < en {
+      let tch = getChild(node, ti);
+      if nodeKind(tch) == "stmt.test_block" {
+        emitNode(tch);
+      }
+      ti = ti + 1;
+    }
+    // Emit module body (main) last
+    let bi = 0;
+    while bi < en {
+      let bch = getChild(node, bi);
+      if nodeKind(bch) == "stmt.module_body" {
+        emitNode(bch);
+      }
+      bi = bi + 1;
+    }
+
+    if kind == "lib" {
+      emitLine("}", "header");
+      emitLine("}");
+    }
   }
 
   on stmt.module_body {
@@ -62,9 +163,23 @@ emitters {
       emitLine("int main(int argc, char** argv) {");
       indentIn();
       emitLine("mor_initconsole();");
+      emitLine("mor_init_exceptions();");
       emitLine("mor_init_args(argc, argv);");
       emitChildren(node);
-      emitLine("return 0;");
+      // Unit test mode: register tests and run them
+      let utm = getAttr(node, "unit_test_mode");
+      if utm == "on" {
+        let tc = strToInt(getAttr(node, "test_count"));
+        let ri = 0;
+        while ri < tc {
+          let tname = getAttr(node, "test." + intToStr(ri) + ".name");
+          emitLine("mor_test_register(\"" + tname + "\", __mor_test_" + intToStr(ri) + ", __FILE__, __LINE__);");
+          ri = ri + 1;
+        }
+        emitLine("return mor_test_run_all();");
+      } else {
+        emitLine("return 0;");
+      }
       indentOut();
       emitLine("}");
     } else {
@@ -104,8 +219,11 @@ emitters {
 
     // DLL export prefix
     let exportAttr = getAttr(node, "var.export_attr");
+    let isVarExported = getAttr(node, "var.exported");
     if exportAttr != "" {
       emitLine(exportAttr + " ");
+    } else if isVarExported == "true" {
+      emitLine("MOR_EXPORT");
     }
     // Handle array types
     if startsWith(typeStr, "array") {
@@ -252,7 +370,7 @@ emitters {
         }
         pi = pi + 1;
       }
-      if linkage == "\"C\"" {
+      if linkage == "C" {
         emitLine("extern \"C\" {");
         emitLine("using " + tname + " = " + retStr + " (*)(" + params + ");");
         emitLine("}");
@@ -346,7 +464,7 @@ emitters {
     let linkage = getAttr(node, "decl.linkage");
     let isExported = getAttr(node, "decl.exported");
     let isExternal = getAttr(node, "decl.external");
-    let isCLink = (linkage == "\"C\"");
+    let isCLink = (linkage == "C");
     let exportAttr = getAttr(node, "decl.export_attr");
 
     // External import: forward declaration only
@@ -365,7 +483,9 @@ emitters {
     // DLL export prefix or static for non-exported
     if exportAttr != "" {
       emitLine(exportAttr + " ");
-    } else if isExported != "true" {
+    } else if isExported == "true" {
+      emitLine("MOR_EXPORT");
+    } else {
       emitLine("static ");
     }
 
@@ -437,14 +557,15 @@ emitters {
   on stmt.directive_copydll     { addCopyDLL(getAttr(node, "value")); }
   on stmt.directive_linklibrary { addLinkLibrary(getAttr(node, "value")); }
   on stmt.directive_librarypath { addLibraryPath(getAttr(node, "value")); }
-  on stmt.directive_modulepath  { addIncludePath(getAttr(node, "value")); }
+  on stmt.directive_modulepath  { addModulePath(getAttr(node, "value")); }
   on stmt.directive_includepath { addIncludePath(getAttr(node, "value")); }
-  on stmt.directive_breakpoint  { }
+  on stmt.directive_breakpoint  { addBreakpoint(getNodeFile(node), getNodeLine(node)); }
   on stmt.directive_message     {
     // BNF: @message hint|warn|error|fatal "text"
     // severity in @severity attr, text in @value attr
     // No C++ output needed; handled at parse time
   }
+  on stmt.directive_unittestmode { }
 
   on stmt.begin_block  { emitChildren(node); }
   on stmt.then_branch  { emitChildren(node); }
@@ -600,31 +721,37 @@ emitters {
   }
 
   on stmt.guard {
-    emitLine("try {");
+    emitLine("{");
+    indentIn();
+    emitLine("auto __mor_guard_fn = [&]() {");
     indentIn();
     if child_count() > 0 {
       emitNode(getChild(node, 0));
     }
     indentOut();
+    emitLine("};");
+    emitLine("int32_t __mor_exc = mor_try_call([](void* __p) " + "{" + " (*static_cast<decltype(__mor_guard_fn)*>(__p))(); " + "}" + ", &__mor_guard_fn);");
     let gi = 1;
     while gi < child_count() {
       emitNode(getChild(node, gi));
       gi = gi + 1;
     }
+    indentOut();
+    emitLine("}");
   }
 
   on stmt.guard_body  { emitChildren(node); }
 
   on stmt.except_block {
-    emitLine("} catch (const std::exception& __mor_ex) {");
+    emitLine("if (__mor_exc != 0) {");
     indentIn();
     emitChildren(node);
     indentOut();
+    emitLine("}");
   }
 
   on stmt.finally_block {
-    emitLine("} // finally");
-    emitLine("{");
+    emitLine("{" + " // finally");
     indentIn();
     emitChildren(node);
     indentOut();
@@ -652,7 +779,7 @@ emitters {
   }
 
   on stmt.raiseexception {
-    emitLine("throw std::runtime_error(" + exprToString(getChild(node, 0)) + ");");
+    emitLine("mor_throw(MOR_EXC_SOFTWARE, " + exprToString(getChild(node, 0)) + ");");
   }
   on stmt.raiseexceptioncode {
     emitLine("mor_throw(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ");");
@@ -767,6 +894,7 @@ emitters {
         let objKind = nodeKind(objNode);
         if objKind == "expr.self" { sep = "->"; }
         else if objKind == "expr.parent" { sep = "::"; }
+        else if objKind == "expr.ident" and lookupSymbolType(getAttr(objNode, "name")) == "module" { sep = "::"; }
         else if getAttr(ch0, "pointer_access") == "true" { sep = "->"; }
         if ch0Kind == "expr.cpp_arrow" { sep = "->"; }
         let margs = "";
@@ -844,6 +972,7 @@ emitters {
     let objKind = nodeKind(objNode);
     if objKind == "expr.self" { sep = "->"; }
     else if objKind == "expr.parent" { sep = "::"; }
+    else if objKind == "expr.ident" and lookupSymbolType(getAttr(objNode, "name")) == "module" { sep = "::"; }
     else if getAttr(node, "pointer_access") == "true" { sep = "->"; }
     emit exprToString(objNode) + sep + fieldName;
   }
@@ -878,7 +1007,12 @@ emitters {
   }
 
   on expr.float {
-    emit @value;
+    let floatType = getAttr(node, "literal.type");
+    if floatType == "float32" {
+      emit @value + "f";
+    } else {
+      emit @value;
+    }
   }
 
   on expr.ident {
@@ -925,7 +1059,7 @@ emitters {
     if isConst == "true" {
       emit "const ";
     }
-    emit ptype + "*)(";
+    emit resolveType(ptype) + "*)(";
     emit exprToString(getChild(node, 0));
     emit ")";
   }
@@ -966,6 +1100,60 @@ emitters {
     } else {
       emit "__mor_va";
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // UNIT TESTING EMITTERS
+  // -----------------------------------------------------------------------
+
+  on stmt.test_block {
+    let idx = getAttr(node, "test.index");
+    emitLine("static void __mor_test_" + idx + "(void) {");
+    indentIn();
+    emitChildren(node);
+    indentOut();
+    emitLine("}");
+    emitLine("");
+  }
+
+  // 1-arg assertions
+  on stmt.testassert {
+    emitLine("mor_test_assert_impl(" + exprToString(getChild(node, 0)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testasserttrue {
+    emitLine("mor_test_assert_true_impl(" + exprToString(getChild(node, 0)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertfalse {
+    emitLine("mor_test_assert_false_impl(" + exprToString(getChild(node, 0)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertnil {
+    emitLine("mor_test_assert_nil_impl(" + exprToString(getChild(node, 0)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertnotnil {
+    emitLine("mor_test_assert_not_nil_impl(" + exprToString(getChild(node, 0)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testfail {
+    emitLine("mor_test_fail_impl(" + exprToString(getChild(node, 0)) + ", __FILE__, __LINE__);");
+  }
+
+  // 2-arg assertions
+  on stmt.testassertequalint {
+    emitLine("mor_test_assert_equal_int_impl(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertequaluint {
+    emitLine("mor_test_assert_equal_uint_impl(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertequalfloat {
+    emitLine("mor_test_assert_equal_float_impl(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertequalstr {
+    emitLine("mor_test_assert_equal_str_impl(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertequalbool {
+    emitLine("mor_test_assert_equal_bool_impl(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ", __FILE__, __LINE__);");
+  }
+  on stmt.testassertequalptr {
+    emitLine("mor_test_assert_equal_ptr_impl(" + exprToString(getChild(node, 0)) + ", " + exprToString(getChild(node, 1)) + ", __FILE__, __LINE__);");
   }
 
 } // end emitters

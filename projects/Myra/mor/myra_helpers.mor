@@ -32,6 +32,9 @@ routine resolveType(typeText: string) -> string {
   if typeText == "string" { return "std::string"; }
   if typeText == "wstring" { return "std::wstring"; }
   if typeText == "pointer" { return "void*"; }
+  if startsWith(typeText, "array of ") {
+    return "std::vector<" + resolveType(substr(typeText, 9, len(typeText) - 9)) + ">";
+  }
   if startsWith(typeText, "pointer to ") {
     return resolveType(substr(typeText, 11, len(typeText) - 11)) + "*";
   }
@@ -419,12 +422,12 @@ routine emitRoutineForwardDecl(ch: node) {
   let rname = getAttr(ch, "decl.name");
   let retType = getAttr(ch, "decl.return_type");
   let linkage = getAttr(ch, "decl.linkage");
-  let isCLink = (linkage == "\"C\"");
+  let isCLink = (linkage == "C");
 
   if isCLink { emitLine("extern \"C\" {", "header"); }
 
   let sig = buildRoutineSig(ch, rname, retType);
-  emitLine(sig + ";", "header");
+  emitLine("MOR_EXPORT " + sig + ";", "header");
 
   if isCLink { emitLine("}", "header"); }
 }
@@ -437,8 +440,20 @@ routine emitExportedVarForwardDecls(varBlock: node) {
     if nodeKind(vch) == "stmt.var_decl" {
       let vname = getAttr(vch, "var.name");
       let vtype = getAttr(vch, "var.type_text");
-      emitLine("extern " + resolveType(vtype) + " " + vname + ";", "header");
+      emitLine("MOR_EXPORT extern " + resolveType(vtype) + " " + vname + ";", "header");
     }
     vi = vi + 1;
+  }
+}
+
+// Recursively stamp float literals with their resolved type
+routine stampFloatLiterals(n: node, targetType: string) {
+  if nodeKind(n) == "expr.float" {
+    setAttr(n, "literal.type", targetType);
+  }
+  let i = 0;
+  while i < childCount(n) {
+    stampFloatLiterals(getChild(n, i), targetType);
+    i = i + 1;
   }
 }

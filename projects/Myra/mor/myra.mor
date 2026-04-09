@@ -25,6 +25,8 @@ const {
   ENABLE_FORWARD_REFS = true;
 }
 
+setDefine("MYRA");
+
 import "myra_tokens.mor";
 import "myra_helpers.mor";
 import "myra_grammar.mor";
