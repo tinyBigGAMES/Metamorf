@@ -36,7 +36,7 @@
  ******************************************************************************/
 
 /** Function pointer type for try blocks. */
-typedef void (*PaxTryFn)(void* context);
+typedef void (*MorTryFn)(void* context);
 
 /**
  * Execute a try block with full exception handling.
@@ -45,7 +45,7 @@ typedef void (*PaxTryFn)(void* context);
  * @param context User context passed to try_fn (can be NULL)
  * @return 0 = no exception, 1 = software exception, 2 = hardware exception
  */
-int32_t mor_try_call(PaxTryFn try_fn, void* context);
+int32_t mor_try_call(MorTryFn try_fn, void* context);
 
 /**
  * Throw a software exception.
@@ -70,6 +70,12 @@ const char* mor_exc_msg();
  * Clear the exception state.
  */
 void mor_exc_clear();
+
+/**
+ * Initialize exception handling (VEH/signals).
+ * Call at the start of main() for exe modules, DllMain() for dll modules.
+ */
+void mor_init_exceptions();
 
 /*******************************************************************************
  * Console Initialization
@@ -178,7 +184,7 @@ void mor_freemem(void* ptr);
 /**
  * Test function signature.
  */
-typedef void (*PaxTestFn)(void);
+typedef void (*MorTestFn)(void);
 
 /**
  * Register a test function.
@@ -188,7 +194,7 @@ typedef void (*PaxTestFn)(void);
  * @param line  Source line number
  * @return 1 on success, 0 if max tests exceeded
  */
-int32_t mor_test_register(const char* name, PaxTestFn func, const char* file, int32_t line);
+int32_t mor_test_register(const char* name, MorTestFn func, const char* file, int32_t line);
 
 /**
  * Run all registered tests.
@@ -227,7 +233,7 @@ void mor_test_fail_impl(const char* message, const char* file, int32_t line);
  * Provides object-style access to variadic function arguments.
  * Automatically cleans up va_list when destroyed.
  *
- * Usage in Pax:
+ * Usage in Mor:
  *   routine myFunc(const count: int32; ...): int32;
  *   begin
  *     x := varargs.next(int32);   // get next arg as int32

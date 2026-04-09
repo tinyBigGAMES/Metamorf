@@ -32,7 +32,7 @@
  ******************************************************************************/
 
 /** Internal C++ exception type for software exceptions. */
-struct PaxException {
+struct MorException {
     int32_t code;
     const char* msg;
 };
@@ -65,7 +65,7 @@ static bool IsHardwareException(DWORD code) {
 }
 
 // Vectored Exception Handler for Windows
-static LONG WINAPI PaxVehHandler(PEXCEPTION_POINTERS ep) {
+static LONG WINAPI MorVehHandler(PEXCEPTION_POINTERS ep) {
     DWORD code = ep->ExceptionRecord->ExceptionCode;
     
     if (g_jmp_target == nullptr)
@@ -115,7 +115,7 @@ static PVOID g_veh_handle = nullptr;
 
 static void mor_install_hw_handler() {
     if (g_veh_handle == nullptr) {
-        g_veh_handle = AddVectoredExceptionHandler(1, PaxVehHandler);
+        g_veh_handle = AddVectoredExceptionHandler(1, MorVehHandler);
     }
 }
 
@@ -167,7 +167,7 @@ static void mor_install_hw_handler() {
 
 #endif
 
-int32_t mor_try_call(PaxTryFn try_fn, void* context) {
+int32_t mor_try_call(MorTryFn try_fn, void* context) {
     mor_install_hw_handler();
     
     jmp_buf buf;
@@ -182,7 +182,7 @@ int32_t mor_try_call(PaxTryFn try_fn, void* context) {
             g_jmp_target = old_target;
             return 0;  // No exception
         } 
-        catch (const PaxException& e) {
+        catch (const MorException& e) {
             g_exc_code = e.code;
             g_exc_msg = e.msg;
             g_jmp_target = old_target;
@@ -208,7 +208,7 @@ int32_t mor_try_call(PaxTryFn try_fn, void* context) {
 }
 
 void mor_throw(int32_t code, const char* msg) {
-    throw PaxException{code, msg};
+    throw MorException{code, msg};
 }
 
 int32_t mor_exc_code() {
@@ -222,6 +222,10 @@ const char* mor_exc_msg() {
 void mor_exc_clear() {
     g_exc_code = 0;
     g_exc_msg = nullptr;
+}
+
+void mor_init_exceptions() {
+    mor_install_hw_handler();
 }
 
 /*******************************************************************************
@@ -306,20 +310,20 @@ void mor_freemem(void* ptr) {
  * Unit Testing Implementation
  ******************************************************************************/
 
-struct PaxTestInfo {
+struct MorTestInfo {
     const char* name;
-    PaxTestFn func;
+    MorTestFn func;
     const char* file;
     int32_t line;
 };
 
-static PaxTestInfo mor_tests[MOR_MAX_TESTS];
+static MorTestInfo mor_tests[MOR_MAX_TESTS];
 static int mor_test_count = 0;
 static bool mor_test_failed = false;
 static char mor_test_error_buffer[MOR_ERROR_BUFFER_SIZE];
 static int mor_test_error_pos = 0;
 
-int32_t mor_test_register(const char* name, PaxTestFn func, const char* file, int32_t line) {
+int32_t mor_test_register(const char* name, MorTestFn func, const char* file, int32_t line) {
     if (mor_test_count >= MOR_MAX_TESTS) {
         std::fprintf(stderr, "ERROR: Maximum test count (%d) exceeded\n", MOR_MAX_TESTS);
         return 0;
@@ -342,7 +346,7 @@ int32_t mor_test_run_all(void) {
     for (int i = 0; i < 62; i++) std::printf("\xE2\x95\x90");  // ═
     std::printf("\xE2\x95\x97\n");  // ╗
     
-    std::printf("\xE2\x95\x91                     Mor Unit Test Runner                     \xE2\x95\x91\n");  // ║...║
+    std::printf("\xE2\x95\x91                     Unit Test Runner                         \xE2\x95\x91\n");  // ║...║
     
     std::printf("\xE2\x95\x9A");  // ╚
     for (int i = 0; i < 62; i++) std::printf("\xE2\x95\x90");  // ═
