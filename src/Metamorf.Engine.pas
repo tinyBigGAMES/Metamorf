@@ -231,17 +231,16 @@ begin
   FMorMasterRoot := TMorASTNode.Create();
   FMorMasterRoot.SetKind('mor.master');
   FMorMasterRoot.AddChild(LMorAST);
-
-  FInterp.SetImportMorFunc(ImportMorFile);
-  FInterp.RunSetup(LMorAST);
-  FInterp.SetImportMorFunc(nil);
-  if FErrors.HasErrors() then Exit;
-
-  // Register C++ passthrough (AFTER custom lang setup)
-  MorConfigCpp(FInterp);
-  Status(RSEngineCppPassthrough);
-
   try
+    FInterp.SetImportMorFunc(ImportMorFile);
+    FInterp.RunSetup(LMorAST);
+    FInterp.SetImportMorFunc(nil);
+    if FErrors.HasErrors() then Exit;
+
+    // Register C++ passthrough (AFTER custom lang setup)
+    MorConfigCpp(FInterp);
+    Status(RSEngineCppPassthrough);
+
     CompileUserSource(ASourceFile, AOutputPath, AAutoRun);
   finally
     FreeAndNil(FMorMasterRoot);
@@ -292,7 +291,11 @@ begin
   finally
     LGenLexer.Free();
   end;
-  if FErrors.HasErrors() then Exit;
+  if FErrors.HasErrors() then
+  begin
+    LUserTokens.Free();
+    Exit;
+  end;
 
   // Parse user source into a branch
   Status(RSUserParserParsing, [LSrcDisplay]);
@@ -532,7 +535,11 @@ begin
   finally
     LGenLexer.Free();
   end;
-  if FErrors.HasErrors() then Exit(False);
+  if FErrors.HasErrors() then
+  begin
+    LTokens.Free();
+    Exit(False);
+  end;
 
   // Parse module source into a branch
   Status(RSUserParserParsing, [LModuleDisplay]);
@@ -545,7 +552,11 @@ begin
     LGenParser.Free();
   end;
   LTokens.Free();
-  if FErrors.HasErrors() then Exit(False);
+  if FErrors.HasErrors() then
+  begin
+    LBranch.Free();
+    Exit(False);
+  end;
 
   // Attach branch to master root and mark processed
   LBranch.SetAttr('source_name', AModuleName);
