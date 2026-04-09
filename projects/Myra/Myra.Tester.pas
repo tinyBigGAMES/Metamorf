@@ -59,7 +59,7 @@ type
   TTestEntry = record
     TestName:     string;
     Dependencies: TArray<string>;
-    CanRun:       Boolean;
+    RunMode:      TMorRunMode;
     DefineName:   string;
     DefineValue:  string;
   end;
@@ -87,7 +87,7 @@ type
     function ExtractAllowWarnings(const ASource: string): Boolean;
     function ExtractTestName(const AFilePath: string): string;
     function RunTestFile(const AFilePath: string;
-      const AAutoRun: Boolean = False;
+      const ARunMode: TMorRunMode = rmNone;
       const ADefine: string = '';
       const ADefineValue: string = ''): Boolean;
     procedure PrintResults();
@@ -106,26 +106,26 @@ type
     // Registration (indexed, ordered execution)
     procedure RegisterTest(const AIndex: Integer;
       const ATestName: string;
-      const ACanRun: Boolean = True;
+      const ARunMode: TMorRunMode = rmNone;
       const ADefine: string = '';
       const ADefineValue: string = '');
     procedure RegisterTests(const AIndex: Integer;
       const ATestName: string;
       const ADependencies: array of string;
-      const ACanRun: Boolean = True;
+      const ARunMode: TMorRunMode = rmNone;
       const ADefine: string = '';
       const ADefineValue: string = '');
     procedure ClearRegisteredTests();
 
     // Execution
     function RunTest(const ATestName: string;
-      const ACanRun: Boolean = False;
+      const ARunMode: TMorRunMode = rmNone;
       const ADefine: string = '';
       const ADefineValue: string = ''): Boolean;
-    function RunTestByIndex(const AIndex: Integer): Boolean;
+    function RunTestByIndex(const AIndex: Integer; const ATarget: TMorTargetPlatform=tpWin64; const AOptimizeLevel: TMorOptimizeLevel=olDebug; const ASubsystem: TMorSubsystemType=stConsole): Boolean;
     function RunAllTests(): Integer;
     function RunTestsMatching(const APattern: string;
-      const ACanRun: Boolean = False): Integer;
+      const ARunMode: TMorRunMode = rmNone): Integer;
 
     // State
     procedure Reset();
@@ -147,6 +147,9 @@ type
   end;
 
 implementation
+
+uses
+  Metamorf.Debug.REPL;
 
 const
   // Delay between test runs to allow ConPTY, WSL, and Zig cache resources
@@ -186,7 +189,7 @@ begin
 end;
 
 procedure TMyraTester.RegisterTest(const AIndex: Integer;
-  const ATestName: string; const ACanRun: Boolean;
+  const ATestName: string; const ARunMode: TMorRunMode;
   const ADefine: string; const ADefineValue: string);
 var
   LEntry: TTestEntry;
@@ -196,7 +199,7 @@ var
 begin
   LEntry.TestName     := ATestName;
   LEntry.Dependencies := [];
-  LEntry.CanRun       := ACanRun;
+  LEntry.RunMode      := ARunMode;
   LEntry.DefineName   := ADefine;
   LEntry.DefineValue  := ADefineValue;
 
@@ -216,7 +219,7 @@ end;
 
 procedure TMyraTester.RegisterTests(const AIndex: Integer;
   const ATestName: string; const ADependencies: array of string;
-  const ACanRun: Boolean; const ADefine: string;
+  const ARunMode: TMorRunMode; const ADefine: string;
   const ADefineValue: string);
 var
   LEntry: TTestEntry;
@@ -226,7 +229,7 @@ var
   LK:     Integer;
 begin
   LEntry.TestName    := ATestName;
-  LEntry.CanRun      := ACanRun;
+  LEntry.RunMode     := ARunMode;
   LEntry.DefineName  := ADefine;
   LEntry.DefineValue := ADefineValue;
   SetLength(LEntry.Dependencies, Length(ADependencies));
@@ -336,7 +339,7 @@ begin
 end;
 
 function TMyraTester.RunTestFile(const AFilePath: string;
-  const AAutoRun: Boolean; const ADefine: string;
+  const ARunMode: TMorRunMode; const ADefine: string;
   const ADefineValue: string): Boolean;
 var
   LEngine:           TMorEngine;
@@ -350,6 +353,9 @@ var
   LItems:            TList<TMorError>;
   LI:                Integer;
   LOutputShown:      Boolean;
+  LOnlyExecError:    Boolean;
+  LExePath:          string;
+  LREPL:             TMorDebugREPL;
 begin
   Result           := False;
   FLastTestSkipped := False;
@@ -412,7 +418,8 @@ begin
       end);
 
     // Compile (and optionally run)
-    LEngine.Compile(FLangFile, AFilePath, FOutputPath, AAutoRun);
+    LEngine.Compile(FLangFile, AFilePath, FOutputPath,
+      ARunMode = rmExecute);
     LErrors := LEngine.GetErrors();
     LItems  := LErrors.GetItems();
 
@@ -428,10 +435,33 @@ begin
     end;
 
     // Exit if build failed
+    // Tolerate execution exit code error (Z005) when expected exit code
+    // is non-zero and matches the actual exit code
     if LErrors.HasErrors() then
     begin
-      Print(COLOR_RED + 'Build failed.');
-      Exit;
+      LOnlyExecError := False;
+      if LExpectedExitCode <> 0 then
+      begin
+        LExitCode := LEngine.GetLastExitCode();
+        if LExitCode = DWORD(LExpectedExitCode) then
+        begin
+          LOnlyExecError := True;
+          for LI := 0 to LItems.Count - 1 do
+          begin
+            if (LItems[LI].Severity = esError) and
+               (LItems[LI].Code <> ERR_ZIGBUILD_BUILD_FAILED) then
+            begin
+              LOnlyExecError := False;
+              Break;
+            end;
+          end;
+        end;
+      end;
+      if not LOnlyExecError then
+      begin
+        Print(COLOR_RED + 'Build failed.');
+        Exit;
+      end;
     end;
 
     // Check for warnings (fail unless allowed)
@@ -447,7 +477,7 @@ begin
     Print(COLOR_GREEN + '  Build OK');
 
     // Check exit code if the test was run
-    if AAutoRun then
+    if ARunMode = rmExecute then
     begin
       Print('');
       LExitCode := LEngine.GetLastExitCode();
@@ -470,6 +500,26 @@ begin
 
     Result := True;
 
+    // Launch debug REPL if requested and build succeeded
+    if ARunMode = rmDebug then
+    begin
+      LExePath := TPath.Combine(FOutputPath,
+        TPath.Combine('zig-out',
+          TPath.Combine('bin',
+            LEngine.GetProjectName() + '.exe')));
+      if FileExists(LExePath) then
+      begin
+        LREPL := TMorDebugREPL.Create();
+        try
+          LREPL.Run(LExePath);
+        finally
+          LREPL.Free();
+        end;
+      end
+      else
+        Print(COLOR_RED + 'Executable not found: ' + LExePath);
+    end;
+
     // Allow ConPTY, WSL, and Zig cache to settle before the next test
     Sleep(TEST_RUNNER_SETTLE_MS);
   finally
@@ -478,7 +528,7 @@ begin
 end;
 
 function TMyraTester.RunTest(const ATestName: string;
-  const ACanRun: Boolean; const ADefine: string;
+  const ARunMode: TMorRunMode; const ADefine: string;
   const ADefineValue: string): Boolean;
 var
   LFilePath: string;
@@ -492,7 +542,7 @@ begin
     begin
       for LDep in LEntry.Dependencies do
       begin
-        if not RunTest(LDep, False) then
+        if not RunTest(LDep, rmNone) then
         begin
           Result := False;
           Exit;
@@ -507,7 +557,7 @@ begin
 
   LFilePath := TPath.Combine(FTestFolder,
     TPath.ChangeExtension(ATestName, MYRA_TEST_EXT));
-  Result := RunTestFile(LFilePath, ACanRun, ADefine, ADefineValue);
+  Result := RunTestFile(LFilePath, ARunMode, ADefine, ADefineValue);
   if FLastTestSkipped then
     Inc(FSkipCount)
   else if Result then
@@ -519,7 +569,7 @@ begin
   end;
 end;
 
-function TMyraTester.RunTestByIndex(const AIndex: Integer): Boolean;
+function TMyraTester.RunTestByIndex(const AIndex: Integer; const ATarget: TMorTargetPlatform; const AOptimizeLevel: TMorOptimizeLevel; const ASubsystem: TMorSubsystemType): Boolean;
 var
   LEntry: TTestEntry;
 begin
@@ -540,7 +590,11 @@ begin
   Print(COLOR_CYAN + Format('Running test #%d...', [AIndex]));
   Print('');
 
-  if not RunTest(LEntry.TestName, LEntry.CanRun,
+  Target := ATarget;
+  OptimizeLevel := AOptimizeLevel;
+  Subsystem := ASubsystem;
+
+  if not RunTest(LEntry.TestName, LEntry.RunMode,
     LEntry.DefineName, LEntry.DefineValue) then
     Result := False;
 
@@ -579,7 +633,7 @@ begin
     for LI := 0 to High(LSortedKeys) do
     begin
       LEntry := FRegisteredTests[LSortedKeys[LI]];
-      RunTest(LEntry.TestName, LEntry.CanRun,
+      RunTest(LEntry.TestName, LEntry.RunMode,
         LEntry.DefineName, LEntry.DefineValue);
       Print('');
       Print(COLOR_BLUE + '----------------------------------------');
@@ -589,7 +643,7 @@ begin
   else
   begin
     // No registered tests -- scan directory (alphabetical)
-    // Directory scan defaults to build-only (ACanRun = False)
+    // Directory scan defaults to build-only (rmNone)
     LFiles := TDirectory.GetFiles(FTestFolder, 'test_*' + MYRA_TEST_EXT);
     TArray.Sort<string>(LFiles);
     LTotal := Length(LFiles);
@@ -600,7 +654,7 @@ begin
 
     for LFile in LFiles do
     begin
-      if RunTestFile(LFile, False) then
+      if RunTestFile(LFile, rmNone) then
         Inc(FPassCount)
       else if FLastTestSkipped then
         Inc(FSkipCount)
@@ -620,7 +674,7 @@ begin
 end;
 
 function TMyraTester.RunTestsMatching(const APattern: string;
-  const ACanRun: Boolean): Integer;
+  const ARunMode: TMorRunMode): Integer;
 var
   LFiles: TStringDynArray;
   LFile:  string;
@@ -640,7 +694,7 @@ begin
   begin
     if Pos(APattern, TPath.GetFileName(LFile)) > 0 then
     begin
-      if RunTestFile(LFile, ACanRun) then
+      if RunTestFile(LFile, ARunMode) then
         Inc(FPassCount)
       else if FLastTestSkipped then
         Inc(FSkipCount)
