@@ -130,6 +130,11 @@ type
     FDefinedTables:  TDictionary<string, Boolean>;
     FArrayTables:    TDictionary<string, TTomlArray>;
 
+    // Comment preservation during parsing
+    FComment:        string;
+    FKeyComments:    TDictionary<string, string>;
+    FPendingComment: string;
+
     // Lexer helpers
     function  IsEOF(): Boolean;
     function  Peek(const AOffset: Integer = 0): Char;
@@ -171,6 +176,7 @@ type
     function  ParseInlineTable(): TToml;
     procedure ParseTableHeader();
     procedure ParseArrayTableHeader();
+    procedure CaptureComment();
 
     // Table navigation
     function  GetOrCreateTablePath(const APath: TArray<string>;
@@ -234,6 +240,12 @@ type
     procedure SetValue(const AKey: string; const AValue: TTomlValue);
 
     property Keys: TArray<string> read GetKeys;
+
+    // Comment preservation
+    property Comment: string read FComment write FComment;
+    function GetKeyComment(const AKey: string): string;
+    procedure SetKeyComment(const AKey: string; const AValue: string);
+    property KeyComments: TDictionary<string, string> read FKeyComments;
   end;
 
 implementation
@@ -459,11 +471,15 @@ begin
   FArrayTables    := nil;
   FCurrentTable   := nil;
   FLastError      := '';
+  FKeyComments    := TDictionary<string, string>.Create();
+  FComment        := '';
+  FPendingComment := '';
 end;
 
 destructor TToml.Destroy();
 begin
   FKeyOrder.Free();
+  FKeyComments.Free();
   FOwnedArrays.Free();
   FOwnedTables.Free();
   FValues.Free();
@@ -506,6 +522,7 @@ begin
   FLength       := Length(FSource);
   FLastError    := '';
   FCurrentTable := Self;
+  FPendingComment := '';
 
   // Initialize tracking dictionaries
   FreeAndNil(FImplicitTables);
@@ -589,7 +606,7 @@ begin
     if IsWhitespace(Peek()) or IsNewline(Peek()) then
       Advance()
     else if Peek() = '#' then
-      SkipToEndOfLine()
+      CaptureComment()
     else
       Break;
   end;
@@ -677,6 +694,21 @@ end;
 
 // -- Parser methods -----------------------------------------------------------
 
+procedure TToml.CaptureComment();
+var
+  LStart: Integer;
+  LLine:  string;
+begin
+  // FPos points to '#'; capture everything to end of line
+  LStart := FPos;
+  SkipToEndOfLine();
+  LLine := Copy(FSource, LStart, FPos - LStart);
+  if FPendingComment <> '' then
+    FPendingComment := FPendingComment + #10 + LLine
+  else
+    FPendingComment := LLine;
+end;
+
 function TToml.ParseDocument(): Boolean;
 begin
   Result := True;
@@ -690,6 +722,13 @@ begin
 
     ParseExpression();
   end;
+
+  // Any trailing comments stored on root
+  if FPendingComment <> '' then
+  begin
+    Self.FComment := FPendingComment;
+    FPendingComment := '';
+  end;
 end;
 
 procedure TToml.ParseExpression();
@@ -702,7 +741,7 @@ begin
   // Comment
   if Peek() = '#' then
   begin
-    SkipToEndOfLine();
+    CaptureComment();
     Exit;
   end;
 
@@ -731,6 +770,13 @@ var
   LValue: TTomlValue;
 begin
   LKey := ParseKey();
+
+  // Attach any pending comment to this key
+  if FPendingComment <> '' then
+  begin
+    ATable.FKeyComments.AddOrSetValue(LKey[0], FPendingComment);
+    FPendingComment := '';
+  end;
 
   SkipWhitespace();
   if Peek() <> '=' then
@@ -1578,6 +1624,13 @@ begin
 
   FCurrentTable := GetOrCreateTablePath(LKey, False);
   FDefinedTables.Add(LPath, True);
+
+  // Attach pending comment to the new table
+  if FPendingComment <> '' then
+  begin
+    FCurrentTable.FComment := FPendingComment;
+    FPendingComment := '';
+  end;
 end;
 
 procedure TToml.ParseArrayTableHeader();
@@ -1605,6 +1658,13 @@ begin
     Error('Cannot redefine table ''%s'' as array table', [LPath]);
 
   FCurrentTable := GetOrCreateArrayTablePath(LKey);
+
+  // Attach pending comment to the new array-of-table entry
+  if FPendingComment <> '' then
+  begin
+    FCurrentTable.FComment := FPendingComment;
+    FPendingComment := '';
+  end;
 end;
 
 function TToml.PathToString(const APath: TArray<string>): string;
@@ -1800,6 +1860,19 @@ begin
   LCurrent.FValues.Add(LKey, AValue);
   if not LCurrent.FKeyOrder.Contains(LKey) then
     LCurrent.FKeyOrder.Add(LKey);
+end;
+
+// -- Comment preservation -----------------------------------------------------
+
+function TToml.GetKeyComment(const AKey: string): string;
+begin
+  if not FKeyComments.TryGetValue(AKey, Result) then
+    Result := '';
+end;
+
+procedure TToml.SetKeyComment(const AKey: string; const AValue: string);
+begin
+  FKeyComments.AddOrSetValue(AKey, AValue);
 end;
 
 // -- Public value access ------------------------------------------------------

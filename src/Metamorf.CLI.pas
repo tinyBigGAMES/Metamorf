@@ -61,6 +61,7 @@ uses
   System.Classes,
   Metamorf.AST,
   Metamorf.Build,
+  Metamorf.Resources,
   Metamorf.Debug.REPL;
 
 { TMorCLI }
@@ -594,17 +595,15 @@ begin
   // Debug requires Win64 target
   if FEngine.GetTarget() <> tpWin64 then
   begin
-    TMorUtils.PrintLn(COLOR_RED +
-      'Error: Debugging is only supported for Win64 targets');
+    TMorUtils.PrintLn(COLOR_RED + 'Error: ' + RSEngineAPIDebugWin64);
     ExitCode := 1;
     Exit;
   end;
 
   // Build exe path
-  LExePath := TPath.Combine(FOutputPath,
-    TPath.Combine('zig-out',
-      TPath.Combine('bin',
-        FEngine.GetProjectName() + '.exe')));
+  LExePath := TPath.GetFullPath(
+    TPath.Combine(FOutputPath, 'zig-out\bin\' +
+      FEngine.GetProjectName() + '.exe'));
 
   if not FileExists(LExePath) then
   begin

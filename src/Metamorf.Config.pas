@@ -126,6 +126,14 @@ type
     procedure SetTableStringArray(const AKeyPath: string;
       const AIndex: Integer; const AField: string;
       const AValues: TArray<string>);
+
+    // Comment preservation
+    function GetFileComment(): string;
+    procedure SetFileComment(const AComment: string);
+    function GetTableComment(const AKeyPath: string;
+      const AIndex: Integer): string;
+    procedure SetTableComment(const AKeyPath: string;
+      const AIndex: Integer; const AComment: string);
   end;
 
 implementation
@@ -329,8 +337,16 @@ var
   LArray:    TTomlArray;
   LI:        Integer;
   LItem:     TTomlValue;
+  LComment:  string;
 begin
   LKeys := AToml.Keys;
+
+  // Emit root table comment (file header)
+  if (ATablePath = '') and (AToml.Comment <> '') then
+  begin
+    ABuilder.Append(AToml.Comment);
+    ABuilder.AppendLine();
+  end;
 
   // First pass: simple scalar values
   for LKey in LKeys do
@@ -341,6 +357,13 @@ begin
          not ((LValue.Kind = tvkArray) and (LValue.AsArray().Count > 0) and
               (LValue.AsArray()[0].Kind = tvkTable)) then
       begin
+        // Emit key comment if present
+        LComment := AToml.GetKeyComment(LKey);
+        if LComment <> '' then
+        begin
+          ABuilder.Append(LComment);
+          ABuilder.AppendLine();
+        end;
         ABuilder.Append(LKey + ' = ');
         SerializeValue(LValue, ABuilder);
         ABuilder.AppendLine();
@@ -361,9 +384,17 @@ begin
           LNewPath := ATablePath + '.' + LKey;
 
         ABuilder.AppendLine();
-        ABuilder.AppendLine('[' + LNewPath + ']');
 
         LSubTable := LValue.AsTable();
+
+        // Emit table comment if present
+        if LSubTable.Comment <> '' then
+        begin
+          ABuilder.Append(LSubTable.Comment);
+          ABuilder.AppendLine();
+        end;
+
+        ABuilder.AppendLine('[' + LNewPath + ']');
         SerializeToml(LSubTable, ABuilder, AIndent, LNewPath);
       end;
     end;
@@ -389,6 +420,12 @@ begin
           if LItem.Kind = tvkTable then
           begin
             ABuilder.AppendLine();
+            // Emit entry comment if present
+            if LItem.AsTable().Comment <> '' then
+            begin
+              ABuilder.Append(LItem.AsTable().Comment);
+              ABuilder.AppendLine();
+            end;
             ABuilder.AppendLine('[[' + LNewPath + ']]');
             SerializeToml(LItem.AsTable(), ABuilder, AIndent, '');
           end;
@@ -971,6 +1008,54 @@ begin
       for LItem in AValues do
         LFieldArray.AddString(LItem);
     end;
+  end;
+end;
+
+// -- Comment preservation -----------------------------------------------------
+
+function TMorConfig.GetFileComment(): string;
+begin
+  if Assigned(FToml) then
+    Result := FToml.Comment
+  else
+    Result := '';
+end;
+
+procedure TMorConfig.SetFileComment(const AComment: string);
+begin
+  if not Assigned(FToml) then
+    FToml := TToml.Create();
+  FToml.Comment := AComment;
+end;
+
+function TMorConfig.GetTableComment(const AKeyPath: string;
+  const AIndex: Integer): string;
+var
+  LValue: TTomlValue;
+  LArray: TTomlArray;
+begin
+  Result := '';
+  if GetValueAtPath(AKeyPath, LValue) and (LValue.Kind = tvkArray) then
+  begin
+    LArray := LValue.AsArray();
+    if (AIndex >= 0) and (AIndex < LArray.Count) and
+       (LArray[AIndex].Kind = tvkTable) then
+      Result := LArray[AIndex].AsTable().Comment;
+  end;
+end;
+
+procedure TMorConfig.SetTableComment(const AKeyPath: string;
+  const AIndex: Integer; const AComment: string);
+var
+  LValue: TTomlValue;
+  LArray: TTomlArray;
+begin
+  if GetValueAtPath(AKeyPath, LValue) and (LValue.Kind = tvkArray) then
+  begin
+    LArray := LValue.AsArray();
+    if (AIndex >= 0) and (AIndex < LArray.Count) and
+       (LArray[AIndex].Kind = tvkTable) then
+      LArray[AIndex].AsTable().Comment := AComment;
   end;
 end;
 

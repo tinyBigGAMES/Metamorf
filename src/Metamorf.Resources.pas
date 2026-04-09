@@ -138,6 +138,7 @@ resourcestring
   RSEngineAPISrcNotParsed = 'ParseSource must be called before RunSemantics';
   RSEngineAPISemNotRun    = 'RunSemantics must be called before RunEmitters';
   RSEngineAPIEmitNotRun   = 'RunEmitters must be called before Build';
+  RSEngineAPIDebugWin64   = 'Debugging is only supported for Win64 targets';
 
 implementation
 

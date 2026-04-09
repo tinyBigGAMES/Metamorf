@@ -765,31 +765,56 @@ function TMorDebugRuntime.StepOut(): Boolean;
 var
   LContext: TContext;
   LReturnAddr: UInt64;
+  LOpcode: Byte;
+  LFile: string;
+  LLine: Integer;
 begin
   Result := False;
   if (FTarget = nil) or (FSourceMap = nil) then
     Exit;
 
   LContext := FTarget.GetContext();
+  LReturnAddr := 0;
 
-  // Use StackWalk64 via source map to find caller's return address
-  // (works regardless of frame pointer optimization)
-  if not FSourceMap.GetCallerReturnAddress(
-    FTarget.GetThreadHandle(), LContext, LReturnAddr) then
-    Exit;
-
-  if LReturnAddr = 0 then
-    Exit;
-
-  // Only set breakpoint if return address is in our code
-  if not FTarget.IsOurCode(LReturnAddr) then
+  // Try StackWalk64 first (reliable when NOT in function epilogue)
+  if FSourceMap.GetCallerReturnAddress(
+    FTarget.GetThreadHandle(), LContext, LReturnAddr) and
+    (LReturnAddr <> 0) and FTarget.IsOurCode(LReturnAddr) and
+    FSourceMap.AddressToSourceLine(LReturnAddr, LFile, LLine) then
   begin
-    // Returning to non-user code -- just continue
+    FBreakpoints.SetTempBreakpoint(LReturnAddr);
     Result := DoContinue();
     Exit;
   end;
 
-  FBreakpoints.SetTempBreakpoint(LReturnAddr);
+  // Fallback: read return address directly from the stack.
+  // StackWalk64 can fail or return the wrong frame during the
+  // function epilogue because x64 unwind info does not reliably
+  // describe the stack state after the frame has been torn down.
+  LReturnAddr := 0;
+  LOpcode := FTarget.ReadByte(LContext.Rip);
+
+  if LOpcode = $C3 then
+    // RET near: return address is at [RSP]
+    LReturnAddr := FTarget.ReadUInt64(LContext.Rsp)
+  else if LOpcode = $5D then
+    // POP RBP: return address is at [RSP+8]
+    LReturnAddr := FTarget.ReadUInt64(LContext.Rsp + 8)
+  else
+    // Unknown epilogue instruction -- try [RBP+8] as last resort
+    // (standard frame: [RBP] = saved RBP, [RBP+8] = return address)
+    LReturnAddr := FTarget.ReadUInt64(LContext.Rbp + 8);
+
+  if (LReturnAddr <> 0) and FTarget.IsOurCode(LReturnAddr) and
+    FSourceMap.AddressToSourceLine(LReturnAddr, LFile, LLine) then
+  begin
+    FBreakpoints.SetTempBreakpoint(LReturnAddr);
+    Result := DoContinue();
+    Exit;
+  end;
+
+  // All fallbacks failed -- just continue
+  // (process will run to next breakpoint or exit)
   Result := DoContinue();
 end;
 

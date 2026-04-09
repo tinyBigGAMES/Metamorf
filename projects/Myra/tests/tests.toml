@@ -1,65 +1,180 @@
-# Myra Test Configuration
-#
-# Each [[test]] entry registers a test in execution order.
-#
-# Fields:
-#   name         (string, required)   - Test filename without extension
-#   deps         (string[], optional) - Dependencies built first, in order
-#   run          (boolean, optional)  - true (default) = build and run, false = build only
-#   define       (string, optional)   - Conditional define name passed to compiler
-#   define_value (string, optional)   - Value for the define (requires define to be set)
-#
-# Usage:
-#   Myra test all                          (uses this file from test folder)
-#   Myra test all -c path/to/custom.toml   (uses a custom config file)
-
-[[test]]
+﻿[[test]]
+index = 0
 name = "test_exe_hello"
 
 [[test]]
-name = "test_exe_consts"
+index = 1
+name = "test_exe_variables"
 
 [[test]]
-name = "test_exe_uselib"
-
-[[test]]
-name = "test_exe_ifelse"
-
-[[test]]
-name = "test_exe_loops"
-
-[[test]]
-name = "test_exe_match"
-
-[[test]]
-name = "test_exe_routines"
-
-[[test]]
-name = "test_exe_strings"
-
-[[test]]
-name = "test_exe_types"
-
-[[test]]
+index = 2
 name = "test_exe_vars"
 
 [[test]]
-name = "test_lib_utils"
+index = 3
+name = "test_exe_assign"
 
 [[test]]
+index = 4
+name = "test_exe_consts"
+
+[[test]]
+index = 5
+name = "test_exe_constants_enums"
+
+[[test]]
+index = 6
+name = "test_exe_types"
+
+[[test]]
+index = 7
+name = "test_exe_math"
+
+[[test]]
+index = 50
+name = "test_exe_ifelse"
+
+[[test]]
+index = 51
+name = "test_exe_conditional"
+
+[[test]]
+index = 52
+name = "test_exe_control_flow"
+
+[[test]]
+index = 53
+name = "test_exe_loops"
+
+[[test]]
+index = 54
+name = "test_exe_match"
+
+[[test]]
+index = 100
+name = "test_exe_routines"
+
+[[test]]
+index = 101
+name = "test_exe_variadic_routines"
+
+[[test]]
+index = 102
+name = "test_exe_routine_type_linkage"
+
+[[test]]
+index = 103
+name = "test_exe_intrinsics"
+
+[[test]]
+index = 150
+name = "test_exe_arrays"
+
+[[test]]
+index = 151
+name = "test_exe_dynamic_arrays"
+
+[[test]]
+index = 152
+name = "test_exe_records"
+
+[[test]]
+index = 153
+name = "test_exe_pointers"
+
+[[test]]
+index = 154
+name = "test_exe_strings"
+
+[[test]]
+index = 155
+name = "test_exe_strings_full"
+
+[[test]]
+index = 156
+name = "test_exe_sets"
+
+[[test]]
+index = 157
+name = "test_exe_sets_enum"
+
+[[test]]
+index = 158
+name = "test_exe_sets_sizes"
+
+[[test]]
+index = 159
+name = "test_exe_classes"
+
+[[test]]
+index = 200
+name = "test_exe_memory"
+
+[[test]]
+index = 201
+name = "test_exe_new_dispose"
+
+[[test]]
+index = 202
+name = "test_exe_new_dispose_managed"
+
+[[test]]
+index = 203
+name = "test_exe_setlength_shrink_managed"
+
+[[test]]
+index = 250
+name = "test_exe_exceptions"
+
+[[test]]
+index = 251
+name = "test_exe_exception_scope"
+
+[[test]]
+index = 300
+name = "test_exe_import"
+
+[[test]]
+index = 350
+name = "test_exe_usedll"
+deps = [
+  "test_dll_exports"
+]
+
+[[test]]
+index = 351
+name = "test_exe_uselib"
+deps = [
+  "test_lib_utils"
+]
+
+[[test]]
+index = 400
 name = "test_exe_mixedmode"
 
-# DLL test — deps are built first before the consumer runs
 [[test]]
-name = "test_exe_usedll"
-deps = ["test_dll_exports"]
+index = 401
+name = "test_exe_target"
 
-# Raylib static — defines STATIC=1 so the test links against libraylib.a
 [[test]]
+index = 402
+name = "test_exe_verinfo"
+
+[[test]]
+index = 403
+name = "test_exe_debug"
+run_mode = "debug"
+
+[[test]]
+index = 404
+name = "test_exe_unittest"
+
+[[test]]
+index = 450
+name = "test_exe_raylib"
+
+[[test]]
+index = 451
 name = "test_exe_raylib"
 define = "STATIC"
 define_value = "1"
-
-# Raylib dynamic — no define, links against raylib.dll
-[[test]]
-name = "test_exe_raylib"

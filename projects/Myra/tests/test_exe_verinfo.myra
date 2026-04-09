@@ -11,6 +11,8 @@
 
 /* EXITCODE: 0 */
 
+/* PLATFORMS: WIN64 */
+
 /* EXPECT: === Version Info Test ===
 
 This executable should have embedded version info.
