@@ -889,6 +889,7 @@ emitters {
       let ch0Kind = nodeKind(ch0);
       if ch0Kind == "expr.field_access" or ch0Kind == "expr.cpp_arrow" {
         let fieldName = getAttr(ch0, "field.name");
+        if rawName == "" or fieldName == rawName {
         let objNode = getChild(ch0, 0);
         let sep = ".";
         let objKind = nodeKind(objNode);
@@ -908,6 +909,7 @@ emitters {
         }
         emit exprToString(objNode) + sep + fieldName + "(" + margs + ")";
         return;
+        }
       }
     }
 
