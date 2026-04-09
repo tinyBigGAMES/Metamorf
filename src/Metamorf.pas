@@ -29,12 +29,12 @@
 ///   </para>
 ///   <para>
 ///   <b>Pipeline overview:</b> The stepped pipeline decomposes compilation
-///   into discrete phases: metamorf_load_mor (parse .mor grammar),
-///   metamorf_parse_source (lex and parse user source), metamorf_run_semantics
-///   (type checking and semantic analysis), metamorf_run_emitters (C++ code
-///   generation), and metamorf_build (invoke Zig/Clang to produce a native
+///   into discrete phases: mor_load_mor (parse .mor grammar),
+///   mor_parse_source (lex and parse user source), mor_run_semantics
+///   (type checking and semantic analysis), mor_run_emitters (C++ code
+///   generation), and mor_build (invoke Zig/Clang to produce a native
 ///   binary). Each step requires the previous step to have succeeded. The
-///   grammar loaded by metamorf_load_mor survives metamorf_reset, so multiple
+///   grammar loaded by mor_load_mor survives mor_reset, so multiple
 ///   source files can be compiled against the same grammar without re-parsing
 ///   the .mor file.
 ///   </para>
@@ -45,17 +45,17 @@
 ///   var
 ///     LHandle: TMorHandle;
 ///   begin
-///     LHandle := metamorf_create();
+///     LHandle := mor_create();
 ///     try
-///       if metamorf_compile(LHandle,
+///       if mor_compile(LHandle,
 ///         PUTF8Char(UTF8Encode('langs\pascal.mor')),
 ///         PUTF8Char(UTF8Encode('hello.pas')),
 ///         PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE) then
 ///         WriteLn('Success')
 ///       else
-///         WriteLn('Failed with ', metamorf_error_count(LHandle), ' error(s)');
+///         WriteLn('Failed with ', mor_error_count(LHandle), ' error(s)');
 ///     finally
-///       metamorf_destroy(LHandle);
+///       mor_destroy(LHandle);
 ///     end;
 ///   end;
 ///   </code>
@@ -66,34 +66,34 @@
 ///   var
 ///     LHandle: TMorHandle;
 ///   begin
-///     LHandle := metamorf_create();
+///     LHandle := mor_create();
 ///     try
-///       if metamorf_load_mor(LHandle, PUTF8Char(UTF8Encode('langs\pascal.mor'))) then
+///       if mor_load_mor(LHandle, PUTF8Char(UTF8Encode('langs\pascal.mor'))) then
 ///       begin
-///         if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('hello.pas'))) then
-///           if metamorf_run_semantics(LHandle) then
-///             if metamorf_run_emitters(LHandle) then
-///               metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
+///         if mor_parse_source(LHandle, PUTF8Char(UTF8Encode('hello.pas'))) then
+///           if mor_run_semantics(LHandle) then
+///             if mor_run_emitters(LHandle) then
+///               mor_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
 ///
-///         metamorf_reset(LHandle);  // clear pipeline state, keep grammar
+///         mor_reset(LHandle);  // clear pipeline state, keep grammar
 ///
-///         if metamorf_parse_source(LHandle, PUTF8Char(UTF8Encode('world.pas'))) then
-///           if metamorf_run_semantics(LHandle) then
-///             if metamorf_run_emitters(LHandle) then
-///               metamorf_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
+///         if mor_parse_source(LHandle, PUTF8Char(UTF8Encode('world.pas'))) then
+///           if mor_run_semantics(LHandle) then
+///             if mor_run_emitters(LHandle) then
+///               mor_build(LHandle, PUTF8Char(UTF8Encode('output')), MOR_RUN_EXECUTE);
 ///       end;
 ///     finally
-///       metamorf_destroy(LHandle);
+///       mor_destroy(LHandle);
 ///     end;
 ///   end;
 ///   </code>
 ///   <para>
-///   <b>Custom code generation:</b> Call metamorf_load_mor, metamorf_parse_source,
-///   and metamorf_run_semantics to obtain a fully typed, semantically analyzed
-///   AST. Then walk the AST yourself using metamorf_get_master_root,
-///   metamorf_node_child_count, metamorf_node_child, metamorf_node_kind,
-///   metamorf_node_get_attr, and metamorf_node_set_attr. Skip
-///   metamorf_run_emitters and metamorf_build entirely to emit any target
+///   <b>Custom code generation:</b> Call mor_load_mor, mor_parse_source,
+///   and mor_run_semantics to obtain a fully typed, semantically analyzed
+///   AST. Then walk the AST yourself using mor_get_master_root,
+///   mor_node_child_count, mor_node_child, mor_node_kind,
+///   mor_node_get_attr, and mor_node_set_attr. Skip
+///   mor_run_emitters and mor_build entirely to emit any target
 ///   language you choose.
 ///   </para>
 ///   <para>
@@ -142,30 +142,48 @@ const
   /// </summary>
   MOR_RUN_DEBUG = 2;
 
+  // Build mode (maps to TMorBuildMode)
+  MOR_BUILD_EXE = 0;
+  MOR_BUILD_LIB = 1;
+  MOR_BUILD_DLL = 2;
+
+  // Optimize level (maps to TMorOptimizeLevel)
+  MOR_OPT_DEBUG        = 0;
+  MOR_OPT_RELEASE_SAFE = 1;
+  MOR_OPT_RELEASE_FAST = 2;
+  MOR_OPT_RELEASE_SMALL = 3;
+
+  // Target platform (maps to TMorTargetPlatform)
+  MOR_TARGET_WIN64   = 0;
+  MOR_TARGET_LINUX64 = 1;
+
+  // Subsystem type (maps to TMorSubsystemType)
+  MOR_SUBSYSTEM_CONSOLE = 0;
+  MOR_SUBSYSTEM_GUI     = 1;
 
 type
 
   /// <summary>
   ///   Opaque handle to a Metamorf engine instance. Returned by
-  ///   metamorf_create and accepted by all API functions that operate on an
-  ///   engine. Must be freed with metamorf_destroy when no longer needed.
+  ///   mor_create and accepted by all API functions that operate on an
+  ///   engine. Must be freed with mor_destroy when no longer needed.
   /// </summary>
   /// <remarks>
   ///   Internally represents a 64-bit object pointer. Do not interpret,
   ///   dereference, or cast this value. Pass it back to the API exactly as
-  ///   received. The handle becomes invalid after metamorf_destroy.
+  ///   received. The handle becomes invalid after mor_destroy.
   /// </remarks>
   TMorHandle = UInt64;
 
   /// <summary>
   ///   Opaque handle to an AST node within a Metamorf engine instance.
-  ///   Returned by metamorf_get_master_root, metamorf_node_child, and passed
+  ///   Returned by mor_get_master_root, mor_node_child, and passed
   ///   to all metamorf_node_* query and mutation functions.
   /// </summary>
   /// <remarks>
   ///   Internally represents a 64-bit object pointer. Do not interpret,
   ///   dereference, or cast this value. Node handles are owned by the engine
-  ///   and become invalid after metamorf_reset or metamorf_destroy. A value
+  ///   and become invalid after mor_reset or mor_destroy. A value
   ///   of zero indicates a nil node (no node).
   /// </remarks>
   TMorNode = UInt64;
@@ -179,7 +197,7 @@ type
   ///   invocation. Copy the string with UTF8ToString() inside the callback
   ///   body if you need to store or display it later.
   ///   <para>
-  ///   Register with metamorf_set_status_callback before calling any pipeline
+  ///   Register with mor_set_status_callback before calling any pipeline
   ///   steps.
   ///   </para>
   ///   <code>
@@ -194,7 +212,7 @@ type
   ///   Null-terminated UTF-8 status message. Valid only during the callback.
   /// </param>
   /// <param name="AUserData">
-  ///   The user data pointer that was passed to metamorf_set_status_callback.
+  ///   The user data pointer that was passed to mor_set_status_callback.
   ///   May be nil.
   /// </param>
   TMorStatusProc = procedure(const AMessage: PUTF8Char;
@@ -202,16 +220,16 @@ type
 
   /// <summary>
   ///   Callback procedure invoked during code emission for AST node kinds
-  ///   that have been registered via metamorf_register_emit_handler. Allows
+  ///   that have been registered via mor_register_emit_handler. Allows
   ///   external consumers to override the .mor-defined emitter for specific
   ///   node kinds and generate custom output.
   /// </summary>
   /// <remarks>
-  ///   The ANodeHandle can be queried using metamorf_node_kind,
-  ///   metamorf_node_get_attr, metamorf_node_child_count, and
-  ///   metamorf_node_child to walk the subtree and produce whatever output
+  ///   The ANodeHandle can be queried using mor_node_kind,
+  ///   mor_node_get_attr, mor_node_child_count, and
+  ///   mor_node_child to walk the subtree and produce whatever output
   ///   format you require. Note that string-returning node query functions
-  ///   (metamorf_node_kind, metamorf_node_get_attr) require the TMorHandle
+  ///   (mor_node_kind, mor_node_get_attr) require the TMorHandle
   ///   to store the returned UTF-8 string. You must provide the handle via
   ///   AUserData or through a captured variable.
   /// </remarks>
@@ -220,7 +238,7 @@ type
   ///   metamorf_node_* functions.
   /// </param>
   /// <param name="AUserData">
-  ///   The user data pointer that was passed to metamorf_register_emit_handler.
+  ///   The user data pointer that was passed to mor_register_emit_handler.
   ///   Typically points to a context record containing the TMorHandle and an
   ///   output buffer.
   /// </param>
@@ -236,7 +254,7 @@ type
   ///   invocation. Copy the string with UTF8ToString() inside the callback
   ///   body if you need to store or display it later.
   ///   <para>
-  ///   Register with metamorf_set_output_callback before calling pipeline steps.
+  ///   Register with mor_set_output_callback before calling pipeline steps.
   ///   </para>
   ///   <code>
   ///   procedure MyOutput(const ALine: PUTF8Char;
@@ -250,7 +268,7 @@ type
   ///   Null-terminated UTF-8 output line. Valid only during the callback.
   /// </param>
   /// <param name="AUserData">
-  ///   The user data pointer that was passed to metamorf_set_output_callback.
+  ///   The user data pointer that was passed to mor_set_output_callback.
   ///   May be nil.
   /// </param>
   TMorOutputProc = procedure(const ALine: PUTF8Char;
@@ -267,9 +285,9 @@ type
 /// </summary>
 /// <returns>
 ///   An opaque TMorHandle that must be passed to all subsequent API calls
-///   and freed with metamorf_destroy when no longer needed.
+///   and freed with mor_destroy when no longer needed.
 /// </returns>
-function metamorf_create(): TMorHandle;
+function mor_create(): TMorHandle;
   external METAMORF_DLL;
 
 /// <summary>
@@ -278,15 +296,15 @@ function metamorf_create(): TMorHandle;
 ///   handle becomes invalid after this call.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
-procedure metamorf_destroy(const AHandle: TMorHandle);
+procedure mor_destroy(const AHandle: TMorHandle);
   external METAMORF_DLL;
 
 /// <summary>
 ///   Resets the pipeline state of a Metamorf engine instance, freeing the
 ///   parsed AST, scopes, and output from the most recent compilation. The
-///   loaded .mor grammar is preserved so that metamorf_parse_source can be
+///   loaded .mor grammar is preserved so that mor_parse_source can be
 ///   called again without re-parsing the .mor file.
 /// </summary>
 /// <remarks>
@@ -295,9 +313,9 @@ procedure metamorf_destroy(const AHandle: TMorHandle);
 ///   previous compilation become invalid after this call.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
-procedure metamorf_reset(const AHandle: TMorHandle);
+procedure mor_reset(const AHandle: TMorHandle);
   external METAMORF_DLL;
 
 // ---------------------------------------------------------------------------
@@ -310,7 +328,7 @@ procedure metamorf_reset(const AHandle: TMorHandle);
 ///   to unregister a previously registered callback.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AProc">
 ///   The callback procedure to invoke, or nil to unregister.
@@ -319,7 +337,7 @@ procedure metamorf_reset(const AHandle: TMorHandle);
 ///   An arbitrary pointer passed through to every invocation of AProc.
 ///   May be nil.
 /// </param>
-procedure metamorf_set_status_callback(const AHandle: TMorHandle;
+procedure mor_set_status_callback(const AHandle: TMorHandle;
   const AProc: TMorStatusProc; const AUserData: Pointer);
   external METAMORF_DLL;
 
@@ -329,7 +347,7 @@ procedure metamorf_set_status_callback(const AHandle: TMorHandle;
 ///   AProc to unregister a previously registered callback.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AProc">
 ///   The callback procedure to invoke, or nil to unregister.
@@ -338,24 +356,24 @@ procedure metamorf_set_status_callback(const AHandle: TMorHandle;
 ///   An arbitrary pointer passed through to every invocation of AProc.
 ///   May be nil.
 /// </param>
-procedure metamorf_set_output_callback(const AHandle: TMorHandle;
+procedure mor_set_output_callback(const AHandle: TMorHandle;
   const AProc: TMorOutputProc; const AUserData: Pointer);
   external METAMORF_DLL;
 
 /// <summary>
 ///   Registers a custom emit handler for a specific AST node kind. When
-///   metamorf_run_emitters encounters a node whose kind matches ANodeKind,
+///   mor_run_emitters encounters a node whose kind matches ANodeKind,
 ///   AProc is called instead of the .mor-defined emitter. This allows
 ///   external consumers to override code generation for selected node kinds
 ///   while letting the .mor grammar handle the rest.
 /// </summary>
 /// <remarks>
-///   Register handlers after metamorf_load_mor and before
-///   metamorf_run_emitters. Native handlers take priority over .mor-defined
+///   Register handlers after mor_load_mor and before
+///   mor_run_emitters. Native handlers take priority over .mor-defined
 ///   emitters for the same node kind.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="ANodeKind">
 ///   Null-terminated UTF-8 string identifying the AST node kind to handle
@@ -369,7 +387,7 @@ procedure metamorf_set_output_callback(const AHandle: TMorHandle;
 ///   Typically points to a context record containing the TMorHandle and an
 ///   output buffer.
 /// </param>
-procedure metamorf_register_emit_handler(const AHandle: TMorHandle;
+procedure mor_register_emit_handler(const AHandle: TMorHandle;
   const ANodeKind: PUTF8Char; const AProc: TMorEmitProc;
   const AUserData: Pointer);
   external METAMORF_DLL;
@@ -382,20 +400,20 @@ procedure metamorf_register_emit_handler(const AHandle: TMorHandle;
 ///   Loads and parses a .mor grammar file, populates the interpreter dispatch
 ///   tables, processes any .mor imports, and registers the C++ passthrough
 ///   layer. This is the most expensive pipeline step and only needs to be
-///   performed once per grammar. After a successful call, metamorf_parse_source
+///   performed once per grammar. After a successful call, mor_parse_source
 ///   may be called repeatedly against different source files.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AMorFile">
 ///   Null-terminated UTF-8 path to the .mor grammar file.
 /// </param>
 /// <returns>
 ///   True if the grammar was loaded successfully; False if errors occurred.
-///   Query errors with metamorf_error_count and metamorf_error_get_*.
+///   Query errors with mor_error_count and metamorf_error_get_*.
 /// </returns>
-function metamorf_load_mor(const AHandle: TMorHandle;
+function mor_load_mor(const AHandle: TMorHandle;
   const AMorFile: PUTF8Char): Boolean;
   external METAMORF_DLL;
 
@@ -405,12 +423,12 @@ function metamorf_load_mor(const AHandle: TMorHandle;
 ///   rooted at the master root node.
 /// </summary>
 /// <remarks>
-///   Requires metamorf_load_mor to have been called successfully. May be
-///   called multiple times after a single metamorf_load_mor, with
-///   metamorf_reset between calls to clear the previous AST.
+///   Requires mor_load_mor to have been called successfully. May be
+///   called multiple times after a single mor_load_mor, with
+///   mor_reset between calls to clear the previous AST.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="ASourceFile">
 ///   Null-terminated UTF-8 path to the user source file.
@@ -418,7 +436,7 @@ function metamorf_load_mor(const AHandle: TMorHandle;
 /// <returns>
 ///   True if the source was parsed successfully; False if errors occurred.
 /// </returns>
-function metamorf_parse_source(const AHandle: TMorHandle;
+function mor_parse_source(const AHandle: TMorHandle;
   const ASourceFile: PUTF8Char): Boolean;
   external METAMORF_DLL;
 
@@ -429,17 +447,17 @@ function metamorf_parse_source(const AHandle: TMorHandle;
 ///   for code generation or external traversal.
 /// </summary>
 /// <remarks>
-///   Requires metamorf_parse_source to have been called successfully. Module
+///   Requires mor_parse_source to have been called successfully. Module
 ///   imports discovered during semantic analysis are automatically compiled
 ///   and attached to the master root as additional branches.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <returns>
 ///   True if semantic analysis succeeded; False if errors occurred.
 /// </returns>
-function metamorf_run_semantics(const AHandle: TMorHandle): Boolean;
+function mor_run_semantics(const AHandle: TMorHandle): Boolean;
   external METAMORF_DLL;
 
 /// <summary>
@@ -450,17 +468,17 @@ function metamorf_run_semantics(const AHandle: TMorHandle): Boolean;
 ///   applied last.
 /// </summary>
 /// <remarks>
-///   Requires metamorf_run_semantics to have been called successfully. If you
+///   Requires mor_run_semantics to have been called successfully. If you
 ///   intend to perform your own code generation by walking the AST, skip this
-///   step and metamorf_build entirely.
+///   step and mor_build entirely.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <returns>
 ///   True if emission succeeded; False if errors occurred.
 /// </returns>
-function metamorf_run_emitters(const AHandle: TMorHandle): Boolean;
+function mor_run_emitters(const AHandle: TMorHandle): Boolean;
   external METAMORF_DLL;
 
 /// <summary>
@@ -469,16 +487,16 @@ function metamorf_run_emitters(const AHandle: TMorHandle): Boolean;
 ///   library depending on the .mor grammar's build mode).
 /// </summary>
 /// <remarks>
-///   Requires metamorf_run_emitters to have been called successfully. Reports
+///   Requires mor_run_emitters to have been called successfully. Reports
 ///   the target platform, build mode, and optimization level via the status
 ///   callback before starting the build.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AOutputPath">
 ///   Null-terminated UTF-8 path to the output directory. If empty, uses the
-///   output path established during metamorf_run_emitters.
+///   output path established during mor_run_emitters.
 /// </param>
 /// <param name="ARunMode">
 ///   Controls post-build behavior. MOR_RUN_NONE (0) builds only.
@@ -488,7 +506,7 @@ function metamorf_run_emitters(const AHandle: TMorHandle): Boolean;
 /// <returns>
 ///   True if the build succeeded; False if errors occurred.
 /// </returns>
-function metamorf_build(const AHandle: TMorHandle;
+function mor_build(const AHandle: TMorHandle;
   const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
   external METAMORF_DLL;
 
@@ -500,11 +518,11 @@ function metamorf_build(const AHandle: TMorHandle;
 /// <remarks>
 ///   Equivalent to calling each stepped function in order. For compiling
 ///   multiple source files against the same grammar, use the stepped
-///   functions with metamorf_reset between runs to avoid re-parsing the
+///   functions with mor_reset between runs to avoid re-parsing the
 ///   .mor file.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AMorFile">
 ///   Null-terminated UTF-8 path to the .mor grammar file.
@@ -523,7 +541,7 @@ function metamorf_build(const AHandle: TMorHandle;
 /// <returns>
 ///   True if all pipeline steps succeeded; False if any step failed.
 /// </returns>
-function metamorf_compile(const AHandle: TMorHandle;
+function mor_compile(const AHandle: TMorHandle;
   const AMorFile: PUTF8Char; const ASourceFile: PUTF8Char;
   const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
   external METAMORF_DLL;
@@ -538,17 +556,17 @@ function metamorf_compile(const AHandle: TMorHandle;
 ///   (the main program at index 0, imported modules at index 1+).
 /// </summary>
 /// <remarks>
-///   Requires metamorf_parse_source to have been called successfully. The
-///   returned node handle becomes invalid after metamorf_reset or
-///   metamorf_destroy.
+///   Requires mor_parse_source to have been called successfully. The
+///   returned node handle becomes invalid after mor_reset or
+///   mor_destroy.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <returns>
 ///   An opaque TMorNode handle to the master root, or zero if no AST exists.
 /// </returns>
-function metamorf_get_master_root(
+function mor_get_master_root(
   const AHandle: TMorHandle): TMorNode;
   external METAMORF_DLL;
 
@@ -571,7 +589,7 @@ function metamorf_get_master_root(
 /// <returns>
 ///   Null-terminated UTF-8 node kind string.
 /// </returns>
-function metamorf_node_kind(const AHandle: TMorHandle;
+function mor_node_kind(const AHandle: TMorHandle;
   const ANode: TMorNode): PUTF8Char;
   external METAMORF_DLL;
 
@@ -597,7 +615,7 @@ function metamorf_node_kind(const AHandle: TMorHandle;
 /// <returns>
 ///   Null-terminated UTF-8 attribute value, or empty string if not found.
 /// </returns>
-function metamorf_node_get_attr(const AHandle: TMorHandle;
+function mor_node_get_attr(const AHandle: TMorHandle;
   const ANode: TMorNode; const AAttrName: PUTF8Char): PUTF8Char;
   external METAMORF_DLL;
 
@@ -613,13 +631,13 @@ function metamorf_node_get_attr(const AHandle: TMorHandle;
 /// <returns>
 ///   True if the attribute exists on the node; False otherwise.
 /// </returns>
-function metamorf_node_has_attr(const ANode: TMorNode;
+function mor_node_has_attr(const ANode: TMorNode;
   const AAttrName: PUTF8Char): Boolean;
   external METAMORF_DLL;
 
 /// <summary>
 ///   Returns the number of child nodes attached to an AST node. Use with
-///   metamorf_node_child to iterate all children.
+///   mor_node_child to iterate all children.
 /// </summary>
 /// <param name="ANode">
 ///   The node handle to query.
@@ -627,24 +645,24 @@ function metamorf_node_has_attr(const ANode: TMorNode;
 /// <returns>
 ///   The number of children (zero or more).
 /// </returns>
-function metamorf_node_child_count(const ANode: TMorNode): Integer;
+function mor_node_child_count(const ANode: TMorNode): Integer;
   external METAMORF_DLL;
 
 /// <summary>
 ///   Returns the child node at the given zero-based index. Use
-///   metamorf_node_child_count to determine valid index bounds.
+///   mor_node_child_count to determine valid index bounds.
 /// </summary>
 /// <param name="ANode">
 ///   The parent node handle.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based child index. Must be in the range
-///   0..metamorf_node_child_count-1.
+///   0..mor_node_child_count-1.
 /// </param>
 /// <returns>
 ///   An opaque TMorNode handle to the child node.
 /// </returns>
-function metamorf_node_child(const ANode: TMorNode;
+function mor_node_child(const ANode: TMorNode;
   const AIndex: Integer): TMorNode;
   external METAMORF_DLL;
 
@@ -662,7 +680,7 @@ function metamorf_node_child(const ANode: TMorNode;
 /// <param name="AValue">
 ///   Null-terminated UTF-8 attribute value.
 /// </param>
-procedure metamorf_node_set_attr(const ANode: TMorNode;
+procedure mor_node_set_attr(const ANode: TMorNode;
   const AAttrName: PUTF8Char; const AValue: PUTF8Char);
   external METAMORF_DLL;
 
@@ -676,12 +694,12 @@ procedure metamorf_node_set_attr(const ANode: TMorNode;
 ///   upper bound for indexing into metamorf_error_get_* functions.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <returns>
 ///   The number of diagnostics (zero or more).
 /// </returns>
-function metamorf_error_count(const AHandle: TMorHandle): Integer;
+function mor_error_count(const AHandle: TMorHandle): Integer;
   external METAMORF_DLL;
 
 /// <summary>
@@ -690,12 +708,12 @@ function metamorf_error_count(const AHandle: TMorHandle): Integer;
 ///   should stop.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <returns>
 ///   True if at least one error or fatal diagnostic exists; False otherwise.
 /// </returns>
-function metamorf_has_errors(const AHandle: TMorHandle): Boolean;
+function mor_has_errors(const AHandle: TMorHandle): Boolean;
   external METAMORF_DLL;
 
 /// <summary>
@@ -703,9 +721,9 @@ function metamorf_has_errors(const AHandle: TMorHandle): Boolean;
 ///   count to zero.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
-procedure metamorf_clear_errors(const AHandle: TMorHandle);
+procedure mor_clear_errors(const AHandle: TMorHandle);
   external METAMORF_DLL;
 
 /// <summary>
@@ -715,12 +733,12 @@ procedure metamorf_clear_errors(const AHandle: TMorHandle);
 ///   multiple errors in a single pass.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <returns>
 ///   The current maximum error count.
 /// </returns>
-function metamorf_get_max_errors(const AHandle: TMorHandle): Integer;
+function mor_get_max_errors(const AHandle: TMorHandle): Integer;
   external METAMORF_DLL;
 
 /// <summary>
@@ -728,13 +746,13 @@ function metamorf_get_max_errors(const AHandle: TMorHandle): Integer;
 ///   halting. The default is 1.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AMaxErrors">
 ///   The new maximum error count. Set to a higher value (e.g. 20) to collect
 ///   multiple errors before halting.
 /// </param>
-procedure metamorf_set_max_errors(const AHandle: TMorHandle;
+procedure mor_set_max_errors(const AHandle: TMorHandle;
   const AMaxErrors: Integer);
   external METAMORF_DLL;
 
@@ -743,16 +761,16 @@ procedure metamorf_set_max_errors(const AHandle: TMorHandle;
 ///   ordinal: 0 = Hint, 1 = Warning, 2 = Error, 3 = Fatal.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based index into the diagnostics list. Must be in the range
-///   0..metamorf_error_count-1.
+///   0..mor_error_count-1.
 /// </param>
 /// <returns>
 ///   Integer severity ordinal (0=Hint, 1=Warning, 2=Error, 3=Fatal).
 /// </returns>
-function metamorf_error_get_severity(const AHandle: TMorHandle;
+function mor_error_get_severity(const AHandle: TMorHandle;
   const AIndex: Integer): Integer;
   external METAMORF_DLL;
 
@@ -765,7 +783,7 @@ function metamorf_error_get_severity(const AHandle: TMorHandle;
 ///   call on the same handle.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based index into the diagnostics list.
@@ -773,7 +791,7 @@ function metamorf_error_get_severity(const AHandle: TMorHandle;
 /// <returns>
 ///   Null-terminated UTF-8 error code string.
 /// </returns>
-function metamorf_error_get_code(const AHandle: TMorHandle;
+function mor_error_get_code(const AHandle: TMorHandle;
   const AIndex: Integer): PUTF8Char;
   external METAMORF_DLL;
 
@@ -786,7 +804,7 @@ function metamorf_error_get_code(const AHandle: TMorHandle;
 ///   call on the same handle.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based index into the diagnostics list.
@@ -794,7 +812,7 @@ function metamorf_error_get_code(const AHandle: TMorHandle;
 /// <returns>
 ///   Null-terminated UTF-8 error message string.
 /// </returns>
-function metamorf_error_get_message(const AHandle: TMorHandle;
+function mor_error_get_message(const AHandle: TMorHandle;
   const AIndex: Integer): PUTF8Char;
   external METAMORF_DLL;
 
@@ -808,7 +826,7 @@ function metamorf_error_get_message(const AHandle: TMorHandle;
 ///   call on the same handle.
 /// </remarks>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based index into the diagnostics list.
@@ -816,7 +834,7 @@ function metamorf_error_get_message(const AHandle: TMorHandle;
 /// <returns>
 ///   Null-terminated UTF-8 filename string, or empty if no location.
 /// </returns>
-function metamorf_error_get_filename(const AHandle: TMorHandle;
+function mor_error_get_filename(const AHandle: TMorHandle;
   const AIndex: Integer): PUTF8Char;
   external METAMORF_DLL;
 
@@ -825,7 +843,7 @@ function metamorf_error_get_filename(const AHandle: TMorHandle;
 ///   index. Returns zero if the diagnostic has no source location.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based index into the diagnostics list.
@@ -833,7 +851,7 @@ function metamorf_error_get_filename(const AHandle: TMorHandle;
 /// <returns>
 ///   One-based line number, or zero if no location.
 /// </returns>
-function metamorf_error_get_line(const AHandle: TMorHandle;
+function mor_error_get_line(const AHandle: TMorHandle;
   const AIndex: Integer): Integer;
   external METAMORF_DLL;
 
@@ -842,7 +860,7 @@ function metamorf_error_get_line(const AHandle: TMorHandle;
 ///   given index. Returns zero if the diagnostic has no source location.
 /// </summary>
 /// <param name="AHandle">
-///   The engine handle returned by metamorf_create.
+///   The engine handle returned by mor_create.
 /// </param>
 /// <param name="AIndex">
 ///   Zero-based index into the diagnostics list.
@@ -850,9 +868,183 @@ function metamorf_error_get_line(const AHandle: TMorHandle;
 /// <returns>
 ///   One-based column number, or zero if no location.
 /// </returns>
-function metamorf_error_get_col(const AHandle: TMorHandle;
+function mor_error_get_col(const AHandle: TMorHandle;
   const AIndex: Integer): Integer;
   external METAMORF_DLL;
+
+// ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+/// <summary>
+///   Launches the DAP debug server for a previously built executable. Call
+///   this after a successful mor_build with MOR_RUN_NONE to debug the binary
+///   interactively. Only supported for Win64 targets.
+/// </summary>
+/// <param name="AHandle">
+///   The engine handle returned by mor_create.
+/// </param>
+/// <param name="AExePath">
+///   Null-terminated UTF-8 path to the executable to debug.
+/// </param>
+/// <param name="APort">
+///   TCP port for the DAP server (default: 4711).
+/// </param>
+/// <returns>
+///   True if the debug session completed successfully; False on error.
+/// </returns>
+function mor_debug_exe(const AHandle: TMorHandle;
+  const AExePath: PUTF8Char; const APort: Integer): Boolean;
+  external METAMORF_DLL;
+
+// ---------------------------------------------------------------------------
+// Build configuration
+// ---------------------------------------------------------------------------
+
+/// <summary>
+///   Sets the target platform for compilation. Use MOR_TARGET_* constants.
+/// </summary>
+procedure mor_set_target(const AHandle: TMorHandle;
+  const ATarget: Integer);
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the current target platform as a MOR_TARGET_* integer.
+/// </summary>
+function mor_get_target(const AHandle: TMorHandle): Integer;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Sets the optimization level. Use MOR_OPT_* constants.
+/// </summary>
+procedure mor_set_optimize_level(const AHandle: TMorHandle;
+  const ALevel: Integer);
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the current optimization level as a MOR_OPT_* integer.
+/// </summary>
+function mor_get_optimize_level(const AHandle: TMorHandle): Integer;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Sets the subsystem type (console or GUI). Use MOR_SUBSYSTEM_* constants.
+/// </summary>
+procedure mor_set_subsystem(const AHandle: TMorHandle;
+  const ASubsystem: Integer);
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the current subsystem type as a MOR_SUBSYSTEM_* integer.
+/// </summary>
+function mor_get_subsystem(const AHandle: TMorHandle): Integer;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Sets the build mode (exe, lib, or dll). Use MOR_BUILD_* constants.
+/// </summary>
+procedure mor_set_build_mode(const AHandle: TMorHandle;
+  const AMode: Integer);
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the current build mode as a MOR_BUILD_* integer.
+/// </summary>
+function mor_get_build_mode(const AHandle: TMorHandle): Integer;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Sets a preprocessor define. Pass nil for AValue to set a define
+///   without a value; pass a non-nil PUTF8Char to set a define with a value.
+/// </summary>
+procedure mor_set_define(const AHandle: TMorHandle;
+  const ADefineName: PUTF8Char; const AValue: PUTF8Char);
+  external METAMORF_DLL;
+
+// ---------------------------------------------------------------------------
+// Toolchain paths
+// ---------------------------------------------------------------------------
+
+/// <summary>
+///   Sets the root path to the Zig/Clang toolchain.
+/// </summary>
+procedure mor_set_toolchain_path(const AHandle: TMorHandle;
+  const APath: PUTF8Char);
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the current toolchain root path.
+/// </summary>
+function mor_get_toolchain_path(const AHandle: TMorHandle): PUTF8Char;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the path to the Zig executable directory, optionally combined
+///   with AFilename.
+/// </summary>
+function mor_get_zig_path(const AHandle: TMorHandle;
+  const AFilename: PUTF8Char): PUTF8Char;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the path to the Metamorf runtime directory, optionally combined
+///   with AFilename.
+/// </summary>
+function mor_get_runtime_path(const AHandle: TMorHandle;
+  const AFilename: PUTF8Char): PUTF8Char;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the path to the libs directory, optionally combined with
+///   AFilename.
+/// </summary>
+function mor_get_libs_path(const AHandle: TMorHandle;
+  const AFilename: PUTF8Char): PUTF8Char;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Returns the path to the assets directory, optionally combined with
+///   AFilename.
+/// </summary>
+function mor_get_assets_path(const AHandle: TMorHandle;
+  const AFilename: PUTF8Char): PUTF8Char;
+  external METAMORF_DLL;
+
+// ---------------------------------------------------------------------------
+// Process/build control
+// ---------------------------------------------------------------------------
+
+/// <summary>
+///   Returns the exit code of the last process launched by mor_build with
+///   MOR_RUN_EXECUTE.
+/// </summary>
+function mor_get_last_exit_code(const AHandle: TMorHandle): Integer;
+  external METAMORF_DLL;
+
+// ---------------------------------------------------------------------------
+// Advanced pipeline
+// ---------------------------------------------------------------------------
+
+/// <summary>
+///   Loads and configures a .mor grammar without compiling any user source.
+///   After a successful call, the engine is ready for mor_parse_source.
+///   This is equivalent to calling mor_load_mor but through the Engine's
+///   SetupLanguage method which also validates the .mor AST.
+/// </summary>
+function mor_setup_language(const AHandle: TMorHandle;
+  const AMorFile: PUTF8Char): Boolean;
+  external METAMORF_DLL;
+
+/// <summary>
+///   Compiles user source using a baked (embedded) AST resource. The baked
+///   AST is loaded from RT_RCDATA, the interpreter runs setup, and then the
+///   user source is compiled through the standard pipeline.
+/// </summary>
+procedure mor_compile_baked(const AHandle: TMorHandle;
+  const ASourceFile: PUTF8Char; const AOutputPath: PUTF8Char;
+  const AAutoRun: Boolean);
+  external METAMORF_DLL;
+
 
 implementation
 

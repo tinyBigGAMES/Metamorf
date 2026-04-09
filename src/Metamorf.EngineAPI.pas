@@ -113,14 +113,12 @@ type
     function RunSemantics(): Boolean;
     function RunEmitters(): Boolean;
     function Build(const AOutputPath: string;
-      const AAutoRun: Boolean = False;
-      const ADebug: Boolean = False): Boolean;
+      const AAutoRun: Boolean = False): Boolean;
 
     // One-shot convenience (equivalent to TMorEngine.Compile)
     function CompileAll(const AMorFile: string;
       const ASourceFile: string; const AOutputPath: string;
-      const AAutoRun: Boolean = False;
-      const ADebug: Boolean = False): Boolean;
+      const AAutoRun: Boolean = False): Boolean;
 
     // Cleanup between compilations
     procedure Reset();
@@ -133,6 +131,38 @@ type
     // Native emit handler registration (for external consumers)
     procedure RegisterEmitHandler(const ANodeKind: string;
       const AProc: TMorEmitProc; const AUserData: Pointer);
+
+    // Debug: standalone post-build debug launch
+    function DebugExe(const AExePath: string;
+      const APort: Integer = 4711): Boolean;
+
+    // Build configuration
+    procedure SetTarget(const ATarget: Integer);
+    function GetTarget(): Integer;
+    procedure SetOptimizeLevel(const ALevel: Integer);
+    function GetOptimizeLevel(): Integer;
+    procedure SetSubsystem(const ASubsystem: Integer);
+    function GetSubsystem(): Integer;
+    procedure SetBuildMode(const AMode: Integer);
+    function GetBuildMode(): Integer;
+    procedure SetDefine(const ADefineName: string;
+      const AValue: string = '');
+
+    // Toolchain paths
+    procedure SetToolchainPath(const APath: string);
+    function GetToolchainPath(): string;
+    function GetZigPath(const AFilename: string = ''): string;
+    function GetRuntimePath(const AFilename: string = ''): string;
+    function GetLibsPath(const AFilename: string = ''): string;
+    function GetAssetsPath(const AFilename: string = ''): string;
+
+    // Process/build control
+    function GetLastExitCode(): Integer;
+
+    // Advanced pipeline
+    function SetupLanguage(const AMorFile: string): Boolean;
+    procedure CompileBaked(const ASourceFile: string;
+      const AOutputPath: string; const AAutoRun: Boolean);
   end;
 
 implementation
@@ -543,12 +573,9 @@ begin
 end;
 
 function TMorEngineAPI.Build(const AOutputPath: string;
-  const AAutoRun: Boolean; const ADebug: Boolean): Boolean;
+  const AAutoRun: Boolean): Boolean;
 var
   LErrors: TMorErrors;
-  LExePath: string;
-  LServer: TMorDebugServer;
-  LPort: Integer;
 begin
   Result := False;
   LErrors := FEngine.GetErrors();
@@ -592,39 +619,11 @@ begin
   FEngine.Process(AAutoRun);
 
   Result := not LErrors.HasErrors();
-
-  // Launch DAP debug server if requested and build succeeded
-  if Result and ADebug and (FEngine.GetTarget() = tpWin64) then
-  begin
-    LPort := 4711;
-    LExePath := TPath.Combine(AOutputPath,
-      TPath.Combine('zig-out',
-        TPath.Combine('bin',
-          FEngine.GetProjectName() + '.exe')));
-
-    LServer := TMorDebugServer.Create();
-    try
-      LServer.SetStatusCallback(
-        procedure(const AText: string; const AUserData: Pointer)
-        begin
-          FEngine.Status('%s', [AText]);
-        end);
-
-      if not LServer.DebugExe(LExePath, LPort) then
-      begin
-        if LServer.HasErrors() then
-          LErrors.Add(esFatal, 'ERR_DEBUG', LServer.GetErrorText());
-        Result := False;
-      end;
-    finally
-      LServer.Free();
-    end;
-  end;
 end;
 
 function TMorEngineAPI.CompileAll(const AMorFile: string;
   const ASourceFile: string; const AOutputPath: string;
-  const AAutoRun: Boolean; const ADebug: Boolean): Boolean;
+  const AAutoRun: Boolean): Boolean;
 begin
   FOutputPath := AOutputPath;
 
@@ -640,7 +639,7 @@ begin
   if not RunEmitters() then
     Exit(False);
 
-  Result := Build(AOutputPath, AAutoRun, ADebug);
+  Result := Build(AOutputPath, AAutoRun);
 end;
 
 procedure TMorEngineAPI.Reset();
@@ -831,6 +830,132 @@ begin
   Result := LAST;
 end;
 
+
+function TMorEngineAPI.DebugExe(const AExePath: string;
+  const APort: Integer): Boolean;
+var
+  LErrors: TMorErrors;
+  LServer: TMorDebugServer;
+begin
+  Result := False;
+  LErrors := FEngine.GetErrors();
+
+  LServer := TMorDebugServer.Create();
+  try
+    LServer.SetStatusCallback(
+      procedure(const AText: string; const AUserData: Pointer)
+      begin
+        FEngine.Status('%s', [AText]);
+      end);
+
+    if not LServer.DebugExe(AExePath, APort) then
+    begin
+      if LServer.HasErrors() then
+        LErrors.Add(esFatal, 'ERR_DEBUG', LServer.GetErrorText());
+      Exit;
+    end;
+
+    Result := True;
+  finally
+    LServer.Free();
+  end;
+end;
+
+procedure TMorEngineAPI.SetTarget(const ATarget: Integer);
+begin
+  FEngine.SetTarget(TMorTargetPlatform(ATarget));
+end;
+
+function TMorEngineAPI.GetTarget(): Integer;
+begin
+  Result := Ord(FEngine.GetTarget());
+end;
+
+procedure TMorEngineAPI.SetOptimizeLevel(const ALevel: Integer);
+begin
+  FEngine.SetOptimizeLevel(TMorOptimizeLevel(ALevel));
+end;
+
+function TMorEngineAPI.GetOptimizeLevel(): Integer;
+begin
+  Result := Ord(FEngine.GetOptimizeLevel());
+end;
+
+procedure TMorEngineAPI.SetSubsystem(const ASubsystem: Integer);
+begin
+  FEngine.SetSubsystem(TMorSubsystemType(ASubsystem));
+end;
+
+function TMorEngineAPI.GetSubsystem(): Integer;
+begin
+  Result := Ord(FEngine.GetSubsystem());
+end;
+
+procedure TMorEngineAPI.SetBuildMode(const AMode: Integer);
+begin
+  FEngine.SetBuildMode(TMorBuildMode(AMode));
+end;
+
+function TMorEngineAPI.GetBuildMode(): Integer;
+begin
+  Result := Ord(FEngine.GetBuildMode());
+end;
+
+procedure TMorEngineAPI.SetDefine(const ADefineName: string;
+  const AValue: string);
+begin
+  if AValue = '' then
+    FEngine.SetDefine(ADefineName)
+  else
+    FEngine.SetDefine(ADefineName, AValue);
+end;
+
+procedure TMorEngineAPI.SetToolchainPath(const APath: string);
+begin
+  FEngine.SetToolchainPath(APath);
+end;
+
+function TMorEngineAPI.GetToolchainPath(): string;
+begin
+  Result := FEngine.GetToolchainPath();
+end;
+
+function TMorEngineAPI.GetZigPath(const AFilename: string): string;
+begin
+  Result := FEngine.GetZigPath(AFilename);
+end;
+
+function TMorEngineAPI.GetRuntimePath(const AFilename: string): string;
+begin
+  Result := FEngine.GetRuntimePath(AFilename);
+end;
+
+function TMorEngineAPI.GetLibsPath(const AFilename: string): string;
+begin
+  Result := FEngine.GetLibsPath(AFilename);
+end;
+
+function TMorEngineAPI.GetAssetsPath(const AFilename: string): string;
+begin
+  Result := FEngine.GetAssetsPath(AFilename);
+end;
+
+function TMorEngineAPI.GetLastExitCode(): Integer;
+begin
+  Result := Integer(FEngine.GetLastExitCode());
+end;
+
+function TMorEngineAPI.SetupLanguage(const AMorFile: string): Boolean;
+begin
+  Result := FEngine.SetupLanguage(AMorFile);
+end;
+
+procedure TMorEngineAPI.CompileBaked(const ASourceFile: string;
+  const AOutputPath: string; const AAutoRun: Boolean);
+begin
+  FEngine.CompileBaked(ASourceFile, AOutputPath, AAutoRun);
+end;
+
 // ==========================================================================
 // Flat C-compatible exports (DLL surface)
 // ==========================================================================
@@ -839,36 +964,36 @@ end;
 
 // --- Lifecycle ---
 
-function metamorf_create(): UInt64;
+function mor_create(): UInt64;
 begin
   Result := UInt64(TMorEngineAPI.Create());
 end;
 
-procedure metamorf_destroy(const AHandle: UInt64);
+procedure mor_destroy(const AHandle: UInt64);
 begin
   TMorEngineAPI(Pointer(AHandle)).Free();
 end;
 
-procedure metamorf_reset(const AHandle: UInt64);
+procedure mor_reset(const AHandle: UInt64);
 begin
   TMorEngineAPI(Pointer(AHandle)).Reset();
 end;
 
 // --- Callbacks ---
 
-procedure metamorf_set_status_callback(const AHandle: UInt64;
+procedure mor_set_status_callback(const AHandle: UInt64;
   const AProc: TMorStatusProc; const AUserData: Pointer);
 begin
   TMorEngineAPI(Pointer(AHandle)).SetStatusCallback(AProc, AUserData);
 end;
 
-procedure metamorf_set_output_callback(const AHandle: UInt64;
+procedure mor_set_output_callback(const AHandle: UInt64;
   const AProc: TMorOutputProc; const AUserData: Pointer);
 begin
   TMorEngineAPI(Pointer(AHandle)).SetOutputCallback(AProc, AUserData);
 end;
 
-procedure metamorf_register_emit_handler(const AHandle: UInt64;
+procedure mor_register_emit_handler(const AHandle: UInt64;
   const ANodeKind: PUTF8Char; const AProc: TMorEmitProc;
   const AUserData: Pointer);
 begin
@@ -878,89 +1003,87 @@ end;
 
 // --- Stepped pipeline ---
 
-function metamorf_load_mor(const AHandle: UInt64;
+function mor_load_mor(const AHandle: UInt64;
   const AMorFile: PUTF8Char): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).LoadMor(
     UTF8ToString(AMorFile));
 end;
 
-function metamorf_parse_source(const AHandle: UInt64;
+function mor_parse_source(const AHandle: UInt64;
   const ASourceFile: PUTF8Char): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ParseSource(
     UTF8ToString(ASourceFile));
 end;
 
-function metamorf_run_semantics(const AHandle: UInt64): Boolean;
+function mor_run_semantics(const AHandle: UInt64): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).RunSemantics();
 end;
 
-function metamorf_run_emitters(const AHandle: UInt64): Boolean;
+function mor_run_emitters(const AHandle: UInt64): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).RunEmitters();
 end;
 
-function metamorf_build(const AHandle: UInt64;
+function mor_build(const AHandle: UInt64;
   const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).Build(
     UTF8ToString(AOutputPath),
-    ARunMode = MOR_RUN_EXECUTE,
-    ARunMode = MOR_RUN_DEBUG);
+    ARunMode = MOR_RUN_EXECUTE);
 end;
 
-function metamorf_compile(const AHandle: UInt64;
+function mor_compile(const AHandle: UInt64;
   const AMorFile: PUTF8Char; const ASourceFile: PUTF8Char;
   const AOutputPath: PUTF8Char; const ARunMode: Integer): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).CompileAll(
     UTF8ToString(AMorFile), UTF8ToString(ASourceFile),
     UTF8ToString(AOutputPath),
-    ARunMode = MOR_RUN_EXECUTE,
-    ARunMode = MOR_RUN_DEBUG);
+    ARunMode = MOR_RUN_EXECUTE);
 end;
 
 // --- AST query ---
 
-function metamorf_get_master_root(const AHandle: UInt64): UInt64;
+function mor_get_master_root(const AHandle: UInt64): UInt64;
 begin
   Result := UInt64(TMorEngineAPI(Pointer(AHandle)).GetMasterRoot());
 end;
 
-function metamorf_node_kind(const AHandle: UInt64;
+function mor_node_kind(const AHandle: UInt64;
   const ANode: UInt64): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
     TMorASTNode(Pointer(ANode)).GetKind());
 end;
 
-function metamorf_node_get_attr(const AHandle: UInt64;
+function mor_node_get_attr(const AHandle: UInt64;
   const ANode: UInt64; const AAttrName: PUTF8Char): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
     TMorASTNode(Pointer(ANode)).GetAttr(UTF8ToString(AAttrName)));
 end;
 
-function metamorf_node_has_attr(const ANode: UInt64;
+function mor_node_has_attr(const ANode: UInt64;
   const AAttrName: PUTF8Char): Boolean;
 begin
   Result := TMorASTNode(Pointer(ANode)).HasAttr(UTF8ToString(AAttrName));
 end;
 
-function metamorf_node_child_count(const ANode: UInt64): Integer;
+function mor_node_child_count(const ANode: UInt64): Integer;
 begin
   Result := TMorASTNode(Pointer(ANode)).ChildCount();
 end;
 
-function metamorf_node_child(const ANode: UInt64;
+function mor_node_child(const ANode: UInt64;
   const AIndex: Integer): UInt64;
 begin
   Result := UInt64(TMorASTNode(Pointer(ANode)).GetChild(AIndex));
 end;
 
-procedure metamorf_node_set_attr(const ANode: UInt64;
+procedure mor_node_set_attr(const ANode: UInt64;
   const AAttrName: PUTF8Char; const AValue: PUTF8Char);
 begin
   TMorASTNode(Pointer(ANode)).SetAttr(
@@ -969,105 +1092,264 @@ end;
 
 // --- Error query ---
 
-function metamorf_error_count(const AHandle: UInt64): Integer;
+function mor_error_count(const AHandle: UInt64): Integer;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).GetErrors().Count();
 end;
 
-function metamorf_has_errors(const AHandle: UInt64): Boolean;
+function mor_has_errors(const AHandle: UInt64): Boolean;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).GetErrors().HasErrors();
 end;
 
-procedure metamorf_clear_errors(const AHandle: UInt64);
+procedure mor_clear_errors(const AHandle: UInt64);
 begin
   TMorEngineAPI(Pointer(AHandle)).GetErrors().Clear();
 end;
 
-function metamorf_get_max_errors(const AHandle: UInt64): Integer;
+function mor_get_max_errors(const AHandle: UInt64): Integer;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).GetErrors().GetMaxErrors();
 end;
 
-procedure metamorf_set_max_errors(const AHandle: UInt64;
+procedure mor_set_max_errors(const AHandle: UInt64;
   const AMaxErrors: Integer);
 begin
   TMorEngineAPI(Pointer(AHandle)).GetErrors().SetMaxErrors(AMaxErrors);
 end;
 
-function metamorf_error_get_severity(const AHandle: UInt64;
+function mor_error_get_severity(const AHandle: UInt64;
   const AIndex: Integer): Integer;
 begin
   Result := Ord(TMorEngineAPI(Pointer(AHandle)).GetErrors().GetItems()[AIndex].Severity);
 end;
 
-function metamorf_error_get_code(const AHandle: UInt64;
+function mor_error_get_code(const AHandle: UInt64;
   const AIndex: Integer): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
     TMorEngineAPI(Pointer(AHandle)).GetErrors().GetItems()[AIndex].Code);
 end;
 
-function metamorf_error_get_message(const AHandle: UInt64;
+function mor_error_get_message(const AHandle: UInt64;
   const AIndex: Integer): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
     TMorEngineAPI(Pointer(AHandle)).GetErrors().GetItems()[AIndex].Message);
 end;
 
-function metamorf_error_get_filename(const AHandle: UInt64;
+function mor_error_get_filename(const AHandle: UInt64;
   const AIndex: Integer): PUTF8Char;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
     TMorEngineAPI(Pointer(AHandle)).GetErrors().GetItems()[AIndex].Range.Filename);
 end;
 
-function metamorf_error_get_line(const AHandle: UInt64;
+function mor_error_get_line(const AHandle: UInt64;
   const AIndex: Integer): Integer;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).GetErrors().GetItems()[AIndex].Range.StartLine;
 end;
 
-function metamorf_error_get_col(const AHandle: UInt64;
+function mor_error_get_col(const AHandle: UInt64;
   const AIndex: Integer): Integer;
 begin
   Result := TMorEngineAPI(Pointer(AHandle)).GetErrors().GetItems()[AIndex].Range.StartColumn;
+end;
+
+
+// --- Debug ---
+
+function mor_debug_exe(const AHandle: UInt64;
+  const AExePath: PUTF8Char; const APort: Integer): Boolean;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).DebugExe(
+    UTF8ToString(AExePath), APort);
+end;
+
+// --- Build configuration ---
+
+procedure mor_set_target(const AHandle: UInt64;
+  const ATarget: Integer);
+begin
+  TMorEngineAPI(Pointer(AHandle)).SetTarget(ATarget);
+end;
+
+function mor_get_target(const AHandle: UInt64): Integer;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).GetTarget();
+end;
+
+procedure mor_set_optimize_level(const AHandle: UInt64;
+  const ALevel: Integer);
+begin
+  TMorEngineAPI(Pointer(AHandle)).SetOptimizeLevel(ALevel);
+end;
+
+function mor_get_optimize_level(const AHandle: UInt64): Integer;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).GetOptimizeLevel();
+end;
+
+procedure mor_set_subsystem(const AHandle: UInt64;
+  const ASubsystem: Integer);
+begin
+  TMorEngineAPI(Pointer(AHandle)).SetSubsystem(ASubsystem);
+end;
+
+function mor_get_subsystem(const AHandle: UInt64): Integer;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).GetSubsystem();
+end;
+
+procedure mor_set_build_mode(const AHandle: UInt64;
+  const AMode: Integer);
+begin
+  TMorEngineAPI(Pointer(AHandle)).SetBuildMode(AMode);
+end;
+
+function mor_get_build_mode(const AHandle: UInt64): Integer;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).GetBuildMode();
+end;
+
+procedure mor_set_define(const AHandle: UInt64;
+  const ADefineName: PUTF8Char; const AValue: PUTF8Char);
+var
+  LValue: string;
+begin
+  if AValue <> nil then
+    LValue := UTF8ToString(AValue)
+  else
+    LValue := '';
+  TMorEngineAPI(Pointer(AHandle)).SetDefine(
+    UTF8ToString(ADefineName), LValue);
+end;
+
+// --- Toolchain paths ---
+
+procedure mor_set_toolchain_path(const AHandle: UInt64;
+  const APath: PUTF8Char);
+begin
+  TMorEngineAPI(Pointer(AHandle)).SetToolchainPath(
+    UTF8ToString(APath));
+end;
+
+function mor_get_toolchain_path(const AHandle: UInt64): PUTF8Char;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
+    TMorEngineAPI(Pointer(AHandle)).GetToolchainPath());
+end;
+
+function mor_get_zig_path(const AHandle: UInt64;
+  const AFilename: PUTF8Char): PUTF8Char;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
+    TMorEngineAPI(Pointer(AHandle)).GetZigPath(
+      UTF8ToString(AFilename)));
+end;
+
+function mor_get_runtime_path(const AHandle: UInt64;
+  const AFilename: PUTF8Char): PUTF8Char;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
+    TMorEngineAPI(Pointer(AHandle)).GetRuntimePath(
+      UTF8ToString(AFilename)));
+end;
+
+function mor_get_libs_path(const AHandle: UInt64;
+  const AFilename: PUTF8Char): PUTF8Char;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
+    TMorEngineAPI(Pointer(AHandle)).GetLibsPath(
+      UTF8ToString(AFilename)));
+end;
+
+function mor_get_assets_path(const AHandle: UInt64;
+  const AFilename: PUTF8Char): PUTF8Char;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).ReturnUTF8(
+    TMorEngineAPI(Pointer(AHandle)).GetAssetsPath(
+      UTF8ToString(AFilename)));
+end;
+
+// --- Process/build control ---
+
+function mor_get_last_exit_code(const AHandle: UInt64): Integer;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).GetLastExitCode();
+end;
+
+// --- Advanced pipeline ---
+
+function mor_setup_language(const AHandle: UInt64;
+  const AMorFile: PUTF8Char): Boolean;
+begin
+  Result := TMorEngineAPI(Pointer(AHandle)).SetupLanguage(
+    UTF8ToString(AMorFile));
+end;
+
+procedure mor_compile_baked(const AHandle: UInt64;
+  const ASourceFile: PUTF8Char; const AOutputPath: PUTF8Char;
+  const AAutoRun: Boolean);
+begin
+  TMorEngineAPI(Pointer(AHandle)).CompileBaked(
+    UTF8ToString(ASourceFile), UTF8ToString(AOutputPath), AAutoRun);
 end;
 
 {$ENDIF METAMORF_EXPORTS}
 
 {$IFDEF METAMORF_EXPORTS}
 exports
-  metamorf_create,
-  metamorf_destroy,
-  metamorf_reset,
-  metamorf_set_status_callback,
-  metamorf_set_output_callback,
-  metamorf_register_emit_handler,
-  metamorf_load_mor,
-  metamorf_parse_source,
-  metamorf_run_semantics,
-  metamorf_run_emitters,
-  metamorf_build,
-  metamorf_compile,
-  metamorf_get_master_root,
-  metamorf_node_kind,
-  metamorf_node_get_attr,
-  metamorf_node_has_attr,
-  metamorf_node_child_count,
-  metamorf_node_child,
-  metamorf_node_set_attr,
-  metamorf_error_count,
-  metamorf_has_errors,
-  metamorf_clear_errors,
-  metamorf_get_max_errors,
-  metamorf_set_max_errors,
-  metamorf_error_get_severity,
-  metamorf_error_get_code,
-  metamorf_error_get_message,
-  metamorf_error_get_filename,
-  metamorf_error_get_line,
-  metamorf_error_get_col;
+  mor_create,
+  mor_destroy,
+  mor_reset,
+  mor_set_status_callback,
+  mor_set_output_callback,
+  mor_register_emit_handler,
+  mor_load_mor,
+  mor_parse_source,
+  mor_run_semantics,
+  mor_run_emitters,
+  mor_build,
+  mor_compile,
+  mor_get_master_root,
+  mor_node_kind,
+  mor_node_get_attr,
+  mor_node_has_attr,
+  mor_node_child_count,
+  mor_node_child,
+  mor_node_set_attr,
+  mor_error_count,
+  mor_has_errors,
+  mor_clear_errors,
+  mor_get_max_errors,
+  mor_set_max_errors,
+  mor_error_get_severity,
+  mor_error_get_code,
+  mor_error_get_message,
+  mor_error_get_filename,
+  mor_error_get_line,
+  mor_error_get_col,
+  mor_debug_exe,
+  mor_set_target,
+  mor_get_target,
+  mor_set_optimize_level,
+  mor_get_optimize_level,
+  mor_set_subsystem,
+  mor_get_subsystem,
+  mor_set_build_mode,
+  mor_get_build_mode,
+  mor_set_define,
+  mor_set_toolchain_path,
+  mor_get_toolchain_path,
+  mor_get_zig_path,
+  mor_get_runtime_path,
+  mor_get_libs_path,
+  mor_get_assets_path,
+  mor_get_last_exit_code,
+  mor_setup_language,
+  mor_compile_baked;
 {$ENDIF METAMORF_EXPORTS}
 
 end.
