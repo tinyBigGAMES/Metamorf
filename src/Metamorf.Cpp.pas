@@ -264,6 +264,89 @@ begin
     end;
   end;
 
+  // C-style cast wrapping: register native prefix for ( so it fires
+  // before the interpreted expr.grouped rule. When ( is followed by
+  // a cpp.keyword.*, treat as C-style cast: (type)operand.
+  // Otherwise, parse as normal grouped expression.
+  AInterp.RegisterNativePrefix('delimiter.lparen',
+    function: TMorASTNode
+    var
+      LNode: TMorASTNode;
+      LCastType: string;
+    begin
+      AInterp.ParserAdvance(); // skip (
+
+      // C-style cast: (cpp_keyword...)expr
+      if AInterp.ParserCurrentKind().StartsWith('cpp.keyword.') then
+      begin
+        // Collect type tokens (handles multi-word: unsigned int, long long)
+        LCastType := '';
+        while AInterp.ParserCurrentKind().StartsWith('cpp.keyword.') or
+              (AInterp.ParserCurrentKind() = 'op.multiply') do
+        begin
+          if LCastType <> '' then
+            LCastType := LCastType + ' ';
+          LCastType := LCastType + AInterp.ParserCurrentText();
+          AInterp.ParserAdvance();
+        end;
+        AInterp.ParserExpect('delimiter.rparen');
+        LNode := TMorASTNode.Create();
+        LNode.SetKind('expr.cpp_cast');
+        LNode.SetAttr('cast.raw', LCastType);
+        LNode.AddChild(AInterp.ParserParseExpr(35)); // unary precedence
+        Result := LNode;
+      end
+      else
+      begin
+        // Normal grouped expression: (expr)
+        LNode := TMorASTNode.Create();
+        LNode.SetKind('expr.grouped');
+        LNode.AddChild(AInterp.ParserParseExpr(0));
+        AInterp.ParserExpect('delimiter.rparen');
+        Result := LNode;
+      end;
+    end);
+
+  // C++ pointer dereference: *expr in prefix position
+  AInterp.RegisterNativePrefix('op.multiply',
+    function: TMorASTNode
+    var
+      LNode: TMorASTNode;
+    begin
+      AInterp.ParserAdvance(); // skip *
+      LNode := TMorASTNode.Create();
+      LNode.SetKind('expr.cpp_deref');
+      LNode.AddChild(AInterp.ParserParseExpr(35)); // unary precedence
+      Result := LNode;
+    end);
+
+  // C++ address-of: &expr in prefix position
+  AInterp.RegisterNativePrefix('cpp.op.bitand',
+    function: TMorASTNode
+    var
+      LNode: TMorASTNode;
+    begin
+      AInterp.ParserAdvance(); // skip &
+      LNode := TMorASTNode.Create();
+      LNode.SetKind('expr.cpp_addrof');
+      LNode.AddChild(AInterp.ParserParseExpr(35)); // unary precedence
+      Result := LNode;
+    end);
+
+  // C++ dereference in statement position: *ptr := value;
+  AInterp.RegisterNativeStmt('op.multiply',
+    function: TMorASTNode
+    var
+      LNode: TMorASTNode;
+    begin
+      LNode := TMorASTNode.Create();
+      LNode.SetKind('stmt.expr');
+      LNode.AddChild(AInterp.ParserParseExpr(0));
+      if AInterp.ParserCurrentKind() = 'delimiter.semicolon' then
+        AInterp.ParserAdvance();
+      Result := LNode;
+    end);
+
   // Infix :: (scope resolution) at power 90
   LNativeInfix.Power := 90;
   LNativeInfix.Assoc := 'left';
@@ -275,7 +358,9 @@ begin
     begin
       AInterp.ParserAdvance(); // skip ::
       // Build qualified name: left::right
-      LName := ALeft.GetAttr('identifier');
+      LName := ALeft.GetAttr('name');
+      if LName = '' then
+        LName := ALeft.GetAttr('identifier');
       if LName = '' then
         LName := ALeft.GetAttr('qualified.name');
       if LName = '' then
@@ -320,24 +405,37 @@ begin
     var
       LNode: TMorASTNode;
       LRaw: string;
+      LKind: string;
       LInAngle: Boolean;
     begin
       AInterp.ParserAdvance(); // skip #
       LRaw := '#';
       LInAngle := False;
-      // Collect until end of line (simplified: collect until ; or eof)
+      // Collect tokens until we leave C++ land (Myra keyword, directive, or terminator)
       while not AInterp.ParserAtEnd() do
       begin
+        LKind := AInterp.ParserCurrentKind();
+        if LKind.StartsWith('keyword.') or
+           LKind.StartsWith('directive.') or
+           (LKind = 'cpp.op.hash') or
+           (LKind = 'delimiter.semicolon') or
+           (LKind = 'eof') then
+          Break;
         if AInterp.ParserCurrentText() = '<' then
           LInAngle := True;
-        LRaw := LRaw + AInterp.ParserCurrentText();
+        if LKind.StartsWith('string.') then
+          LRaw := LRaw + ' "' + AInterp.ParserCurrentText() + '"'
+        else if LKind = 'cpp.string.char' then
+          LRaw := LRaw + ' ''' + AInterp.ParserCurrentText() + ''''
+        else
+        begin
+          if not LInAngle then
+            LRaw := LRaw + ' ';
+          LRaw := LRaw + AInterp.ParserCurrentText();
+        end;
+        if AInterp.ParserCurrentText() = '>' then
+          LInAngle := False;
         AInterp.ParserAdvance();
-        // Stop after include "..." or include <...> forms
-        if LRaw.Contains('>') or
-           (LRaw.Contains('"') and (LRaw.CountChar('"') >= 2)) then
-          Break;
-        if not LInAngle then
-          LRaw := LRaw + ' ';
       end;
       LNode := TMorASTNode.Create();
       LNode.SetKind('stmt.preprocessor');
@@ -404,6 +502,36 @@ begin
         if ANode.ChildCount() > 0 then
           LOutput.EmitNode(ANode.GetChild(0));
         LOutput.Emit('->' + ANode.GetAttr('field.name'));
+      end;
+    end);
+
+  // expr.cpp_deref -> emit *operand
+  AInterp.RegisterNativeEmit('expr.cpp_deref',
+    procedure(const ANode: TMorASTNode)
+    var
+      LOutput: TMorCodeOutput;
+    begin
+      LOutput := AInterp.GetOutput();
+      if LOutput <> nil then
+      begin
+        LOutput.Emit('*');
+        if ANode.ChildCount() > 0 then
+          LOutput.EmitNode(ANode.GetChild(0));
+      end;
+    end);
+
+  // expr.cpp_addrof -> emit &operand
+  AInterp.RegisterNativeEmit('expr.cpp_addrof',
+    procedure(const ANode: TMorASTNode)
+    var
+      LOutput: TMorCodeOutput;
+    begin
+      LOutput := AInterp.GetOutput();
+      if LOutput <> nil then
+      begin
+        LOutput.Emit('&');
+        if ANode.ChildCount() > 0 then
+          LOutput.EmitNode(ANode.GetChild(0));
       end;
     end);
 

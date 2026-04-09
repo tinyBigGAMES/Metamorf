@@ -20,6 +20,7 @@ uses
   System.Character,
   System.Generics.Collections,
   Metamorf.Utils,
+  Metamorf.Common,
   Metamorf.Resources,
   Metamorf.AST,
   Metamorf.Interpreter;
@@ -30,6 +31,7 @@ const
   MOR_ERR_USERLEXER_UNTERMINATED_STR = 'UL002';
   MOR_ERR_USERLEXER_UNTERMINATED_CMT = 'UL003';
   MOR_ERR_USERLEXER_INVALID_NUMBER   = 'UL004';
+  MOR_ERR_USERLEXER_UNKNOWN_DIRECTIVE = 'UL005';
 
 type
 
@@ -40,7 +42,7 @@ type
   end;
 
   { TMorGenericLexer }
-  TMorGenericLexer = class(TMorErrorsObject)
+  TMorGenericLexer = class(TMorBuildObject)
   private
     FSource: string;
     FFilename: string;
@@ -59,7 +61,6 @@ type
     FConfig: TMorLexerConfig;
 
     // Conditional compilation state
-    FDefines: TDictionary<string, Boolean>;
     FCondStack: TList<TMorCondEntry>;
     FSkipping: Boolean;
 
@@ -88,6 +89,9 @@ type
 
 implementation
 
+uses
+  Metamorf.Build;
+
 { TMorGenericLexer }
 
 constructor TMorGenericLexer.Create();
@@ -99,7 +103,6 @@ begin
   FLineComments := nil;
   FBlockComments := nil;
   FDirectiveFlags := nil;
-  FDefines := TDictionary<string, Boolean>.Create();
   FCondStack := TList<TMorCondEntry>.Create();
   FSkipping := False;
 end;
@@ -107,7 +110,6 @@ end;
 destructor TMorGenericLexer.Destroy();
 begin
   FreeAndNil(FCondStack);
-  FreeAndNil(FDefines);
   // We don't own these - they belong to the interpreter
   inherited;
 end;
@@ -489,7 +491,6 @@ begin
   FCol := 1;
 
   // Reset conditional compilation state
-  FDefines.Clear();
   FCondStack.Clear();
   FSkipping := False;
 
@@ -548,12 +549,14 @@ begin
           if LFlag = 'define' then
           begin
             if not FSkipping then
-              FDefines.AddOrSetValue(LSymbol, True);
+              if Assigned(FBuild) then
+                TMorBuild(FBuild).SetDefine(LSymbol);
           end
           else if LFlag = 'undef' then
           begin
             if not FSkipping then
-              FDefines.Remove(LSymbol);
+              if Assigned(FBuild) then
+                TMorBuild(FBuild).RemoveDefine(LSymbol);
           end
           else if LFlag = 'ifdef' then
           begin
@@ -561,7 +564,7 @@ begin
             LEntry.BranchTaken := False;
             if not FSkipping then
             begin
-              if FDefines.ContainsKey(LSymbol) then
+              if Assigned(FBuild) and TMorBuild(FBuild).HasDefine(LSymbol) then
                 LEntry.BranchTaken := True
               else
                 FSkipping := True;
@@ -574,7 +577,7 @@ begin
             LEntry.BranchTaken := False;
             if not FSkipping then
             begin
-              if not FDefines.ContainsKey(LSymbol) then
+              if not (Assigned(FBuild) and TMorBuild(FBuild).HasDefine(LSymbol)) then
                 LEntry.BranchTaken := True
               else
                 FSkipping := True;
@@ -596,7 +599,7 @@ begin
                 // A branch already ran, skip
                 FSkipping := True;
               end
-              else if FDefines.ContainsKey(LSymbol) then
+              else if Assigned(FBuild) and TMorBuild(FBuild).HasDefine(LSymbol) then
               begin
                 // This branch is active
                 FSkipping := False;
@@ -642,13 +645,13 @@ begin
           Result.Add(LToken);
         Continue;
       end;
-      // Not a registered directive -- treat prefix + word as unknown
+      // Not a registered directive -- report unknown directive name
       if not FSkipping then
       begin
         if Assigned(FErrors) then
           FErrors.Add(FFilename, LToken.Line, LToken.Col,
-            esError, MOR_ERR_USERLEXER_UNEXPECTED_CHAR,
-            RSUserLexerUnexpectedChar, [FDirectivePrefix]);
+            esError, MOR_ERR_USERLEXER_UNKNOWN_DIRECTIVE,
+            RSUserLexerUnknownDirective, [LToken.Text]);
       end;
       Continue;
     end;

@@ -1616,6 +1616,11 @@ begin
     else if LKind = 'kw.import' then LRoot.AddChild(ParseImport())
     else if LKind = 'kw.include' then LRoot.AddChild(ParseInclude())
     else if LKind = 'kw.guard' then LRoot.AddChild(ParseGuard())
+    else if LKind = 'identifier' then
+    begin
+      // Top-level expression statement (e.g. setDefine("MYRA");)
+      LRoot.AddChild(ParseStmt());
+    end
     else
     begin
       if Assigned(FErrors) then

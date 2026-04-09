@@ -354,7 +354,7 @@ begin
       begin
         LNode := TMorASTNode(LPair.Value.GetDeclNode());
         if LNode.HasAttr('decl.linkage') and
-           (LNode.GetAttr('decl.linkage') = '"C"') then
+           (LNode.GetAttr('decl.linkage') = 'C') then
         begin
           LNode.SetAttr('decl.linkage', '');
           Inc(Result);

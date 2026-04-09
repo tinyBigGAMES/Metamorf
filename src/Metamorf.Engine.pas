@@ -95,8 +95,11 @@ type
     function GetSubsystem(): TMorSubsystemType;
     procedure SetBuildMode(const ABuildMode: TMorBuildMode);
     function GetBuildMode(): TMorBuildMode;
+    function GetBuild(): TObject;
     procedure SetOutputCallback(const ACallback: TMorCaptureConsoleCallback;
       const AUserData: Pointer = nil);
+    procedure SetStatusCallback(const ACallback: TMorStatusCallback;
+      const AUserData: Pointer = nil); override;
     procedure SetOutputPath(const APath: string);
     function GetOutputPath(): string;
     procedure SetProjectName(const AProjectName: string);
@@ -131,6 +134,8 @@ type
   end;
 
 implementation
+
+{$R Metamorf.ResData.res}
 
 { TMorEngine }
 
@@ -281,6 +286,7 @@ begin
   LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(FErrors);
+    LGenLexer.SetBuild(FBuild);
     LGenLexer.Configure(FInterp);
     LUserTokens := LGenLexer.Tokenize(LUserSource, LSrcDisplay);
   finally
@@ -480,10 +486,25 @@ var
   LGenParser: TMorGenericParser;
   LTokens: TList<TMorToken>;
   LBranch: TMorASTNode;
+  LI: Integer;
 begin
   // Resolve filename using module extension
   LModuleFile := AModuleName + '.' + FInterp.GetModuleExtension();
   LModulePath := TPath.Combine(FSourceDir, LModuleFile);
+
+  // Search module paths if not found in source dir
+  if not TFile.Exists(LModulePath) then
+  begin
+    for LI := 0 to FInterp.GetModulePaths().Count - 1 do
+    begin
+      LModulePath := TPath.Combine(
+        FInterp.GetModulePaths()[LI],
+        LModuleFile);
+      if TFile.Exists(LModulePath) then
+        Break;
+    end;
+  end;
+
   LModuleDisplay := TMorUtils.DisplayPath(LModulePath);
 
   // Check dedup
@@ -505,6 +526,7 @@ begin
   LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(FErrors);
+    LGenLexer.SetBuild(FBuild);
     LGenLexer.Configure(FInterp);
     LTokens := LGenLexer.Tokenize(LSource, LModuleDisplay);
   finally
@@ -636,10 +658,22 @@ begin
   Result := FBuild.GetBuildMode();
 end;
 
+function TMorEngine.GetBuild(): TObject;
+begin
+  Result := FBuild;
+end;
+
 procedure TMorEngine.SetOutputCallback(const ACallback: TMorCaptureConsoleCallback;
   const AUserData: Pointer);
 begin
   FBuild.SetOutputCallback(ACallback, AUserData);
+end;
+
+procedure TMorEngine.SetStatusCallback(const ACallback: TMorStatusCallback;
+  const AUserData: Pointer);
+begin
+  inherited;
+  FBuild.SetStatusCallback(ACallback, AUserData);
 end;
 
 procedure TMorEngine.SetOutputPath(const APath: string);

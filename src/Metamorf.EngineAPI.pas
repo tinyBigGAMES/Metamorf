@@ -362,6 +362,7 @@ begin
   LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(LErrors);
+    LGenLexer.SetBuild(FEngine.GetBuild());
     LGenLexer.Configure(FEngine.GetInterpreter());
     LUserTokens := LGenLexer.Tokenize(LUserSource, LSrcDisplay);
   finally
@@ -734,6 +735,7 @@ begin
   LGenLexer := TMorGenericLexer.Create();
   try
     LGenLexer.SetErrors(LErrors);
+    LGenLexer.SetBuild(FEngine.GetBuild());
     LGenLexer.Configure(LInterp);
     LTokens := LGenLexer.Tokenize(LSource, LModuleDisplay);
   finally

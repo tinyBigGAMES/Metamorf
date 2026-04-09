@@ -107,6 +107,7 @@ resourcestring
   RSUserLexerUnexpectedChar      = 'Unexpected character: ''%s''';
   RSUserLexerUnterminatedString  = 'Unterminated string literal';
   RSUserLexerUnterminatedComment = 'Unterminated comment';
+  RSUserLexerUnknownDirective    = 'Unknown directive: ''%s''';
 
   //--------------------------------------------------------------------------
   // User Parser Messages
