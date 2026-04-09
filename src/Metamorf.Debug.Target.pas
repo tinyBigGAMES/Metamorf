@@ -86,6 +86,10 @@ type
     // Address queries
     function IsOurCode(const AAddress: UInt64): Boolean; virtual; abstract;
 
+    // Handle access for StackWalk64 (default: returns 0)
+    function GetProcessHandle(): THandle; virtual;
+    function GetThreadHandle(): THandle; virtual;
+
     // Single-step re-patch tracking (default: no-op / returns -1)
     // In PDB model, stores absolute virtual address (not code offset)
     procedure SetRepatchOffset(const AOffset: Int64); virtual;
@@ -191,6 +195,10 @@ type
     // Address queries
     function IsOurCode(const AAddress: UInt64): Boolean; override;
 
+    // Handle access
+    function GetProcessHandle(): THandle; override;
+    function GetThreadHandle(): THandle; override;
+
     // Lifecycle
     function Start(): Boolean; override;
     procedure Stop(); override;
@@ -261,6 +269,16 @@ end;
 function TMorDebugTarget.GetRepatchOffset(): Int64;
 begin
   Result := -1;
+end;
+
+function TMorDebugTarget.GetProcessHandle(): THandle;
+begin
+  Result := 0;
+end;
+
+function TMorDebugTarget.GetThreadHandle(): THandle;
+begin
+  Result := 0;
 end;
 
 procedure TMorDebugTarget.SignalConfigDone();
@@ -1037,6 +1055,16 @@ begin
     // Without size info, check within a reasonable range (16 MB)
     Result := (AAddress >= LTextStart) and
               (AAddress < LTextStart + $1000000);
+end;
+
+function TMorPEDebugTarget.GetProcessHandle(): THandle;
+begin
+  Result := FProcessHandle;
+end;
+
+function TMorPEDebugTarget.GetThreadHandle(): THandle;
+begin
+  Result := FMainThreadHandle;
 end;
 
 //------------------------------------------------------------------------------

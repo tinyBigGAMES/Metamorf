@@ -438,24 +438,57 @@ function TMorStackWalker.WalkStack(const ATarget: TMorDebugTarget;
 var
   LFrame: TMorDebugStackFrame;
   LFrameID: Integer;
-  LRIP: UInt64;
-  LRBP: UInt64;
   LFile: string;
   LLine: Integer;
   LFuncName: string;
   LFuncStart: UInt64;
   LFuncSize: DWORD;
+  LLocalContext: TContext;
+  LStackFrame: STACKFRAME64;
+  LProcessHandle: THandle;
+  LThreadHandle: THandle;
+  LRIP: UInt64;
 begin
   SetLength(Result, 0);
-  LFrameID := 0;
-  LRIP := AContext.Rip;
-  LRBP := AContext.Rbp;
 
-  while ATarget.IsOurCode(LRIP) do
+  LProcessHandle := ATarget.GetProcessHandle();
+  LThreadHandle := ATarget.GetThreadHandle();
+
+  // Fall back to simple single-frame result if handles unavailable
+  if (LProcessHandle = 0) or (LThreadHandle = 0) then
+    Exit;
+
+  // StackWalk64 modifies the context, so work on a local copy
+  LLocalContext := AContext;
+
+  // Initialize stack frame for x64
+  FillChar(LStackFrame, SizeOf(LStackFrame), 0);
+  LStackFrame.AddrPC.Offset := AContext.Rip;
+  LStackFrame.AddrPC.Mode := AddrModeFlat;
+  LStackFrame.AddrFrame.Offset := AContext.Rsp;
+  LStackFrame.AddrFrame.Mode := AddrModeFlat;
+  LStackFrame.AddrStack.Offset := AContext.Rsp;
+  LStackFrame.AddrStack.Mode := AddrModeFlat;
+
+  LFrameID := 0;
+
+  while StackWalk64(IMAGE_FILE_MACHINE_AMD64, LProcessHandle,
+    LThreadHandle, @LStackFrame, @LLocalContext,
+    nil, @SymFunctionTableAccess64, @SymGetModuleBase64, nil) do
   begin
+    LRIP := LStackFrame.AddrPC.Offset;
+
+    // Stop on null address
+    if LRIP = 0 then
+      Break;
+
+    // Only include frames within our code
+    if not ATarget.IsOurCode(LRIP) then
+      Break;
+
     LFrame.FrameID := LFrameID;
     LFrame.Address := LRIP;
-    LFrame.RBP := LRBP;
+    LFrame.RBP := LStackFrame.AddrFrame.Offset;
     LFrame.RIP := LRIP;
     LFrame.SourceColumn := 0;
 
@@ -480,22 +513,8 @@ begin
     Result := Result + [LFrame];
     Inc(LFrameID);
 
-    // Walk up one frame via RBP chain
-    // Standard x64 frame: [RBP] = saved RBP, [RBP+8] = return address
-    // Requires -fno-omit-frame-pointer in compile flags
-    if LRBP = 0 then
-      Break;
-
-    try
-      LRIP := ATarget.ReadUInt64(LRBP + 8);  // Saved return address
-      LRBP := ATarget.ReadUInt64(LRBP);       // Saved RBP
-    except
-      // Memory read failed -- end of valid stack
-      Break;
-    end;
-
-    // Safety: stop if we've gone too deep or RBP is zero/invalid
-    if (LRBP = 0) or (LFrameID > 256) then
+    // Safety limit
+    if LFrameID > 256 then
       Break;
   end;
 end;
@@ -748,21 +767,19 @@ var
   LReturnAddr: UInt64;
 begin
   Result := False;
-  if FTarget = nil then
+  if (FTarget = nil) or (FSourceMap = nil) then
     Exit;
 
   LContext := FTarget.GetContext();
 
-  // Read return address from [RBP+8] (standard x64 frame)
-  // Requires -fno-omit-frame-pointer in compile flags
-  if LContext.Rbp = 0 then
+  // Use StackWalk64 via source map to find caller's return address
+  // (works regardless of frame pointer optimization)
+  if not FSourceMap.GetCallerReturnAddress(
+    FTarget.GetThreadHandle(), LContext, LReturnAddr) then
     Exit;
 
-  try
-    LReturnAddr := FTarget.ReadUInt64(LContext.Rbp + 8);
-  except
+  if LReturnAddr = 0 then
     Exit;
-  end;
 
   // Only set breakpoint if return address is in our code
   if not FTarget.IsOurCode(LReturnAddr) then
@@ -877,10 +894,14 @@ begin
 end;
 
 function TMorDebugRuntime.GetVariables(): TArray<TMorDebugVariable>;
+const
+  CV_AMD64_RBP = 334;
+  CV_AMD64_RSP = 335;
 var
   LVars: TArray<TMorDebugVariable>;
   LContext: TContext;
   LAddress: UInt64;
+  LRegBase: UInt64;
   LBytes: TBytes;
   LI: Integer;
   LVar: TMorDebugVariable;
@@ -895,7 +916,7 @@ begin
   if Length(LVars) = 0 then
     Exit;
 
-  // Capture thread context for RBP
+  // Get thread context
   LContext := FTarget.GetContext();
 
   LResultList := TList<TMorDebugVariable>.Create();
@@ -904,15 +925,28 @@ begin
     begin
       LVar := LVars[LI];
 
-      // Read value from debuggee stack memory
-      // PDB variables with SYMFLAG_REGREL have Address = RBP offset
       LVar.VarValue := '???';
 
       // Default to 8 bytes if PDB doesn't report size (common for locals)
       if LVar.Size = 0 then
         LVar.Size := 8;
 
-      LAddress := UInt64(Int64(LContext.Rbp) + Int64(LVar.Address));
+      // REGREL = offset from register; otherwise Address is absolute VA
+      if (LVar.Flags and SYMFLAG_REGREL) <> 0 then
+      begin
+        if LVar.RegId = CV_AMD64_RSP then
+          LRegBase := LContext.Rsp
+        else
+          LRegBase := LContext.Rbp;
+        LAddress := UInt64(Int64(LRegBase) + Int64(LVar.Address));
+      end
+      else
+      begin
+        // Absolute address (global/static)
+        LRegBase := 0;
+        LAddress := LVar.Address;
+      end;
+
       try
         LBytes := FTarget.ReadBytes(LAddress, LVar.Size);
         if Cardinal(Length(LBytes)) = LVar.Size then
@@ -941,12 +975,58 @@ begin
 end;
 
 function TMorDebugRuntime.Evaluate(const AExpression: string): TMorDebugVariable;
+const
+  CV_AMD64_RSP = 335;
 var
   LVars: TArray<TMorDebugVariable>;
+  LVar: TMorDebugVariable;
   LI: Integer;
   LExpr: string;
+  LContext: TContext;
+  LAddress: UInt64;
+  LRegBase: UInt64;
+  LBytes: TBytes;
+  LFound: Boolean;
+
+  function ReadVarValue(var AVar: TMorDebugVariable): Boolean;
+  begin
+    Result := False;
+    AVar.VarValue := '???';
+    if AVar.Size = 0 then
+      AVar.Size := 8;
+
+    // Compute memory address
+    if (AVar.Flags and SYMFLAG_REGREL) <> 0 then
+    begin
+      if AVar.RegId = CV_AMD64_RSP then
+        LRegBase := LContext.Rsp
+      else
+        LRegBase := LContext.Rbp;
+      LAddress := UInt64(Int64(LRegBase) + Int64(AVar.Address));
+    end
+    else
+      LAddress := AVar.Address;  // Absolute VA (global/static)
+
+    try
+      LBytes := FTarget.ReadBytes(LAddress, AVar.Size);
+      if Cardinal(Length(LBytes)) = AVar.Size then
+      begin
+        case AVar.Size of
+          1: AVar.VarValue := IntToStr(ShortInt(LBytes[0]));
+          2: AVar.VarValue := IntToStr(SmallInt(PWord(@LBytes[0])^));
+          4: AVar.VarValue := IntToStr(PInteger(@LBytes[0])^);
+          8: AVar.VarValue := IntToStr(PInt64(@LBytes[0])^);
+        else
+          AVar.VarValue := IntToStr(PInt64(@LBytes[0])^);
+        end;
+        Result := True;
+      end;
+    except
+      AVar.VarValue := '<unreadable>';
+    end;
+  end;
+
 begin
-  // Default: not found
   Result := Default(TMorDebugVariable);
   Result.VarName := AExpression;
 
@@ -954,13 +1034,49 @@ begin
   if LExpr = '' then
     Exit;
 
-  // Get all variables for the current frame, then filter by name
+  if (FTarget = nil) or (FSourceMap = nil) then
+    Exit;
+
+  LContext := FTarget.GetContext();
+
+  // 1. Try locals/params at current stop address
   LVars := GetVariables();
   for LI := 0 to High(LVars) do
   begin
     if SameText(LVars[LI].VarName, LExpr) then
     begin
       Result := LVars[LI];
+      Exit;
+    end;
+  end;
+
+  // 2. Scope backtrack: try previous address (variable scope may end before current instruction)
+  LVars := FSourceMap.GetVariablesAtAddress(FLastStopEvent.Address - 1);
+  LFound := False;
+  for LI := 0 to High(LVars) do
+  begin
+    if SameText(LVars[LI].VarName, LExpr) then
+    begin
+      LVar := LVars[LI];
+      LFound := True;
+      Break;
+    end;
+  end;
+  if LFound then
+  begin
+    if ReadVarValue(LVar) then
+    begin
+      Result := LVar;
+      Exit;
+    end;
+  end;
+
+  // 3. Global lookup via SymFromName
+  if FSourceMap.FindSymbolByName(LExpr, LVar) then
+  begin
+    if ReadVarValue(LVar) then
+    begin
+      Result := LVar;
       Exit;
     end;
   end;

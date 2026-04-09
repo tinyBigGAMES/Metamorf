@@ -22,6 +22,14 @@ uses
   System.Generics.Collections,
   Metamorf.Utils;
 
+const
+  MAX_SYM_NAME = 2000;
+
+  // SYMBOL_INFO flags
+  SYMFLAG_PARAMETER = $00000040;
+  SYMFLAG_LOCAL     = $00000080;
+  SYMFLAG_REGREL    = $00000010;
+
 type
   { TMorDebugVariable }
   TMorDebugVariable = record
@@ -29,8 +37,11 @@ type
     VarValue: string;        // Formatted value string
     VarType: string;         // Type name (v2: from PDB type info)
     IsParameter: Boolean;    // True = parameter, False = local
-    Address: UInt64;         // Stack address or register
+    Address: UInt64;         // Stack address or register offset
     Size: DWORD;             // Size in bytes
+    RegId: ULONG;            // Register ID for REGREL vars (334=RBP, 335=RSP)
+    Flags: ULONG;            // SYMBOL_INFO.Flags (SYMFLAG_REGREL, etc.)
+    TypeIndex: ULONG;        // SYMBOL_INFO.TypeIndex (for SymGetTypeInfo)
   end;
 
   { TMorPDBSourceMap }
@@ -66,6 +77,8 @@ type
 
     // Variable enumeration at address
     function GetVariablesAtAddress(const AAddress: UInt64): TArray<TMorDebugVariable>;
+    function FindSymbolByName(const AName: string;
+      out AVar: TMorDebugVariable): Boolean;
 
     // Stack unwinding via StackWalk64 (works with -fomit-frame-pointer)
     function GetCallerReturnAddress(const AThreadHandle: THandle;
@@ -77,27 +90,94 @@ type
     function GetProcessHandle(): THandle;
   end;
 
+const
+  DbgHelpDLL = 'dbghelp.dll';
+  IMAGE_FILE_MACHINE_AMD64 = $8664;
+  AddrModeFlat = 3;
+
+type
+  // ADDRESS64 - used by STACKFRAME64 for StackWalk64
+  PADDRESS64 = ^ADDRESS64;
+  ADDRESS64 = record
+    Offset: UInt64;
+    Segment: Word;
+    Mode: DWORD;
+  end;
+
+  // KDHELP64 - kernel callback helper data for StackWalk64
+  KDHELP64 = record
+    Thread: UInt64;
+    ThCallbackStack: DWORD;
+    ThCallbackBStore: DWORD;
+    NextCallback: DWORD;
+    FramePointer: DWORD;
+    KiCallUserMode: UInt64;
+    KeUserCallbackDispatcher: UInt64;
+    SystemRangeStart: UInt64;
+    KiUserExceptionDispatcher: UInt64;
+    StackBase: UInt64;
+    StackLimit: UInt64;
+    Reserved2: array[0..4] of UInt64;
+  end;
+
+  // STACKFRAME64 - stack frame for StackWalk64
+  PSTACKFRAME64 = ^STACKFRAME64;
+  STACKFRAME64 = record
+    AddrPC: ADDRESS64;
+    AddrReturn: ADDRESS64;
+    AddrFrame: ADDRESS64;
+    AddrStack: ADDRESS64;
+    AddrBStore: ADDRESS64;
+    FuncTableEntry: Pointer;
+    Params: array[0..3] of UInt64;
+    bFar: BOOL;
+    bVirtual: BOOL;
+    Reserved: array[0..2] of UInt64;
+    KdHelp: KDHELP64;
+  end;
+
+// StackWalk64 and helper callbacks (from dbghelp.dll)
+function StackWalk64(
+  AMachineType: DWORD;
+  AProcess: THandle;
+  AThread: THandle;
+  AStackFrame: PSTACKFRAME64;
+  AContextRecord: Pointer;
+  AReadMemoryRoutine: Pointer;
+  AFunctionTableAccessRoutine: Pointer;
+  AGetModuleBaseRoutine: Pointer;
+  ATranslateAddress: Pointer
+): BOOL; stdcall; external DbgHelpDLL;
+
+function SymFunctionTableAccess64(
+  AProcess: THandle;
+  AAddrBase: UInt64
+): Pointer; stdcall; external DbgHelpDLL;
+
+function SymGetModuleBase64(
+  AProcess: THandle;
+  AAddr: UInt64
+): UInt64; stdcall; external DbgHelpDLL;
+
+const
+  // IMAGEHLP_SYMBOL_TYPE_INFO values for SymGetTypeInfo
+  TI_GET_LENGTH = 2;
+
+function SymGetTypeInfo(
+  AProcess: THandle;
+  AModBase: UInt64;
+  ATypeId: ULONG;
+  AGetType: ULONG;
+  AInfo: Pointer
+): BOOL; stdcall; external DbgHelpDLL;
+
 implementation
 
 const
-  DbgHelpDLL = 'dbghelp.dll';
-
   // SymSetOptions flags
   SYMOPT_LOAD_LINES     = $00000010;
   SYMOPT_UNDNAME        = $00000002;
   SYMOPT_DEFERRED_LOADS = $00000004;
-
-  // Maximum symbol name length
-  MAX_SYM_NAME = 2000;
-
-  // StackWalk64 constants
-  IMAGE_FILE_MACHINE_AMD64 = $8664;
-  AddrModeFlat = 3;
-
-  // SYMBOL_INFO flags
-  SYMFLAG_PARAMETER = $00000008;
-  SYMFLAG_LOCAL     = $00000020;
-  SYMFLAG_REGREL    = $00000200;
 
 type
   //============================================================================
@@ -146,46 +226,6 @@ type
     Reserved2: ULONG;
   end;
 
-  // ADDRESS64 - used by STACKFRAME64 for StackWalk64
-  PADDRESS64 = ^ADDRESS64;
-  ADDRESS64 = record
-    Offset: UInt64;
-    Segment: Word;
-    Mode: DWORD;  // ADDRESS_MODE enum (AddrModeFlat = 3)
-  end;
-
-  // KDHELP64 - kernel callback helper data for StackWalk64
-  KDHELP64 = record
-    Thread: UInt64;
-    ThCallbackStack: DWORD;
-    ThCallbackBStore: DWORD;
-    NextCallback: DWORD;
-    FramePointer: DWORD;
-    KiCallUserMode: UInt64;
-    KeUserCallbackDispatcher: UInt64;
-    SystemRangeStart: UInt64;
-    KiUserExceptionDispatcher: UInt64;
-    StackBase: UInt64;
-    StackLimit: UInt64;
-    Reserved2: array[0..4] of UInt64;
-  end;
-
-  // STACKFRAME64 - stack frame for StackWalk64
-  PSTACKFRAME64 = ^STACKFRAME64;
-  STACKFRAME64 = record
-    AddrPC: ADDRESS64;
-    AddrReturn: ADDRESS64;
-    AddrFrame: ADDRESS64;
-    AddrStack: ADDRESS64;
-    AddrBStore: ADDRESS64;
-    FuncTableEntry: Pointer;
-    Params: array[0..3] of UInt64;
-    bFar: BOOL;
-    bVirtual: BOOL;
-    Reserved: array[0..2] of UInt64;
-    KdHelp: KDHELP64;
-  end;
-
   TSymEnumSymbolsCallback = function(
     const ASymInfo: PSYMBOL_INFO;
     const ASymbolSize: ULONG;
@@ -228,6 +268,12 @@ function SymFromAddr(
   ASymbol: PSYMBOL_INFO
 ): BOOL; stdcall; external DbgHelpDLL;
 
+function SymFromName(
+  AProcess: THandle;
+  AName: PAnsiChar;
+  ASymbol: PSYMBOL_INFO
+): BOOL; stdcall; external DbgHelpDLL;
+
 function SymGetLineFromAddr64(
   AProcess: THandle;
   AAddr: UInt64;
@@ -258,28 +304,6 @@ function SymSetContext(
   AContext: Pointer
 ): BOOL; stdcall; external DbgHelpDLL;
 
-function StackWalk64(
-  AMachineType: DWORD;
-  AProcess: THandle;
-  AThread: THandle;
-  AStackFrame: PSTACKFRAME64;
-  AContextRecord: Pointer;
-  AReadMemoryRoutine: Pointer;
-  AFunctionTableAccessRoutine: Pointer;
-  AGetModuleBaseRoutine: Pointer;
-  ATranslateAddress: Pointer
-): BOOL; stdcall; external DbgHelpDLL;
-
-function SymFunctionTableAccess64(
-  AProcess: THandle;
-  AAddrBase: UInt64
-): Pointer; stdcall; external DbgHelpDLL;
-
-function SymGetModuleBase64(
-  AProcess: THandle;
-  AAddr: UInt64
-): UInt64; stdcall; external DbgHelpDLL;
-
 function EnumSymbolsCallback(
   const ASymInfo: PSYMBOL_INFO;
   const ASymbolSize: ULONG;
@@ -306,6 +330,9 @@ begin
   LVar.IsParameter := (ASymInfo.Flags and SYMFLAG_PARAMETER) <> 0;
   LVar.Address := ASymInfo.Address;
   LVar.Size := ASymInfo.Size;
+  LVar.RegId := ASymInfo.Register_;
+  LVar.Flags := ASymInfo.Flags;
+  LVar.TypeIndex := ASymInfo.TypeIndex;
   LVar.VarType := '';   // v2: use SymGetTypeInfo
   LVar.VarValue := '';  // Filled later by reading process memory
 
@@ -501,6 +528,9 @@ function TMorPDBSourceMap.GetVariablesAtAddress(
 var
   LStackFrame: IMAGEHLP_STACK_FRAME;
   LList: TList<TMorDebugVariable>;
+  LVar: TMorDebugVariable;
+  LTypeSize: UInt64;
+  LI: Integer;
 begin
   Result := nil;
 
@@ -531,10 +561,75 @@ begin
       FLock.Leave();
     end;
 
+    // Resolve actual type sizes via SymGetTypeInfo (SYMBOL_INFO.Size is unreliable)
+    for LI := 0 to LList.Count - 1 do
+    begin
+      LVar := LList[LI];
+      if (LVar.TypeIndex <> 0) then
+      begin
+        LTypeSize := 0;
+        if SymGetTypeInfo(FProcessHandle, FModuleBase, LVar.TypeIndex,
+          TI_GET_LENGTH, @LTypeSize) then
+        begin
+          LVar.Size := DWORD(LTypeSize);
+          LList[LI] := LVar;
+        end;
+      end;
+    end;
+
     Result := LList.ToArray();
   finally
     FreeAndNil(LList);
   end;
+end;
+
+function TMorPDBSourceMap.FindSymbolByName(const AName: string;
+  out AVar: TMorDebugVariable): Boolean;
+var
+  LSymBuf: array[0..SizeOf(SYMBOL_INFO) + MAX_SYM_NAME - 1] of Byte;
+  LSym: PSYMBOL_INFO;
+  LTypeSize: UInt64;
+begin
+  Result := False;
+  AVar := Default(TMorDebugVariable);
+
+  if not FInitialized then
+    Exit;
+
+  FillChar(LSymBuf, SizeOf(LSymBuf), 0);
+  LSym := @LSymBuf[0];
+  LSym.SizeOfStruct := SizeOf(SYMBOL_INFO);
+  LSym.MaxNameLen := MAX_SYM_NAME;
+
+  FLock.Enter();
+  try
+    if not SymFromName(FProcessHandle, PAnsiChar(AnsiString(AName)), LSym) then
+      Exit;
+  finally
+    FLock.Leave();
+  end;
+
+  AVar.VarName := AName;
+  AVar.Address := LSym.Address;
+  AVar.Size := LSym.Size;
+  AVar.RegId := LSym.Register_;
+  AVar.Flags := LSym.Flags;
+  AVar.TypeIndex := LSym.TypeIndex;
+  AVar.IsParameter := (LSym.Flags and SYMFLAG_PARAMETER) <> 0;
+
+  // Resolve type size
+  if AVar.TypeIndex <> 0 then
+  begin
+    LTypeSize := 0;
+    if SymGetTypeInfo(FProcessHandle, FModuleBase, AVar.TypeIndex,
+      TI_GET_LENGTH, @LTypeSize) then
+      AVar.Size := DWORD(LTypeSize);
+  end;
+
+  if AVar.Size = 0 then
+    AVar.Size := 8;
+
+  Result := True;
 end;
 
 function TMorPDBSourceMap.IsInitialized(): Boolean;
