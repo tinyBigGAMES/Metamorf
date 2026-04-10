@@ -2140,6 +2140,8 @@ begin
     begin
       LNode := TMorASTNode.Create();
       LNode.SetKind(AArgs[0].AsString());
+      if Assigned(FActiveParser) then
+        LNode.SetToken(TMorGenericParser(FActiveParser).Current());
       Result := TValue.From<TMorASTNode>(LNode);
     end
     else

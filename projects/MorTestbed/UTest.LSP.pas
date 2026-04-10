@@ -189,17 +189,17 @@ begin
         'Hover on "add" (routine declaration)  ->  ' + LHover.Contents,
         'Hover on "add" returned empty or wrong: ' + LHover.Contents);
 
-      LHover := LService.GetHover(LUri, 30, 9);
+      LHover := LService.GetHover(LUri, 31, 9);
       Check(LHover.Contents.Contains('factorial'),
         'Hover on "factorial" (routine declaration)  ->  ' + LHover.Contents,
         'Hover on "factorial" returned: ' + LHover.Contents);
-      LHover := LService.GetHover(LUri, 39, 2);
+      LHover := LService.GetHover(LUri, 41, 2);
 
       Check(LHover.Contents.Contains('sum'),
         'Hover on "sum" (variable declaration)  ->  ' + LHover.Contents,
         'Hover on "sum" returned: ' + LHover.Contents);
 
-      LHover := LService.GetHover(LUri, 40, 2);
+      LHover := LService.GetHover(LUri, 42, 2);
 
       Check(LHover.Contents.Contains('i'),
         'Hover on "i" (variable declaration)  ->  ' + LHover.Contents,
@@ -223,14 +223,14 @@ begin
         [LLocation.Range.StartPos.Line + 1]),
         '"add" could not be resolved');
 
-      LLocation := LService.GetDefinition(LUri, 30, 9);
+      LLocation := LService.GetDefinition(LUri, 31, 9);
 
       Check(LLocation.Uri <> '',
         Format('"factorial" at declaration  ->  line %d',
         [LLocation.Range.StartPos.Line + 1]),
         '"factorial" could not be resolved');
 
-      LLocation := LService.GetDefinition(LUri, 39, 2);
+      LLocation := LService.GetDefinition(LUri, 41, 2);
 
       Check(LLocation.Uri <> '',
         Format('"sum" at var section  ->  line %d',
@@ -247,7 +247,7 @@ begin
 
       // ---- 5. Find All References ----
       BeginSection('5. Find All References  (all usages of a symbol)');
-      LLocations := LService.GetReferences(LUri, 30, 9, True);
+      LLocations := LService.GetReferences(LUri, 31, 9, True);
 
       Check(Length(LLocations) >= 2,
         Format('"factorial"  ->  %d references found', [Length(LLocations)]),
@@ -277,7 +277,7 @@ begin
 
       BeginSection('6. Rename Symbol  (project-wide identifier rename)');
 
-      LRename := LService.GetRenameEdits(LUri, 39, 2, 'total');
+      LRename := LService.GetRenameEdits(LUri, 41, 2, 'total');
 
       Check(Length(LRename.Edits) >= 1,
         Format('Rename "sum" -> "total"  ->  %d edit locations',
@@ -897,7 +897,7 @@ begin
       Check(False, '', 'Hover: no response (timeout)');
 
     LBody := MakeTextDocRequest(4,
-      'textDocument/hover', LUri, 30, 9);
+      'textDocument/hover', LUri, 31, 9);
 
     LResponse := SendRequestAndRead(LStdinWrite, LStdoutRead, LBody, 5000);
 
@@ -956,7 +956,7 @@ begin
       .AddPair('textDocument', TJSONObject.Create()
       .AddPair('uri', LUri))
       .AddPair('position', TJSONObject.Create()
-      .AddPair('line', TJSONNumber.Create(30))
+      .AddPair('line', TJSONNumber.Create(31))
       .AddPair('character', TJSONNumber.Create(9)))
       .AddPair('context', TJSONObject.Create()
       .AddPair('includeDeclaration', TJSONBool.Create(True))))
@@ -1159,7 +1159,7 @@ begin
       .AddPair('textDocument', TJSONObject.Create()
       .AddPair('uri', LUri))
       .AddPair('position', TJSONObject.Create()
-      .AddPair('line', TJSONNumber.Create(39))
+      .AddPair('line', TJSONNumber.Create(41))
       .AddPair('character', TJSONNumber.Create(2)))
       .AddPair('newName', 'total'))
       .ToString();

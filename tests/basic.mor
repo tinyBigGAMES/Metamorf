@@ -79,7 +79,6 @@ tokens {
   token keyword.false     = "false";
   token keyword.print     = "print";
   token keyword.write     = "write";
-  token keyword.include   = "include";
   token keyword.module    = "module";
   token keyword.declare   = "declare";
   token op.eq             = "=";
@@ -200,10 +199,6 @@ grammar {
     expect keyword.module;
     consume identifier -> @name;
   }
-  rule stmt.include {
-    expect keyword.include;
-    consume identifier -> @file_name;
-  }
   rule stmt.dim {
     expect keyword.dim;
     let nd = getResultNode();
@@ -227,8 +222,15 @@ grammar {
     // In BASIC, = is both assignment and comparison.
     // At statement level: consume identifier, check for ( or =.
     let nd = getResultNode();
-    setAttr(nd, "target", currentText());
+    let target = currentText();
+    setAttr(nd, "target", target);
     advance();
+    // Handle INCLUDE as identifier (not keyword, avoids C++ passthrough collision)
+    if lower(target) == "include" {
+      setAttr(nd, "is_include", "true");
+      setAttr(nd, "file_name", currentText());
+      advance();
+    } else
     if checkToken("delimiter.lparen") {
       // Call statement: ident(args)
       setAttr(nd, "is_assign", "false");
@@ -415,7 +417,13 @@ semantics {
     declare @vname as variable;
     visit children;
   }
-  on stmt.ident_stmt { visit children; }
+  on stmt.ident_stmt {
+    if getAttr(node, "is_include") == "true" {
+      setModuleExtension("inc");
+      compileModule(getAttr(node, "file_name"));
+    }
+    visit children;
+  }
   on stmt.if         { visit children; }
   on stmt.while      { visit children; }
   on stmt.for        { visit children; }
@@ -427,10 +435,6 @@ semantics {
   on stmt.directive_optimize  { }
   on stmt.directive_subsystem { }
   on stmt.module     { }
-  on stmt.include {
-    setModuleExtension("inc");
-    compileModule(getAttr(node, "file_name"));
-  }
   on expr.call       { visit children; }
   on expr.ident      { }
 }
@@ -457,7 +461,7 @@ emitters {
       if nodeKind(ch) == "stmt.directive_subsystem" { emitNode(ch); }
       if nodeKind(ch) == "stmt.preprocessor" { emitNode(ch); }
       if nodeKind(ch) == "stmt.module" { emitNode(ch); }
-      if nodeKind(ch) == "stmt.include" { emitNode(ch); }
+      if nodeKind(ch) == "stmt.ident_stmt" and getAttr(ch, "is_include") == "true" { emitNode(ch); }
       i = i + 1;
     }
     // Pass 1: functions and subs
@@ -517,7 +521,7 @@ emitters {
       while i < n {
         let ch = getChild(node, i);
         let k = nodeKind(ch);
-        if k != "stmt.func_decl" and k != "stmt.sub_decl" and k != "stmt.dim" and k != "stmt.module" and k != "stmt.include" and k != "stmt.directive_platform" and k != "stmt.directive_optimize" and k != "stmt.directive_subsystem" and k != "stmt.preprocessor" {
+        if k != "stmt.func_decl" and k != "stmt.sub_decl" and k != "stmt.dim" and k != "stmt.module" and k != "stmt.directive_platform" and k != "stmt.directive_optimize" and k != "stmt.directive_subsystem" and k != "stmt.preprocessor" and getAttr(ch, "is_include") != "true" {
           emitNode(ch);
         }
         i = i + 1;
@@ -529,11 +533,6 @@ emitters {
 
   on stmt.module {
     setBuildMode("lib");
-  }
-
-  on stmt.include {
-    let fileName = getAttr(node, "file_name");
-    emitLine("#include \"" + fileName + ".h\"");
   }
 
   on stmt.directive_platform {
@@ -563,6 +562,10 @@ emitters {
   }
 
   on stmt.ident_stmt {
+    if getAttr(node, "is_include") == "true" {
+      let fileName = getAttr(node, "file_name");
+      emitLine("#include \"" + fileName + ".h\"");
+    } else
     if getAttr(node, "is_assign") == "true" {
       let target = getAttr(node, "target");
       let val = exprToString(getChild(node, 0));

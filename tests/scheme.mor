@@ -1,4 +1,4 @@
-// ===========================================================================
+﻿// ===========================================================================
 //  scheme.mor -- Scheme language definition for Metamorf
 //
 //  Defines a typed Scheme dialect that compiles to C++23 via the
@@ -6,8 +6,11 @@
 //  that Metamorf handles S-expression syntax, proving it is not
 //  limited to Algol-family languages.
 //
-//    Tokens        Keywords, operators, delimiters, semicolon line
+//    Tokens        Keywords, operators, delimiters, // line
 //                  comments, strings, and source-level directives.
+//                  Traditional ; comments are replaced with // because
+//                  ; must be delimiter.semicolon so the C++ passthrough
+//                  # handler has a stop signal before S-expression forms.
 //
 //    Grammar       S-expression parsing: a single ( triggers dispatch
 //                  based on the head symbol. No infix operators, no
@@ -57,9 +60,11 @@
 //  does NOT declare tokens for symbols that ConfigCpp provides:
 //    !=   Use cpp.op.neq in grammar headKind checks (not a custom op.neq)
 //    %    Use cpp.op.modulo in grammar headKind checks (not a custom op.percent)
-//  The ; comment delimiter overlaps with a common C++ token, but the
-//  lexer processes comments before operators, so ; always starts a
-//  comment in Scheme source.
+//  Traditional Scheme ; comments are replaced with // so that ; can be
+//  registered as delimiter.semicolon. The C++ # handler breaks on
+//  delimiter.semicolon, which prevents it from consuming past
+//  preprocessor lines into S-expression forms. C++ passthrough lines
+//  must end with ; in the source (e.g., #include <cstdio>;).
 //
 //  Test source: hello.scm
 // ===========================================================================
@@ -99,12 +104,13 @@ tokens {
   token op.slash          = "/";
   token op.lt             = "<";
   token op.gt             = ">";
-  token delimiter.lparen    = "(";
-  token delimiter.rparen    = ")";
+  token op.lparen    = "(";
+  token op.rparen    = ")";
   token delimiter.comma     = ",";
   token delimiter.colon     = ":";
   token delimiter.dot       = ".";
-  token comment.line        = ";";
+  token delimiter.semicolon = ";";
+  token comment.line        = "//";
   token string.dquote       = "\"";
   directive_prefix = "@";
   token directive.platform  = "platform";
@@ -145,21 +151,21 @@ grammar {
   // infix rule never fires there -- preventing ( from being captured
   // as a function call when it should start a nested S-expression.
   rule expr.call precedence left 80 {
-    expect delimiter.lparen;
+    expect op.lparen;
     let nd = getResultNode();
-    if not checkToken("delimiter.rparen") {
+    if not checkToken("op.rparen") {
       addChild(nd, parseExpr(0));
       while matchToken("delimiter.comma") {
         addChild(nd, parseExpr(0));
       }
     }
-    expect delimiter.rparen;
+    expect op.rparen;
   }
 
   // --- S-expression as expression (triggered by ( in expression position) ---
   // Handles: operators, if, let, begin, cond, and, or, not, function calls
   rule expr.sexp {
-    expect delimiter.lparen;
+    expect op.lparen;
     let nd = getResultNode();
     let headKind = currentKind();
     let head = currentText();
@@ -208,7 +214,7 @@ grammar {
       advance();
       addChild(nd, parseExpr(100));
       addChild(nd, parseExpr(100));
-      if not checkToken("delimiter.rparen") {
+      if not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -218,7 +224,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "begin");
       advance();
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -228,7 +234,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "display");
       advance();
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -238,7 +244,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "write");
       advance();
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -265,7 +271,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "cond");
       advance();
-      while checkToken("delimiter.lparen") {
+      while checkToken("op.lparen") {
         advance();
         let branch = createNode("stmt.cond_branch");
         if checkToken("keyword.else") {
@@ -275,10 +281,10 @@ grammar {
           setAttr(branch, "is_else", "false");
           addChild(branch, parseExpr(100));
         }
-        while not checkToken("delimiter.rparen") {
+        while not checkToken("op.rparen") {
           addChild(branch, parseExpr(100));
         }
-        requireToken("delimiter.rparen");
+        requireToken("op.rparen");
         addChild(nd, branch);
       }
     }
@@ -287,12 +293,12 @@ grammar {
     if not handled {
       setAttr(nd, "form", "call");
       addChild(nd, parseExpr(100));
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
 
-    expect delimiter.rparen;
+    expect op.rparen;
   }
 
   // --- Directive rules ---
@@ -313,7 +319,7 @@ grammar {
   // Handles: (define ...), (display ...), (write ...), (newline),
   //          (module ...), (require ...), and expression-statements
   rule stmt.sexp {
-    expect delimiter.lparen;
+    expect op.lparen;
     let nd = getResultNode();
     let headKind = currentKind();
     let head = currentText();
@@ -324,14 +330,14 @@ grammar {
     if headKind == "keyword.define" {
       handled = true;
       advance();
-      if checkToken("delimiter.lparen") {
+      if checkToken("op.lparen") {
         // Function definition
         setAttr(nd, "form", "define_func");
         advance();
         setAttr(nd, "func_name", currentText());
         advance();
         // Parse typed parameters: (name : type) ...
-        while checkToken("delimiter.lparen") {
+        while checkToken("op.lparen") {
           advance();
           let p = createNode("stmt.param");
           setAttr(p, "param.name", currentText());
@@ -339,17 +345,17 @@ grammar {
           requireToken("delimiter.colon");
           setAttr(p, "param.type_text", currentText());
           advance();
-          requireToken("delimiter.rparen");
+          requireToken("op.rparen");
           addChild(nd, p);
         }
-        requireToken("delimiter.rparen");
+        requireToken("op.rparen");
         // Optional return type annotation: ) : type
         if matchToken("delimiter.colon") {
           setAttr(nd, "return_type", currentText());
           advance();
         }
         // Parse body expressions until closing )
-        while not checkToken("delimiter.rparen") {
+        while not checkToken("op.rparen") {
           addChild(nd, parseExpr(100));
         }
       } else {
@@ -369,7 +375,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "display");
       advance();
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -386,7 +392,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "write");
       advance();
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -424,7 +430,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "begin");
       advance();
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -436,7 +442,7 @@ grammar {
       advance();
       addChild(nd, parseExpr(100));
       addChild(nd, parseExpr(100));
-      if not checkToken("delimiter.rparen") {
+      if not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
@@ -446,7 +452,7 @@ grammar {
       handled = true;
       setAttr(nd, "form", "cond");
       advance();
-      while checkToken("delimiter.lparen") {
+      while checkToken("op.lparen") {
         advance();
         let branch = createNode("stmt.cond_branch");
         if checkToken("keyword.else") {
@@ -457,10 +463,10 @@ grammar {
           addChild(branch, parseExpr(100));
         }
         // Parse body expressions in this branch
-        while not checkToken("delimiter.rparen") {
+        while not checkToken("op.rparen") {
           addChild(branch, parseExpr(100));
         }
-        requireToken("delimiter.rparen");
+        requireToken("op.rparen");
         addChild(nd, branch);
       }
     }
@@ -469,12 +475,12 @@ grammar {
     if not handled {
       setAttr(nd, "form", "expr_stmt");
       addChild(nd, parseExpr(100));
-      while not checkToken("delimiter.rparen") {
+      while not checkToken("op.rparen") {
         addChild(nd, parseExpr(100));
       }
     }
 
-    expect delimiter.rparen;
+    expect op.rparen;
   }
 
   // --- C++ passthrough: bare identifier at statement position ---
@@ -498,6 +504,12 @@ grammar {
     raw = raw + collectRaw();
     let nd = getResultNode();
     setAttr(nd, "raw_text", raw);
+  }
+  // Semicolon terminator: consumed as no-op after C++ preprocessor lines.
+  // The # handler breaks on delimiter.semicolon without consuming it,
+  // so this rule absorbs the leftover ;
+  rule stmt.empty {
+    expect delimiter.semicolon;
   }
 }
 
@@ -534,6 +546,7 @@ semantics {
     if form == "expr_stmt" { visit children; }
   }
   on stmt.ident_stmt { }
+  on stmt.empty      { }
   on stmt.directive_platform  { }
   on stmt.directive_optimize  { }
   on stmt.directive_subsystem { }
@@ -830,6 +843,9 @@ emitters {
   on stmt.ident_stmt {
     stmt(getAttr(node, "raw_text") + ";");
   }
+
+  // --- Semicolon terminator (no-op) ---
+  on stmt.empty { }
 
   // --- Expression emitters ---
   on expr.string {

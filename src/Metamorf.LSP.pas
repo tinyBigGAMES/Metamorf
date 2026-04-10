@@ -1451,9 +1451,26 @@ begin
   if SameText(LName, ATargetName) then
   begin
     LLocation.Uri := AUri;
-    LLocation.Range := TMorLSPRange.FromSourceRange(ANode.GetRange());
-    SetLength(ALocations, Length(ALocations) + 1);
-    ALocations[High(ALocations)] := LLocation;
+    if not ANode.GetRange().IsEmpty() then
+      LLocation.Range := TMorLSPRange.FromSourceRange(ANode.GetRange())
+    else if ANode.GetToken().Line > 0 then
+    begin
+      LLocation.Range.StartPos.Line := ANode.GetToken().Line - 1;
+      LLocation.Range.StartPos.Character := ANode.GetToken().Col - 1;
+      LLocation.Range.EndPos.Line := LLocation.Range.StartPos.Line;
+      LLocation.Range.EndPos.Character :=
+        LLocation.Range.StartPos.Character + Length(ANode.GetToken().Text);
+    end
+    else
+    begin
+      // No usable position — skip this node entirely
+      LLocation.Uri := '';
+    end;
+    if LLocation.Uri <> '' then
+    begin
+      SetLength(ALocations, Length(ALocations) + 1);
+      ALocations[High(ALocations)] := LLocation;
+    end;
   end;
 
   for LI := 0 to ANode.ChildCount() - 1 do
@@ -1522,6 +1539,9 @@ var
   LPosition: TMorLSPPosition;
   LNode: TMorASTNode;
   LName: string;
+  LI: Integer;
+  LJ: Integer;
+  LDup: Boolean;
 begin
   SetLength(Result, 0);
   LDoc := GetDocument(AUri);
@@ -1538,6 +1558,30 @@ begin
   // Token-based scan for identifiers not represented in the AST
   // (e.g. inside collectUntil regions like stmt.writeln/stmt.write)
   CollectReferencesFromTokens(LDoc, LName, AUri, Result);
+
+  // Deduplicate by start position
+  LI := 0;
+  while LI < Length(Result) do
+  begin
+    LDup := False;
+    for LJ := 0 to LI - 1 do
+    begin
+      if (Result[LI].Range.StartPos.Line = Result[LJ].Range.StartPos.Line) and
+         (Result[LI].Range.StartPos.Character = Result[LJ].Range.StartPos.Character) then
+      begin
+        LDup := True;
+        Break;
+      end;
+    end;
+    if LDup then
+    begin
+      for LJ := LI to High(Result) - 1 do
+        Result[LJ] := Result[LJ + 1];
+      SetLength(Result, Length(Result) - 1);
+    end
+    else
+      Inc(LI);
+  end;
 end;
 
 procedure TMorLSPService.CollectDocSymbolsFromScope(
@@ -1741,6 +1785,8 @@ var
   LLocations: TArray<TMorLSPLocation>;
   LEdit: TMorLSPTextEdit;
   LI: Integer;
+  LJ: Integer;
+  LDup: Boolean;
 begin
   Result.Uri := '';
   SetLength(Result.Edits, 0);
@@ -1759,6 +1805,30 @@ begin
 
   // Token-based scan for identifiers not in the AST
   CollectReferencesFromTokens(LDoc, LName, AUri, LLocations);
+
+  // Deduplicate by start position
+  LI := 0;
+  while LI < Length(LLocations) do
+  begin
+    LDup := False;
+    for LJ := 0 to LI - 1 do
+    begin
+      if (LLocations[LI].Range.StartPos.Line = LLocations[LJ].Range.StartPos.Line) and
+         (LLocations[LI].Range.StartPos.Character = LLocations[LJ].Range.StartPos.Character) then
+      begin
+        LDup := True;
+        Break;
+      end;
+    end;
+    if LDup then
+    begin
+      for LJ := LI to High(LLocations) - 1 do
+        LLocations[LJ] := LLocations[LJ + 1];
+      SetLength(LLocations, Length(LLocations) - 1);
+    end
+    else
+      Inc(LI);
+  end;
 
   Result.Uri := AUri;
   SetLength(Result.Edits, Length(LLocations));

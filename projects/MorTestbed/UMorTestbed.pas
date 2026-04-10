@@ -78,9 +78,7 @@ var
 begin
   try
 
-    //LNum := 8;
-    LNum := 300;
-    //LNum := 100;
+    LNum := 1;
 
     case LNum of
       // Languages
