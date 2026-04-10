@@ -120,11 +120,15 @@ Each release ships the following:
 | `Mor.exe` | CLI compiler. Reads a `.mor` language definition and compiles source files to native binaries. Supports `--bake` for creating standalone compilers. |
 | `MorLSP.exe` | Out-of-process Language Server Protocol (LSP) server. Provides editor integration for any Metamorf-defined language. |
 | `MorTestbed.exe` | Test suite runner. Exercises the full library including API tests and LSP tests. |
+| `Myra.exe` | Baked Myra compiler. Standalone compiler for the Myra showcase language. |
+| `MyraTester.exe` | Myra language test runner. Exercises the Myra test suite. |
 | `Metamorf.dll` | C-callable API. Exposes the entire compilation pipeline for use from any programming language. |
+| `Metamorf.pas` | Delphi/Free Pascal import unit for `Metamorf.dll`. No Metamorf source dependencies. |
 | `src/` | Source checkpoint matching the binaries. Rebuild from here if needed. |
+| `projects/` | Myra language definition, test files, and sub-project sources. |
 | `tests/` | Test `.mor` language definitions and source files including `pascal.mor`, `lua.mor`, and `scheme.mor`. |
-| `docs/` | Reference documentation including the Metamorf Manual. |
-| `bin/res/zig/` | Bundled Zig/Clang toolchain used for native code generation. |
+| `docs/` | Reference documentation including the Metamorf Manual and Myra language reference. |
+| `bin/toolchain/zig/` | Bundled Zig/Clang toolchain used for native code generation. |
 
 ### Getting Source Between Releases
 
@@ -154,7 +158,7 @@ Each release includes the full source alongside the binaries.
 2. Open `projects\Metamorf - Language Engineering Platform.groupproj` in Delphi 12 or higher
 3. Build the project group
 
-The project group contains four sub-projects:
+The project group contains five sub-projects:
 
 | Project | Output | Description |
 |---------|--------|-------------|
@@ -162,6 +166,7 @@ The project group contains four sub-projects:
 | Mor | `Mor.exe` | Command-line compiler |
 | MorLSP | `MorLSP.exe` | Out-of-process LSP server |
 | MorTestbed | `MorTestbed.exe` | Test suite runner |
+| MyraTester | `MyraTester.exe` | Myra language test runner |
 
 > [!IMPORTANT]
 > This repository is under active development. Language surfaces may change without notice. Each release aims to be stable and usable as we work toward v1.0. Follow the repo or join the [Discord](https://discord.gg/Wb6z8Wam7p) to track progress.
