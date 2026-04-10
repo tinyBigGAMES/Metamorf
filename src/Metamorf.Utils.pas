@@ -137,6 +137,17 @@ type
 
   { TMorBaseObject }
   TMorBaseObject = class
+  {$IFDEF MOR_LEAK_TRACK}
+  private class var
+    FLeakInstances: TDictionary<Pointer, string>;
+    FLeakCounter: Int64;
+  public
+    class procedure InitLeakTracking(); static;
+    class procedure FinalizeLeakTracking(); static;
+    class procedure DumpLeaks(); static;
+    class function  LeakLiveCount(): Integer; static;
+    procedure LeakTrackUpdateLabel(const AExtra: string);
+  {$ENDIF}
   public
     constructor Create(); virtual;
     destructor Destroy(); override;
@@ -1932,13 +1943,92 @@ end;
 
 { TMorBaseObject }
 
+{$IFDEF MOR_LEAK_TRACK}
+class procedure TMorBaseObject.InitLeakTracking();
+begin
+  FLeakInstances := TDictionary<Pointer, string>.Create();
+  FLeakCounter := 0;
+end;
+
+class procedure TMorBaseObject.FinalizeLeakTracking();
+begin
+  DumpLeaks();
+  FreeAndNil(FLeakInstances);
+end;
+
+class procedure TMorBaseObject.DumpLeaks();
+var
+  LCounts: TDictionary<string, Integer>;
+  LPair: TPair<Pointer, string>;
+  LCountPair: TPair<string, Integer>;
+  LCount: Integer;
+begin
+  if FLeakInstances = nil then Exit;
+  if FLeakInstances.Count = 0 then
+  begin
+    WriteLn('[LeakTrack] No leaks detected.');
+    Exit;
+  end;
+
+  // Group by class name and count
+  LCounts := TDictionary<string, Integer>.Create();
+  try
+    for LPair in FLeakInstances do
+    begin
+      if LCounts.TryGetValue(LPair.Value, LCount) then
+        LCounts[LPair.Value] := LCount + 1
+      else
+        LCounts.Add(LPair.Value, 1);
+    end;
+
+    WriteLn('[LeakTrack] === LEAKED INSTANCES (' +
+      FLeakInstances.Count.ToString() + ' total) ===');
+    for LCountPair in LCounts do
+      WriteLn('[LeakTrack]   ' + LCountPair.Key + ': ' +
+        LCountPair.Value.ToString());
+    WriteLn('[LeakTrack] =======================================');
+  finally
+    LCounts.Free();
+  end;
+end;
+
+class function TMorBaseObject.LeakLiveCount(): Integer;
+begin
+  if FLeakInstances <> nil then
+    Result := FLeakInstances.Count
+  else
+    Result := 0;
+end;
+
+procedure TMorBaseObject.LeakTrackUpdateLabel(const AExtra: string);
+var
+  LCurrent: string;
+begin
+  if (FLeakInstances <> nil) and
+     FLeakInstances.TryGetValue(Pointer(Self), LCurrent) then
+    FLeakInstances[Pointer(Self)] := LCurrent + ' (' + AExtra + ')';
+end;
+{$ENDIF}
+
 constructor TMorBaseObject.Create();
 begin
   inherited;
+  {$IFDEF MOR_LEAK_TRACK}
+  if FLeakInstances <> nil then
+  begin
+    Inc(FLeakCounter);
+    FLeakInstances.AddOrSetValue(Pointer(Self), ClassName +
+      ' #' + FLeakCounter.ToString());
+  end;
+  {$ENDIF}
 end;
 
 destructor TMorBaseObject.Destroy();
 begin
+  {$IFDEF MOR_LEAK_TRACK}
+  if FLeakInstances <> nil then
+    FLeakInstances.Remove(Pointer(Self));
+  {$ENDIF}
   inherited;
 end;
 
@@ -2477,10 +2567,16 @@ procedure Startup();
 begin
   ReportMemoryLeaksOnShutdown := True;
   TMorUtils.InitConsole();
+  {$IFDEF MOR_LEAK_TRACK}
+  TMorBaseObject.InitLeakTracking();
+  {$ENDIF}
 end;
 
 procedure Shutdown();
 begin
+  {$IFDEF MOR_LEAK_TRACK}
+  TMorBaseObject.FinalizeLeakTracking();
+  {$ENDIF}
 end;
 
 initialization

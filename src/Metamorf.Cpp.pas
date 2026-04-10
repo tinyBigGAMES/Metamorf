@@ -374,6 +374,7 @@ begin
         LName := LName + '::' + AInterp.ParserCurrentText();
         AInterp.ParserAdvance();
       end;
+      ALeft.Free();
       LNode := TMorASTNode.Create();
       LNode.SetKind('expr.cpp_qualified');
       LNode.SetAttr('qualified.name', LName);

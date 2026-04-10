@@ -226,6 +226,9 @@ end;
 procedure TMorASTNode.SetKind(const AKind: string);
 begin
   FKind := AKind;
+  {$IFDEF MOR_LEAK_TRACK}
+  LeakTrackUpdateLabel('kind=' + AKind);
+  {$ENDIF}
 end;
 
 function TMorASTNode.GetToken(): TMorToken;
@@ -236,6 +239,10 @@ end;
 procedure TMorASTNode.SetToken(const AToken: TMorToken);
 begin
   FToken := AToken;
+  {$IFDEF MOR_LEAK_TRACK}
+  LeakTrackUpdateLabel('token=' + AToken.Text + ' @' +
+    AToken.Filename + ':' + AToken.Line.ToString());
+  {$ENDIF}
 end;
 
 function TMorASTNode.GetAttr(const AKey: string): string;
@@ -267,6 +274,10 @@ end;
 procedure TMorASTNode.AddChild(const AChild: TMorASTNode);
 begin
   FChildren.Add(AChild);
+  {$IFDEF MOR_LEAK_TRACK}
+  if Assigned(AChild) then
+    AChild.LeakTrackUpdateLabel('parented');
+  {$ENDIF}
 end;
 
 function TMorASTNode.GetNamedChild(const AName: string): TMorASTNode;
