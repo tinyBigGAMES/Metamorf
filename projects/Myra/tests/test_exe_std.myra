@@ -37,7 +37,7 @@ module exe test_exe_std;
 
 import
   Maths,
-  Strings,
+  StrUtils,
   Console,
   Convert,
   Paths,
@@ -59,9 +59,9 @@ begin
 
   //TEST 02 - Strings
   writeln("=== TEST 02 - Strings ===");
-  writeln("UpperCase(\"hello\") = {}", Strings.UpperCase("hello"));
-  writeln("Trim(\"  x  \") = {}", Strings.Trim("  x  "));
-  writeln("Length(\"test\") = {}", Strings.Length("test"));
+  writeln("UpperCase(\"hello\") = {}", StrUtils.UpperCase("hello"));
+  writeln("Trim(\"  x  \") = {}", StrUtils.Trim("  x  "));
+  writeln("Length(\"test\") = {}", StrUtils.Length("test"));
 
   //TEST 03 - Console
   writeln("=== TEST 03 - Console ===");

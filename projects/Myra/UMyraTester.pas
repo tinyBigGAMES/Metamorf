@@ -75,7 +75,7 @@ begin
 
   // --- Modules/imports ---
   ATester.RegisterTest(0300, 'test_exe_import', rmExecute);
-  //ATester.RegisterTest(0301, 'test_exe_std', rmExecute);
+  ATester.RegisterTest(0301, 'test_exe_std', rmExecute);
 
   // --- DLL/Lib consumers (depend on earlier builds) ---
   ATester.RegisterTests(0350, 'test_exe_usedll',
@@ -239,7 +239,8 @@ begin
       {$IFDEF RELEASE}
       ProcessCmdLine(LTester);
       {$ELSE}
-      LTester.RunTestByIndex(351, tpLinux64);
+      LTester.RunTestByIndex(301, tpWin64);
+      //LTester.RunTestByIndex(400, tpWin64);
       {$ENDIF}
     finally
       LTester.Free();

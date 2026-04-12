@@ -135,6 +135,10 @@ index = 300
 name = "test_exe_import"
 
 [[test]]
+index = 301
+name = "test_exe_std"
+
+[[test]]
 index = 350
 name = "test_exe_usedll"
 deps = [
