@@ -2008,6 +2008,7 @@ var
   LDepth: Int64;
   LRawAccum: string;
   LSym: TSymbol;
+  LTok: TMorToken;
 begin
   // Common functions
 
@@ -2292,8 +2293,18 @@ begin
   else if AName = 'error' then
   begin
     if Assigned(FErrors) and (Length(AArgs) > 0) then
-      FErrors.Add(esError, MOR_ERR_MORINTERP_UNKNOWN_NODE,
-        MorToString(AArgs[0]));
+    begin
+      if Assigned(FActiveParser) then
+      begin
+        LTok := ParserCurrentToken();
+        FErrors.Add(LTok.Filename, LTok.Line, LTok.Col,
+          esError, MOR_ERR_MORINTERP_UNKNOWN_NODE,
+          MorToString(AArgs[0]));
+      end
+      else
+        FErrors.Add(esError, MOR_ERR_MORINTERP_UNKNOWN_NODE,
+          MorToString(AArgs[0]));
+    end;
     Result := TValue.Empty;
   end
 
@@ -2301,8 +2312,18 @@ begin
   else if AName = 'warning' then
   begin
     if Assigned(FErrors) and (Length(AArgs) > 0) then
-      FErrors.Add(esWarning, MOR_ERR_MORINTERP_UNKNOWN_NODE,
-        MorToString(AArgs[0]));
+    begin
+      if Assigned(FActiveParser) then
+      begin
+        LTok := ParserCurrentToken();
+        FErrors.Add(LTok.Filename, LTok.Line, LTok.Col,
+          esWarning, MOR_ERR_MORINTERP_UNKNOWN_NODE,
+          MorToString(AArgs[0]));
+      end
+      else
+        FErrors.Add(esWarning, MOR_ERR_MORINTERP_UNKNOWN_NODE,
+          MorToString(AArgs[0]));
+    end;
     Result := TValue.Empty;
   end
 

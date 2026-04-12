@@ -137,12 +137,14 @@ function CollectRaw(const AInterp: TMorInterpreter;
   const AStmtMode: Boolean): string;
 var
   LDepth: Integer;
+  LAngleDepth: Integer;
   LKind: string;
   LText: string;
   LNeedSpace: Boolean;
 begin
   Result := '';
   LDepth := 0;
+  LAngleDepth := 0;
   LNeedSpace := False;
 
   while not AInterp.ParserAtEnd() do
@@ -152,6 +154,12 @@ begin
 
     if LKind = 'eof' then
       Break;
+
+    // Track angle bracket depth for C++ templates
+    if (LKind = 'op.lt') then
+      Inc(LAngleDepth)
+    else if (LKind = 'op.gt') and (LAngleDepth > 0) then
+      Dec(LAngleDepth);
 
     // Track depth for braces, parens, brackets
     if (LKind = 'delimiter.lbrace') or
@@ -175,8 +183,9 @@ begin
       end;
     end;
 
-    // Statement mode: stop at ; when depth <= 0
-    if AStmtMode and (LKind = 'delimiter.semicolon') and (LDepth <= 0) then
+    // Statement mode: stop at ; when depth <= 0 and not inside angle brackets
+    if AStmtMode and (LKind = 'delimiter.semicolon') and
+       (LDepth <= 0) and (LAngleDepth <= 0) then
     begin
       if LNeedSpace then Result := Result + ' ';
       Result := Result + LText;
@@ -184,9 +193,8 @@ begin
       Break;
     end;
 
-    // Expression mode: stop at boundaries when depth <= 0
     // Expression mode: stop at boundaries
-    if not AStmtMode then
+    if not AStmtMode and (LAngleDepth <= 0) then
     begin
       // Comma and semicolon stop at depth <= 0
       if (LDepth <= 0) and
@@ -355,6 +363,7 @@ begin
     var
       LNode: TMorASTNode;
       LName: string;
+      LAngleDepth: Integer;
     begin
       AInterp.ParserAdvance(); // skip ::
       // Build qualified name: left::right
@@ -373,6 +382,34 @@ begin
         AInterp.ParserAdvance();
         LName := LName + '::' + AInterp.ParserCurrentText();
         AInterp.ParserAdvance();
+      end;
+      // Collect template arguments: <...>
+      if AInterp.ParserCurrentKind() = 'op.lt' then
+      begin
+        LName := LName + '<';
+        AInterp.ParserAdvance();
+        LAngleDepth := 1;
+        while (LAngleDepth > 0) and (AInterp.ParserCurrentKind() <> 'eof') do
+        begin
+          if AInterp.ParserCurrentKind() = 'op.gt' then
+          begin
+            Dec(LAngleDepth);
+            if LAngleDepth > 0 then
+            begin
+              LName := LName + '>';
+              AInterp.ParserAdvance();
+            end;
+          end
+          else
+          begin
+            if AInterp.ParserCurrentKind() = 'op.lt' then
+              Inc(LAngleDepth);
+            LName := LName + AInterp.ParserCurrentText();
+            AInterp.ParserAdvance();
+          end;
+        end;
+        LName := LName + '>';
+        AInterp.ParserAdvance(); // consume final >
       end;
       ALeft.Free();
       LNode := TMorASTNode.Create();
@@ -400,6 +437,40 @@ begin
     end;
   AInterp.RegisterNativeInfix('cpp.op.arrow', LNativeInfix);
 
+  // Infix << (C++ stream insertion / left shift) at power 20
+  LNativeInfix.Power := 20;
+  LNativeInfix.Assoc := 'left';
+  LNativeInfix.Handler :=
+    function(const ALeft: TMorASTNode): TMorASTNode
+    var
+      LNode: TMorASTNode;
+    begin
+      AInterp.ParserAdvance(); // skip <<
+      LNode := TMorASTNode.Create();
+      LNode.SetKind('expr.shl');
+      LNode.AddChild(ALeft);
+      LNode.AddChild(AInterp.ParserParseExpr(20));
+      Result := LNode;
+    end;
+  AInterp.RegisterNativeInfix('cpp.op.shl', LNativeInfix);
+
+  // Infix >> (C++ right shift) at power 20
+  LNativeInfix.Power := 20;
+  LNativeInfix.Assoc := 'left';
+  LNativeInfix.Handler :=
+    function(const ALeft: TMorASTNode): TMorASTNode
+    var
+      LNode: TMorASTNode;
+    begin
+      AInterp.ParserAdvance(); // skip >>
+      LNode := TMorASTNode.Create();
+      LNode.SetKind('expr.shr');
+      LNode.AddChild(ALeft);
+      LNode.AddChild(AInterp.ParserParseExpr(20));
+      Result := LNode;
+    end;
+  AInterp.RegisterNativeInfix('cpp.op.shr', LNativeInfix);
+
   // Statement # (preprocessor)
   AInterp.RegisterNativeStmt('cpp.op.hash',
     function: TMorASTNode
@@ -412,12 +483,19 @@ begin
       AInterp.ParserAdvance(); // skip #
       LRaw := '#';
       LInAngle := False;
-      // Collect tokens until we leave C++ land (Myra keyword, directive, or terminator)
+      // Always consume the directive name (ifdef, else, endif, include, etc.)
+      if not AInterp.ParserAtEnd() then
+      begin
+        LRaw := LRaw + AInterp.ParserCurrentText();
+        AInterp.ParserAdvance();
+      end;
+      // Collect remaining tokens until boundary
       while not AInterp.ParserAtEnd() do
       begin
         LKind := AInterp.ParserCurrentKind();
         if LKind.StartsWith('keyword.') or
            LKind.StartsWith('directive.') or
+           LKind.StartsWith('cpp.keyword.') or
            (LKind = 'cpp.op.hash') or
            (LKind = 'delimiter.semicolon') or
            (LKind = 'eof') then
@@ -443,6 +521,24 @@ begin
       LNode.SetAttr('cpp.raw', LRaw.Trim());
       Result := LNode;
     end);
+
+  // C++ keyword statement passthrough (constexpr, static, auto, etc.)
+  for LI := Low(CppKW) to High(CppKW) do
+  begin
+    AInterp.RegisterNativeStmt('cpp.keyword.' + CppKW[LI],
+      function: TMorASTNode
+      var
+        LNode: TMorASTNode;
+        LKwText: string;
+      begin
+        LKwText := AInterp.ParserCurrentText();
+        AInterp.ParserAdvance();
+        LNode := TMorASTNode.Create();
+        LNode.SetKind('stmt.cpp_raw');
+        LNode.SetAttr('cpp.raw', LKwText + ' ' + CollectRaw(AInterp, True));
+        Result := LNode;
+      end);
+  end;
 end;
 
 procedure ConfigCppCodeGen(const AInterp: TMorInterpreter);
