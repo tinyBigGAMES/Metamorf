@@ -18,19 +18,26 @@
 //  Test source files: projects/Myra/tests/*.myra
 // ===========================================================================
 
+// language declaration
 language Myra version "1.0";
 
+// language options
 const {
   ENABLE_OVERLOADS = true;
   ENABLE_FORWARD_REFS = true;
 }
 
+// defines
 setDefine("MYRA");
 
+// std
 addModulePath("../myra/std");
-addModulePath("../myra/vendor/raylib");
-addModulePath("../myra/vendor/sdl3");
 
+// raylib
+addModulePath("../myra/vendor/raylib");
+addIncludePath("../myra/vendor/raylib/include");
+
+// language implementation
 import "myra_tokens.mor";
 import "myra_helpers.mor";
 import "myra_grammar.mor";

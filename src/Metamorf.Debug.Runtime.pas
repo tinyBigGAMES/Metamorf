@@ -968,7 +968,7 @@ begin
       else
       begin
         // Absolute address (global/static)
-        LRegBase := 0;
+        //LRegBase := 0;
         LAddress := LVar.Address;
       end;
 

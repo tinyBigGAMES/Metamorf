@@ -239,8 +239,9 @@ begin
       {$IFDEF RELEASE}
       ProcessCmdLine(LTester);
       {$ELSE}
-      LTester.RunTestByIndex(301, tpWin64);
-      //LTester.RunTestByIndex(400, tpWin64);
+      //LTester.RunTestByIndex(301, tpLinux64);
+      LTester.RunTestByIndex(450, tpLinux64);
+      //LTester.RunTestByIndex(451, tpwin64);
       {$ENDIF}
     finally
       LTester.Free();

@@ -813,7 +813,7 @@ begin
           LRunMode := LEntry.RunMode;
           LDefine  := LEntry.DefineName;
           LDefVal  := LEntry.DefineValue;
-          LFound   := True;
+          //LFound   := True;
           Break;
         end;
       end;
