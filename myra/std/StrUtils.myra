@@ -1,0 +1,458 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib StrUtils;
+
+#include <string>
+#include <algorithm>
+#include <cctype>
+
+//-----------------------------------------------------------------------------
+// Case Conversion
+//-----------------------------------------------------------------------------
+
+exported routine UpperCase(const AValue: string): string;
+var
+  LResult: std::string;
+  LI: size_t;
+begin
+  LResult := AValue;
+  LI := 0;
+  while LI < LResult.size() do
+    LResult[LI] := char(std::toupper(int32_t(LResult[LI])));
+    LI := LI + 1;
+  end;
+  return LResult;
+end;
+
+exported routine LowerCase(const AValue: string): string;
+var
+  LResult: std::string;
+  LI: size_t;
+begin
+  LResult := AValue;
+  LI := 0;
+  while LI < LResult.size() do
+    LResult[LI] := char(std::tolower(int32_t(LResult[LI])));
+    LI := LI + 1;
+  end;
+  return LResult;
+end;
+
+exported routine UpCase(const AValue: char): char;
+begin
+  return char(std::toupper(int32_t(AValue)));
+end;
+
+exported routine LowCase(const AValue: char): char;
+begin
+  return char(std::tolower(int32_t(AValue)));
+end;
+
+//-----------------------------------------------------------------------------
+// Trimming
+//-----------------------------------------------------------------------------
+
+exported routine TrimLeft(const AValue: string): string;
+var
+  LResult: std::string;
+  LPos: size_t;
+begin
+  LResult := AValue;
+  LPos := LResult.find_first_not_of(" \t\n\r\f\v");
+  if LPos = std::string::npos then
+    LResult.clear();
+  else
+    if LPos > 0 then
+      LResult := LResult.substr(LPos);
+    end;
+  end;
+  return LResult;
+end;
+
+exported routine TrimRight(const AValue: string): string;
+var
+  LResult: std::string;
+  LPos: size_t;
+begin
+  LResult := AValue;
+  LPos := LResult.find_last_not_of(" \t\n\r\f\v");
+  if LPos = std::string::npos then
+    LResult.clear();
+  else
+    LResult := LResult.substr(0, LPos + 1);
+  end;
+  return LResult;
+end;
+
+exported routine Trim(const AValue: string): string;
+begin
+  return TrimRight(TrimLeft(AValue));
+end;
+
+//-----------------------------------------------------------------------------
+// Searching
+//-----------------------------------------------------------------------------
+
+// Find position of substring (1-based, 0 if not found)
+exported routine Pos(const ASubStr: string; const AStr: string): int32;
+var
+  LPos: int32;
+  LF: size_t;
+begin
+  LPos := 0;
+  if not ASubStr.empty() then
+    LF := AStr.find(ASubStr);
+    if LF <> std::string::npos then
+      LPos := int32(LF) + 1;
+    end;
+  end;
+  return LPos;
+end;
+
+// Find position starting from offset (1-based index and result)
+exported routine PosEx(const ASubStr: string; const AStr: string; const AOffset: int32): int32;
+var
+  LPos: int32;
+  LF: size_t;
+begin
+  LPos := 0;
+  if (not ASubStr.empty()) and (AOffset >= 1) then
+    LF := AStr.find(ASubStr, size_t(AOffset - 1));
+    if LF <> std::string::npos then
+      LPos := int32(LF) + 1;
+    end;
+  end;
+  return LPos;
+end;
+
+exported routine ContainsStr(const AText: string; const ASubText: string): boolean;
+begin
+  return AText.find(ASubText) <> std::string::npos;
+end;
+
+exported routine ContainsText(const AText: string; const ASubText: string): boolean;
+begin
+  return ContainsStr(LowerCase(AText), LowerCase(ASubText));
+end;
+
+exported routine StartsStr(const ASubText: string; const AText: string): boolean;
+begin
+  if ASubText.empty() then
+    return true;
+  end;
+  if ASubText.size() > AText.size() then
+    return false;
+  end;
+  return AText.compare(0, ASubText.size(), ASubText) = 0;
+end;
+
+exported routine EndsStr(const ASubText: string; const AText: string): boolean;
+begin
+  if ASubText.empty() then
+    return true;
+  end;
+  if ASubText.size() > AText.size() then
+    return false;
+  end;
+  return AText.compare(AText.size() - ASubText.size(), ASubText.size(), ASubText) = 0;
+end;
+
+exported routine StartsText(const ASubText: string; const AText: string): boolean;
+begin
+  return StartsStr(LowerCase(ASubText), LowerCase(AText));
+end;
+
+exported routine EndsText(const ASubText: string; const AText: string): boolean;
+begin
+  return EndsStr(LowerCase(ASubText), LowerCase(AText));
+end;
+
+//-----------------------------------------------------------------------------
+// Substring Extraction
+//-----------------------------------------------------------------------------
+
+// Get leftmost N characters
+exported routine LeftStr(const AText: string; const ACount: int32): string;
+begin
+  if ACount <= 0 then
+    return "";
+  end;
+  if size_t(ACount) >= AText.size() then
+    return AText;
+  end;
+  return AText.substr(0, size_t(ACount));
+end;
+
+// Get rightmost N characters
+exported routine RightStr(const AText: string; const ACount: int32): string;
+begin
+  if ACount <= 0 then
+    return "";
+  end;
+  if size_t(ACount) >= AText.size() then
+    return AText;
+  end;
+  return AText.substr(AText.size() - size_t(ACount));
+end;
+
+// Get substring from position (1-based) with count
+exported routine MidStr(const AText: string; const AStart: int32; const ACount: int32): string;
+var
+  LOff: size_t;
+begin
+  if (AStart < 1) or (ACount <= 0) then
+    return "";
+  end;
+  LOff := size_t(AStart - 1);
+  if LOff >= AText.size() then
+    return "";
+  end;
+  return AText.substr(LOff, size_t(ACount));
+end;
+
+// Copy substring (1-based index, count) - Delphi compatible
+exported routine Copy(const AText: string; const AIndex: int32; const ACount: int32): string;
+begin
+  return MidStr(AText, AIndex, ACount);
+end;
+
+//-----------------------------------------------------------------------------
+// String Building
+//-----------------------------------------------------------------------------
+
+exported routine StringOfChar(const AChar: char; const ACount: int32): string;
+var
+  LResult: std::string;
+begin
+  if ACount > 0 then
+    LResult.assign(size_t(ACount), AChar);
+  end;
+  return LResult;
+end;
+
+exported routine DupeString(const AText: string; const ACount: int32): string;
+var
+  LResult: std::string;
+  LI: int32;
+begin
+  if ACount > 0 then
+    LResult.reserve(AText.size() * size_t(ACount));
+    for LI := 1 to ACount do
+      LResult.append(AText);
+    end;
+  end;
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Comparison
+//-----------------------------------------------------------------------------
+
+exported routine CompareStr(const AStr1: string; const AStr2: string): int32;
+var
+  LC: int32;
+begin
+  LC := AStr1.compare(AStr2);
+  if LC < 0 then
+    return -1;
+  else
+    if LC > 0 then
+      return 1;
+    else
+      return 0;
+    end;
+  end;
+end;
+
+exported routine CompareText(const AStr1: string; const AStr2: string): int32;
+begin
+  return CompareStr(LowerCase(AStr1), LowerCase(AStr2));
+end;
+
+exported routine SameStr(const AStr1: string; const AStr2: string): boolean;
+begin
+  return AStr1 = AStr2;
+end;
+
+exported routine SameText(const AStr1: string; const AStr2: string): boolean;
+begin
+  return LowerCase(AStr1) = LowerCase(AStr2);
+end;
+
+//-----------------------------------------------------------------------------
+// Replace
+//-----------------------------------------------------------------------------
+
+// Replace all occurrences
+exported routine StringReplace(const AText: string; const AOldPattern: string; const ANewPattern: string): string;
+var
+  LResult: std::string;
+  LPos: size_t;
+begin
+  LResult := AText;
+  if not AOldPattern.empty() then
+    LPos := LResult.find(AOldPattern);
+    while LPos <> std::string::npos do
+      LResult.replace(LPos, AOldPattern.size(), ANewPattern);
+      LPos := LResult.find(AOldPattern, LPos + ANewPattern.size());
+    end;
+  end;
+  return LResult;
+end;
+
+// Replace only first occurrence
+exported routine StringReplaceFirst(const AText: string; const AOldPattern: string; const ANewPattern: string): string;
+var
+  LResult: std::string;
+  LPos: size_t;
+begin
+  LResult := AText;
+  if not AOldPattern.empty() then
+    LPos := LResult.find(AOldPattern);
+    if LPos <> std::string::npos then
+      LResult.replace(LPos, AOldPattern.size(), ANewPattern);
+    end;
+  end;
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Miscellaneous
+//-----------------------------------------------------------------------------
+
+exported routine ReverseString(const AText: string): string;
+var
+  LResult: std::string;
+begin
+  LResult := AText;
+  std::reverse(LResult.begin(), LResult.end());
+  return LResult;
+end;
+
+exported routine PadLeft(const AText: string; const AWidth: int32): string;
+var
+  LPadding: int32;
+begin
+  LPadding := AWidth - int32(AText.size());
+  if LPadding > 0 then
+    return StringOfChar(' ', LPadding) + AText;
+  else
+    return AText;
+  end;
+end;
+
+exported routine PadLeft(const AText: string; const AWidth: int32; const APadChar: char): string;
+var
+  LPadding: int32;
+begin
+  LPadding := AWidth - int32(AText.size());
+  if LPadding > 0 then
+    return StringOfChar(APadChar, LPadding) + AText;
+  else
+    return AText;
+  end;
+end;
+
+exported routine PadRight(const AText: string; const AWidth: int32): string;
+var
+  LPadding: int32;
+begin
+  LPadding := AWidth - int32(AText.size());
+  if LPadding > 0 then
+    return AText + StringOfChar(' ', LPadding);
+  else
+    return AText;
+  end;
+end;
+
+exported routine PadRight(const AText: string; const AWidth: int32; const APadChar: char): string;
+var
+  LPadding: int32;
+begin
+  LPadding := AWidth - int32(AText.size());
+  if LPadding > 0 then
+    return AText + StringOfChar(APadChar, LPadding);
+  else
+    return AText;
+  end;
+end;
+
+exported routine PadCenter(const AText: string; const AWidth: int32): string;
+var
+  LPadding: int32;
+  LLeft: int32;
+  LRight: int32;
+begin
+  LPadding := AWidth - int32(AText.size());
+  if LPadding > 0 then
+    LLeft  := LPadding div 2;
+    LRight := LPadding - LLeft;
+    return StringOfChar(' ', LLeft) + AText + StringOfChar(' ', LRight);
+  else
+    return AText;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Character Classification
+//-----------------------------------------------------------------------------
+
+exported routine IsDigit(const AChar: char): boolean;
+begin
+  return std::isdigit(int32_t(AChar)) <> 0;
+end;
+
+exported routine IsAlpha(const AChar: char): boolean;
+begin
+  return std::isalpha(int32_t(AChar)) <> 0;
+end;
+
+exported routine IsAlphaNumeric(const AChar: char): boolean;
+begin
+  return std::isalnum(int32_t(AChar)) <> 0;
+end;
+
+exported routine IsSpace(const AChar: char): boolean;
+begin
+  return std::isspace(int32_t(AChar)) <> 0;
+end;
+
+exported routine IsUpper(const AChar: char): boolean;
+begin
+  return std::isupper(int32_t(AChar)) <> 0;
+end;
+
+exported routine IsLower(const AChar: char): boolean;
+begin
+  return std::islower(int32_t(AChar)) <> 0;
+end;
+
+//-----------------------------------------------------------------------------
+// String Queries
+//-----------------------------------------------------------------------------
+
+exported routine IsEmpty(const AText: string): boolean;
+begin
+  return AText.empty();
+end;
+
+exported routine IsBlank(const AText: string): boolean;
+begin
+  return Trim(AText).empty();
+end;
+
+exported routine Length(const AText: string): int32;
+begin
+  return int32(AText.size());
+end;
+
+end.

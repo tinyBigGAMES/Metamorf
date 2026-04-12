@@ -1,0 +1,494 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Maths;
+
+#include <cmath>
+#include <limits>
+#include <random>
+#include <algorithm>
+
+// Module-level RNG state
+var
+  myra_maths_rng: std::mt19937_64;
+  myra_maths_rng_seeded: boolean = false;
+
+//-----------------------------------------------------------------------------
+// Constants
+//-----------------------------------------------------------------------------
+
+exported const
+  PI: float64 = 3.14159265358979323846;
+  E: float64 = 2.71828182845904523536;
+  TAU: float64 = 6.28318530717958647692;
+
+  MaxInt32: int32 = 2147483647;
+  MinInt32: int32 = -2147483648;
+  MaxInt64: int64 = 9223372036854775807;
+  MinInt64: int64 = -9223372036854775807 - 1;
+
+//-----------------------------------------------------------------------------
+// Absolute Value
+//-----------------------------------------------------------------------------
+
+exported routine Abs(const AValue: int32): int32;
+begin
+  return std::abs(AValue);
+end;
+
+exported routine Abs(const AValue: int64): int64;
+begin
+  return std::abs(AValue);
+end;
+
+exported routine Abs(const AValue: float64): float64;
+begin
+  return std::fabs(AValue);
+end;
+
+//-----------------------------------------------------------------------------
+// Basic Arithmetic
+//-----------------------------------------------------------------------------
+
+exported routine Sqr(const AValue: float64): float64;
+begin
+  return AValue * AValue;
+end;
+
+exported routine Sqr(const AValue: int64): int64;
+begin
+  return AValue * AValue;
+end;
+
+exported routine Sqrt(const AValue: float64): float64;
+begin
+  return std::sqrt(AValue);
+end;
+
+exported routine Cbrt(const AValue: float64): float64;
+begin
+  return std::cbrt(AValue);
+end;
+
+exported routine Hypot(const AX: float64; const AY: float64): float64;
+begin
+  return std::hypot(AX, AY);
+end;
+
+//-----------------------------------------------------------------------------
+// Trigonometric Functions
+//-----------------------------------------------------------------------------
+
+exported routine Sin(const AValue: float64): float64;
+begin
+  return std::sin(AValue);
+end;
+
+exported routine Cos(const AValue: float64): float64;
+begin
+  return std::cos(AValue);
+end;
+
+exported routine Tan(const AValue: float64): float64;
+begin
+  return std::tan(AValue);
+end;
+
+exported routine ArcSin(const AValue: float64): float64;
+begin
+  return std::asin(AValue);
+end;
+
+exported routine ArcCos(const AValue: float64): float64;
+begin
+  return std::acos(AValue);
+end;
+
+exported routine ArcTan(const AValue: float64): float64;
+begin
+  return std::atan(AValue);
+end;
+
+exported routine ArcTan2(const AY: float64; const AX: float64): float64;
+begin
+  return std::atan2(AY, AX);
+end;
+
+//-----------------------------------------------------------------------------
+// Hyperbolic Functions
+//-----------------------------------------------------------------------------
+
+exported routine Sinh(const AValue: float64): float64;
+begin
+  return std::sinh(AValue);
+end;
+
+exported routine Cosh(const AValue: float64): float64;
+begin
+  return std::cosh(AValue);
+end;
+
+exported routine Tanh(const AValue: float64): float64;
+begin
+  return std::tanh(AValue);
+end;
+
+exported routine ArcSinh(const AValue: float64): float64;
+begin
+  return std::asinh(AValue);
+end;
+
+exported routine ArcCosh(const AValue: float64): float64;
+begin
+  return std::acosh(AValue);
+end;
+
+exported routine ArcTanh(const AValue: float64): float64;
+begin
+  return std::atanh(AValue);
+end;
+
+//-----------------------------------------------------------------------------
+// Logarithmic and Exponential
+//-----------------------------------------------------------------------------
+
+exported routine Ln(const AValue: float64): float64;
+begin
+  return std::log(AValue);
+end;
+
+exported routine Log10(const AValue: float64): float64;
+begin
+  return std::log10(AValue);
+end;
+
+exported routine Log2(const AValue: float64): float64;
+begin
+  return std::log2(AValue);
+end;
+
+exported routine LogN(const ABase: float64; const AValue: float64): float64;
+begin
+  return std::log(AValue) / std::log(ABase);
+end;
+
+exported routine Exp(const AValue: float64): float64;
+begin
+  return std::exp(AValue);
+end;
+
+exported routine Exp2(const AValue: float64): float64;
+begin
+  return std::exp2(AValue);
+end;
+
+exported routine Power(const ABase: float64; const AExponent: float64): float64;
+begin
+  return std::pow(ABase, AExponent);
+end;
+
+//-----------------------------------------------------------------------------
+// Rounding Functions
+//-----------------------------------------------------------------------------
+
+exported routine Trunc(const AValue: float64): int64;
+begin
+  return static_cast<int64_t>(std::trunc(AValue));
+end;
+
+exported routine Round(const AValue: float64): int64;
+begin
+  return static_cast<int64_t>(std::round(AValue));
+end;
+
+exported routine Ceil(const AValue: float64): int64;
+begin
+  return static_cast<int64_t>(std::ceil(AValue));
+end;
+
+exported routine Floor(const AValue: float64): int64;
+begin
+  return static_cast<int64_t>(std::floor(AValue));
+end;
+
+exported routine Int(const AValue: float64): float64;
+begin
+  return std::trunc(AValue);
+end;
+
+exported routine Frac(const AValue: float64): float64;
+begin
+  return AValue - std::trunc(AValue);
+end;
+
+exported routine FMod(const AX: float64; const AY: float64): float64;
+begin
+  return std::fmod(AX, AY);
+end;
+
+exported routine Remainder(const AX: float64; const AY: float64): float64;
+begin
+  return std::remainder(AX, AY);
+end;
+
+//-----------------------------------------------------------------------------
+// Min/Max
+//-----------------------------------------------------------------------------
+
+exported routine Min(const A: int32; const B: int32): int32;
+begin
+  return std::min(A, B);
+end;
+
+exported routine Min(const A: int64; const B: int64): int64;
+begin
+  return std::min(A, B);
+end;
+
+exported routine Min(const A: float64; const B: float64): float64;
+begin
+  return std::fmin(A, B);
+end;
+
+exported routine Max(const A: int32; const B: int32): int32;
+begin
+  return std::max(A, B);
+end;
+
+exported routine Max(const A: int64; const B: int64): int64;
+begin
+  return std::max(A, B);
+end;
+
+exported routine Max(const A: float64; const B: float64): float64;
+begin
+  return std::fmax(A, B);
+end;
+
+//-----------------------------------------------------------------------------
+// Sign
+//-----------------------------------------------------------------------------
+
+exported routine Sign(const AValue: int32): int32;
+begin
+  if AValue < 0 then
+    return -1;
+  else
+    if AValue > 0 then
+      return 1;
+    else
+      return 0;
+    end;
+  end;
+end;
+
+exported routine Sign(const AValue: int64): int32;
+begin
+  if AValue < 0 then
+    return -1;
+  else
+    if AValue > 0 then
+      return 1;
+    else
+      return 0;
+    end;
+  end;
+end;
+
+exported routine Sign(const AValue: float64): int32;
+begin
+  if AValue < 0.0 then
+    return -1;
+  else
+    if AValue > 0.0 then
+      return 1;
+    else
+      return 0;
+    end;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Clamping
+//-----------------------------------------------------------------------------
+
+exported routine Clamp(const AValue: int32; const AMin: int32; const AMax: int32): int32;
+begin
+  return std::clamp(AValue, AMin, AMax);
+end;
+
+exported routine Clamp(const AValue: int64; const AMin: int64; const AMax: int64): int64;
+begin
+  return std::clamp(AValue, AMin, AMax);
+end;
+
+exported routine Clamp(const AValue: float64; const AMin: float64; const AMax: float64): float64;
+begin
+  return std::clamp(AValue, AMin, AMax);
+end;
+
+//-----------------------------------------------------------------------------
+// Linear Interpolation
+//-----------------------------------------------------------------------------
+
+exported routine Lerp(const A: float64; const B: float64; const T: float64): float64;
+begin
+  return std::lerp(A, B, T);
+end;
+
+//-----------------------------------------------------------------------------
+// Degrees/Radians Conversion
+//-----------------------------------------------------------------------------
+
+exported routine DegToRad(const ADegrees: float64): float64;
+begin
+  return ADegrees * PI / 180.0;
+end;
+
+exported routine RadToDeg(const ARadians: float64): float64;
+begin
+  return ARadians * 180.0 / PI;
+end;
+
+//-----------------------------------------------------------------------------
+// Random Numbers
+//-----------------------------------------------------------------------------
+
+exported routine Randomize();
+var
+  LRd: std::random_device;
+begin
+  myra_maths_rng.seed(LRd());
+  myra_maths_rng_seeded := true;
+end;
+
+exported routine RandomF(): float64;
+var
+  LRd: std::random_device;
+  LDist: std::uniform_real_distribution<double>;
+  LVal: float64;
+begin
+  if not myra_maths_rng_seeded then
+    myra_maths_rng.seed(LRd());
+    myra_maths_rng_seeded := true;
+  end;
+  LDist := std::uniform_real_distribution<double>(0.0, 1.0);
+  LVal := LDist(myra_maths_rng);
+  return LVal;
+end;
+
+exported routine Random(const ARange: int32): int32;
+var
+  LRd: std::random_device;
+  LDist: std::uniform_int_distribution<int32_t>;
+  LVal: int32;
+begin
+  if not myra_maths_rng_seeded then
+    myra_maths_rng.seed(LRd());
+    myra_maths_rng_seeded := true;
+  end;
+  if ARange > 0 then
+    LDist := std::uniform_int_distribution<int32_t>(0, ARange - 1);
+    LVal := LDist(myra_maths_rng);
+  else
+    LVal := 0;
+  end;
+  return LVal;
+end;
+
+exported routine RandomRange(const AMin: int32; const AMax: int32): int32;
+var
+  LRd: std::random_device;
+  LDist: std::uniform_int_distribution<int32_t>;
+  LVal: int32;
+begin
+  if not myra_maths_rng_seeded then
+    myra_maths_rng.seed(LRd());
+    myra_maths_rng_seeded := true;
+  end;
+  LDist := std::uniform_int_distribution<int32_t>(AMin, AMax);
+  LVal := LDist(myra_maths_rng);
+  return LVal;
+end;
+
+exported routine RandomRangeF(const AMin: float64; const AMax: float64): float64;
+var
+  LRd: std::random_device;
+  LDist: std::uniform_real_distribution<double>;
+  LVal: float64;
+begin
+  if not myra_maths_rng_seeded then
+    myra_maths_rng.seed(LRd());
+    myra_maths_rng_seeded := true;
+  end;
+  LDist := std::uniform_real_distribution<double>(AMin, AMax);
+  LVal := LDist(myra_maths_rng);
+  return LVal;
+end;
+
+//-----------------------------------------------------------------------------
+// Swap
+//-----------------------------------------------------------------------------
+
+exported routine Swap(var A: int32; var B: int32);
+begin
+  std::swap(A, B);
+end;
+
+exported routine Swap(var A: int64; var B: int64);
+begin
+  std::swap(A, B);
+end;
+
+exported routine Swap(var A: float64; var B: float64);
+begin
+  std::swap(A, B);
+end;
+
+//-----------------------------------------------------------------------------
+// Float Classification
+//-----------------------------------------------------------------------------
+
+exported routine IsNaN(const AValue: float64): boolean;
+begin
+  return std::isnan(AValue);
+end;
+
+exported routine IsInfinite(const AValue: float64): boolean;
+begin
+  return std::isinf(AValue);
+end;
+
+exported routine IsFinite(const AValue: float64): boolean;
+begin
+  return std::isfinite(AValue);
+end;
+
+//-----------------------------------------------------------------------------
+// Additional Utilities
+//-----------------------------------------------------------------------------
+
+exported routine CopySign(const AMagnitude: float64; const ASign: float64): float64;
+begin
+  return std::copysign(AMagnitude, ASign);
+end;
+
+exported routine FDim(const AX: float64; const AY: float64): float64;
+begin
+  return std::fdim(AX, AY);
+end;
+
+exported routine FMA(const AX: float64; const AY: float64; const AZ: float64): float64;
+begin
+  return std::fma(AX, AY, AZ);
+end;
+
+end.

@@ -1,0 +1,284 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Paths;
+
+#include <filesystem>
+#include <string>
+#ifdef _WIN32
+constexpr char PathDelim = '\\';
+constexpr char DriveDelim = ':';
+#else
+constexpr char PathDelim = '/';
+constexpr char DriveDelim = '/';
+#endif
+
+exported const
+  ExtDelim: char = '.';
+
+//-----------------------------------------------------------------------------
+// Path Extraction
+//-----------------------------------------------------------------------------
+
+// Extract path with trailing delimiter
+exported routine ExtractFilePath(const AFileName: string): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::filesystem::path(AFileName).parent_path().string();
+  if not LResult.empty() then
+    LResult := LResult + PathDelim;
+  end;
+  return LResult;
+end;
+
+// Extract path without trailing delimiter
+exported routine ExtractFileDir(const AFileName: string): string;
+begin
+  return std::filesystem::path(AFileName).parent_path().string();
+end;
+
+// Extract filename with extension
+exported routine ExtractFileName(const AFileName: string): string;
+begin
+  return std::filesystem::path(AFileName).filename().string();
+end;
+
+// Extract file extension (including dot)
+exported routine ExtractFileExt(const AFileName: string): string;
+begin
+  return std::filesystem::path(AFileName).extension().string();
+end;
+
+// Extract filename without extension
+exported routine ExtractFileNameOnly(const AFileName: string): string;
+begin
+  return std::filesystem::path(AFileName).stem().string();
+end;
+
+// Extract root/drive (e.g., "C:" on Windows, "/" on Unix)
+exported routine ExtractFileDrive(const AFileName: string): string;
+begin
+  return std::filesystem::path(AFileName).root_name().string();
+end;
+
+// Extract root path (e.g., "C:\" on Windows, "/" on Unix)
+exported routine ExtractRootPath(const AFileName: string): string;
+begin
+  return std::filesystem::path(AFileName).root_path().string();
+end;
+
+//-----------------------------------------------------------------------------
+// Path Modification
+//-----------------------------------------------------------------------------
+
+// Change file extension
+exported routine ChangeFileExt(const AFileName: string; const AExtension: string): string;
+begin
+  return std::filesystem::path(AFileName).replace_extension(AExtension).string();
+end;
+
+// Expand to absolute path
+exported routine ExpandFileName(const AFileName: string): string;
+begin
+  return std::filesystem::absolute(AFileName).string();
+end;
+
+// Get canonical path (resolves symlinks, .., etc.)
+exported routine CanonicalPath(const AFileName: string): string;
+begin
+  guard
+    return std::filesystem::canonical(AFileName).string();
+  except
+    return AFileName;
+  end;
+end;
+
+// Get relative path from base
+exported routine RelativePath(const APath: string; const ABase: string): string;
+begin
+  guard
+    return std::filesystem::relative(APath, ABase).string();
+  except
+    return APath;
+  end;
+end;
+
+// Get proximate path (like relative but doesn't fail)
+exported routine ProximatePath(const APath: string; const ABase: string): string;
+begin
+  return std::filesystem::proximate(APath, ABase).string();
+end;
+
+//-----------------------------------------------------------------------------
+// Trailing Delimiter Handling
+//-----------------------------------------------------------------------------
+
+// Ensure path ends with delimiter
+exported routine IncludeTrailingPathDelimiter(const APath: string): string;
+var
+  LLast: char;
+begin
+  if APath.empty() then
+    return std::string(1, PathDelim);
+  end;
+  LLast := APath.back();
+  if (LLast = '/') or (LLast = '\\') then
+    return APath;
+  end;
+  return APath + PathDelim;
+end;
+
+// Ensure path doesn't end with delimiter
+exported routine ExcludeTrailingPathDelimiter(const APath: string): string;
+var
+  LResult: std::string;
+  LLast: char;
+begin
+  LResult := APath;
+  if not LResult.empty() then
+    LLast := LResult.back();
+    if (LLast = '/') or (LLast = '\\') then
+      LResult.pop_back();
+    end;
+  end;
+  return LResult;
+end;
+
+// Alias
+exported routine IncludeTrailingBackslash(const APath: string): string;
+begin
+  return IncludeTrailingPathDelimiter(APath);
+end;
+
+// Alias
+exported routine ExcludeTrailingBackslash(const APath: string): string;
+begin
+  return ExcludeTrailingPathDelimiter(APath);
+end;
+
+//-----------------------------------------------------------------------------
+// Path Combination
+//-----------------------------------------------------------------------------
+
+// Combine path and filename
+exported routine CombinePath(const APath: string; const AFileName: string): string;
+begin
+  if APath.empty() then
+    return AFileName;
+  end;
+  if AFileName.empty() then
+    return APath;
+  end;
+  return (std::filesystem::path(APath) / AFileName).string();
+end;
+
+// Combine three path segments
+exported routine CombinePath(const APath1: string; const APath2: string; const APath3: string): string;
+begin
+  return (std::filesystem::path(APath1) / APath2 / APath3).string();
+end;
+
+//-----------------------------------------------------------------------------
+// Path Validation
+//-----------------------------------------------------------------------------
+
+// Check if path is absolute
+exported routine IsAbsolutePath(const APath: string): boolean;
+begin
+  return std::filesystem::path(APath).is_absolute();
+end;
+
+// Check if path is relative
+exported routine IsRelativePath(const APath: string): boolean;
+begin
+  return std::filesystem::path(APath).is_relative();
+end;
+
+// Check if path has root
+exported routine HasRootPath(const APath: string): boolean;
+begin
+  return std::filesystem::path(APath).has_root_path();
+end;
+
+// Check if path has filename
+exported routine HasFileName(const APath: string): boolean;
+begin
+  return std::filesystem::path(APath).has_filename();
+end;
+
+// Check if path has extension
+exported routine HasExtension(const APath: string): boolean;
+begin
+  return std::filesystem::path(APath).has_extension();
+end;
+
+//-----------------------------------------------------------------------------
+// Delimiter Detection
+//-----------------------------------------------------------------------------
+
+// Check if character at position is a path delimiter (1-based index)
+exported routine IsPathDelimiter(const APath: string; const AIndex: int32): boolean;
+var
+  LIdx: size_t;
+  LCh: char;
+begin
+  if AIndex < 1 then
+    return false;
+  end;
+  LIdx := size_t(AIndex - 1);
+  if LIdx >= APath.size() then
+    return false;
+  end;
+  LCh := APath[LIdx];
+  return (LCh = '/') or (LCh = '\\');
+end;
+
+// Find last occurrence of any delimiter character (1-based result, 0 if not found)
+exported routine LastDelimiter(const ADelimiters: string; const AText: string): int32;
+var
+  LF: size_t;
+begin
+  LF := AText.find_last_of(ADelimiters);
+  if LF = std::string::npos then
+    return 0;
+  end;
+  return int32(LF) + 1;
+end;
+
+//-----------------------------------------------------------------------------
+// Special Paths
+//-----------------------------------------------------------------------------
+
+// Get current working directory
+exported routine GetCurrentDir(): string;
+begin
+  return std::filesystem::current_path().string();
+end;
+
+// Set current working directory
+exported routine SetCurrentDir(const ADirectory: string): boolean;
+begin
+  guard
+    std::filesystem::current_path(ADirectory);
+    return true;
+  except
+    return false;
+  end;
+end;
+
+// Get temporary directory
+exported routine GetTempDir(): string;
+begin
+  return std::filesystem::temp_directory_path().string();
+end;
+
+end.

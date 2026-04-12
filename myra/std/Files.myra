@@ -1,0 +1,495 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Files;
+
+#include <fstream>
+#include <filesystem>
+#include <string>
+
+//-----------------------------------------------------------------------------
+// Types
+//-----------------------------------------------------------------------------
+
+exported type
+  TFileStream = pointer;
+
+//-----------------------------------------------------------------------------
+// File Open / Close
+//-----------------------------------------------------------------------------
+
+// Open file for reading text
+exported routine OpenRead(const AFileName: string): TFileStream;
+var
+  LStream: std::fstream*;
+begin
+  LStream := new std::fstream(AFileName, std::ios::in);
+  if not LStream->is_open() then
+    delete LStream;
+    return nil;
+  end;
+  return TFileStream(LStream);
+end;
+
+// Open file for writing text (creates/overwrites)
+exported routine OpenWrite(const AFileName: string): TFileStream;
+var
+  LStream: std::fstream*;
+begin
+  LStream := new std::fstream(AFileName, std::ios::out | std::ios::trunc);
+  if not LStream->is_open() then
+    delete LStream;
+    return nil;
+  end;
+  return TFileStream(LStream);
+end;
+
+// Open file for appending text
+exported routine OpenAppend(const AFileName: string): TFileStream;
+var
+  LStream: std::fstream*;
+begin
+  LStream := new std::fstream(AFileName, std::ios::out | std::ios::app);
+  if not LStream->is_open() then
+    delete LStream;
+    return nil;
+  end;
+  return TFileStream(LStream);
+end;
+
+// Open file for reading binary
+exported routine OpenReadBinary(const AFileName: string): TFileStream;
+var
+  LStream: std::fstream*;
+begin
+  LStream := new std::fstream(AFileName, std::ios::in | std::ios::binary);
+  if not LStream->is_open() then
+    delete LStream;
+    return nil;
+  end;
+  return TFileStream(LStream);
+end;
+
+// Open file for writing binary (creates/overwrites)
+exported routine OpenWriteBinary(const AFileName: string): TFileStream;
+var
+  LStream: std::fstream*;
+begin
+  LStream := new std::fstream(AFileName, std::ios::out | std::ios::trunc | std::ios::binary);
+  if not LStream->is_open() then
+    delete LStream;
+    return nil;
+  end;
+  return TFileStream(LStream);
+end;
+
+// Open file for read/write binary
+exported routine OpenReadWriteBinary(const AFileName: string): TFileStream;
+var
+  LStream: std::fstream*;
+begin
+  LStream := new std::fstream(AFileName, std::ios::in | std::ios::out | std::ios::binary);
+  if not LStream->is_open() then
+    delete LStream;
+    return nil;
+  end;
+  return TFileStream(LStream);
+end;
+
+// Close file and free handle
+exported routine CloseFile(const AFile: TFileStream);
+begin
+  if AFile <> nil then
+    reinterpret_cast<std::fstream*>(AFile)->close();
+    delete reinterpret_cast<std::fstream*>(AFile);
+  end;
+end;
+
+// Check if file handle is open and valid
+exported routine IsOpen(const AFile: TFileStream): boolean;
+begin
+  return (AFile <> nil) and reinterpret_cast<std::fstream*>(AFile)->is_open();
+end;
+
+//-----------------------------------------------------------------------------
+// Text File I/O
+//-----------------------------------------------------------------------------
+
+// Read a line from a text file (without line terminator)
+exported routine ReadLine(const AFile: TFileStream): string;
+var
+  LLine: std::string;
+begin
+  if AFile <> nil then
+    std::getline(*reinterpret_cast<std::fstream*>(AFile), LLine);
+  end;
+  return LLine;
+end;
+
+// Write a string to a text file
+exported routine WriteStr(const AFile: TFileStream; const AText: string);
+begin
+  if AFile <> nil then
+    *reinterpret_cast<std::fstream*>(AFile) << AText;
+  end;
+end;
+
+// Write a string followed by a newline
+exported routine FileWriteLn(const AFile: TFileStream; const AText: string);
+begin
+  if AFile <> nil then
+    *reinterpret_cast<std::fstream*>(AFile) << AText << '\n';
+  end;
+end;
+
+// Write just a newline
+exported routine FileWriteLn(const AFile: TFileStream);
+begin
+  if AFile <> nil then
+    *reinterpret_cast<std::fstream*>(AFile) << '\n';
+  end;
+end;
+
+// Check for end of file
+exported routine Eof(const AFile: TFileStream): boolean;
+begin
+  return (AFile = nil) or reinterpret_cast<std::fstream*>(AFile)->eof();
+end;
+
+// Check if file stream is in a good state
+exported routine IsGood(const AFile: TFileStream): boolean;
+begin
+  return (AFile <> nil) and reinterpret_cast<std::fstream*>(AFile)->good();
+end;
+
+//-----------------------------------------------------------------------------
+// Binary File I/O
+//-----------------------------------------------------------------------------
+
+// Read bytes from file into buffer - returns bytes actually read
+exported routine ReadBytes(const AFile: TFileStream; const ABuffer: pointer; const ACount: int64): int64;
+var
+  LN: int64;
+  LFs: std::fstream*;
+begin
+  LN := 0;
+  if (AFile <> nil) and (ABuffer <> nil) and (ACount > 0) then
+    LFs := reinterpret_cast<std::fstream*>(AFile);
+    LFs->read(reinterpret_cast<char*>(const_cast<void*>(ABuffer)), ACount);
+    LN := static_cast<int64_t>(LFs->gcount());
+  end;
+  return LN;
+end;
+
+// Write bytes from buffer to file - returns bytes actually written
+exported routine WriteBytes(const AFile: TFileStream; const ABuffer: pointer; const ACount: int64): int64;
+var
+  LN: int64;
+  LFs: std::fstream*;
+  LBefore: int64;
+begin
+  LN := 0;
+  if (AFile <> nil) and (ABuffer <> nil) and (ACount > 0) then
+    LFs := reinterpret_cast<std::fstream*>(AFile);
+    LBefore := static_cast<int64_t>(LFs->tellp());
+    LFs->write(reinterpret_cast<const char*>(ABuffer), ACount);
+    LN := static_cast<int64_t>(LFs->tellp()) - LBefore;
+  end;
+  return LN;
+end;
+
+// Seek to position - AOrigin: SEEK_SET(0), SEEK_CUR(1), or SEEK_END(2)
+exported routine Seek(const AFile: TFileStream; const AOffset: int64; const AOrigin: int32): boolean;
+var
+  LOk: boolean;
+  LFs: std::fstream*;
+  LDir: std::ios_base::seekdir;
+begin
+  LOk := false;
+  if AFile <> nil then
+    LFs := reinterpret_cast<std::fstream*>(AFile);
+    if AOrigin = 0 then
+      LDir := std::ios::beg;
+    else
+      if AOrigin = 1 then
+        LDir := std::ios::cur;
+      else
+        LDir := std::ios::end;
+      end;
+    end;
+    LFs->seekg(AOffset, LDir);
+    LFs->seekp(AOffset, LDir);
+    LOk := LFs->good();
+  end;
+  return LOk;
+end;
+
+// Seek to absolute position from start of file
+exported routine SeekTo(const AFile: TFileStream; const APosition: int64): boolean;
+var
+  LOk: boolean;
+  LFs: std::fstream*;
+begin
+  LOk := false;
+  if AFile <> nil then
+    LFs := reinterpret_cast<std::fstream*>(AFile);
+    LFs->seekg(APosition, std::ios::beg);
+    LFs->seekp(APosition, std::ios::beg);
+    LOk := LFs->good();
+  end;
+  return LOk;
+end;
+
+// Get current read/write position
+exported routine FilePos(const AFile: TFileStream): int64;
+begin
+  if AFile <> nil then
+    return static_cast<int64_t>(reinterpret_cast<std::fstream*>(AFile)->tellg());
+  end;
+  return -1;
+end;
+
+// Get total file size
+exported routine FileSize(const AFile: TFileStream): int64;
+var
+  LSize: int64;
+  LFs: std::fstream*;
+  LCur: std::streampos;
+begin
+  LSize := -1;
+  if AFile <> nil then
+    LFs := reinterpret_cast<std::fstream*>(AFile);
+    LCur := LFs->tellg();
+    LFs->seekg(0, std::ios::end);
+    LSize := static_cast<int64_t>(LFs->tellg());
+    LFs->seekg(LCur);
+  end;
+  return LSize;
+end;
+
+// Flush buffered writes to disk
+exported routine FlushFile(const AFile: TFileStream);
+begin
+  if AFile <> nil then
+    reinterpret_cast<std::fstream*>(AFile)->flush();
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Filesystem Operations
+//-----------------------------------------------------------------------------
+
+// Check if a regular file exists
+exported routine FileExists(const AFileName: string): boolean;
+begin
+  return std::filesystem::exists(AFileName) and std::filesystem::is_regular_file(AFileName);
+end;
+
+// Check if a directory exists
+exported routine DirectoryExists(const ADirectory: string): boolean;
+begin
+  return std::filesystem::exists(ADirectory) and std::filesystem::is_directory(ADirectory);
+end;
+
+// Delete a file - returns true on success
+exported routine DeleteFile(const AFileName: string): boolean;
+var
+  LOk: boolean;
+begin
+  LOk := false;
+  guard
+    LOk := std::filesystem::remove(AFileName);
+  except
+  end;
+  return LOk;
+end;
+
+// Rename or move a file - returns true on success
+exported routine RenameFile(const AOldName: string; const ANewName: string): boolean;
+var
+  LOk: boolean;
+begin
+  LOk := false;
+  guard
+    std::filesystem::rename(AOldName, ANewName);
+    LOk := true;
+  except
+  end;
+  return LOk;
+end;
+
+// Copy a file, overwriting destination if it exists - returns true on success
+exported routine CopyFile(const ASource: string; const ADest: string): boolean;
+var
+  LOk: boolean;
+begin
+  LOk := false;
+  guard
+    std::filesystem::copy_file(ASource, ADest, std::filesystem::copy_options::overwrite_existing);
+    LOk := true;
+  except
+  end;
+  return LOk;
+end;
+
+// Create a single directory - returns true on success
+exported routine CreateDir(const ADirectory: string): boolean;
+var
+  LOk: boolean;
+begin
+  LOk := false;
+  guard
+    LOk := std::filesystem::create_directory(ADirectory);
+  except
+  end;
+  return LOk;
+end;
+
+// Create directory and all intermediate directories - returns true on success
+exported routine CreateDirs(const ADirectory: string): boolean;
+var
+  LOk: boolean;
+begin
+  LOk := false;
+  guard
+    LOk := std::filesystem::create_directories(ADirectory);
+  except
+  end;
+  return LOk;
+end;
+
+// Remove an empty directory - returns true on success
+exported routine RemoveDir(const ADirectory: string): boolean;
+var
+  LOk: boolean;
+begin
+  LOk := false;
+  guard
+    LOk := std::filesystem::remove(ADirectory);
+  except
+  end;
+  return LOk;
+end;
+
+// Remove a directory and all its contents - returns count removed, or -1 on error
+exported routine RemoveDirRecursive(const ADirectory: string): int64;
+var
+  LN: int64;
+begin
+  LN := -1;
+  guard
+    LN := static_cast<int64_t>(std::filesystem::remove_all(ADirectory));
+  except
+  end;
+  return LN;
+end;
+
+// Get file size by path - returns -1 on error
+exported routine GetFileSize(const AFileName: string): int64;
+var
+  LSize: int64;
+begin
+  LSize := -1;
+  guard
+    LSize := static_cast<int64_t>(std::filesystem::file_size(AFileName));
+  except
+  end;
+  return LSize;
+end;
+
+//-----------------------------------------------------------------------------
+// Convenience Routines
+//-----------------------------------------------------------------------------
+
+// Read entire file contents as a string
+exported routine ReadAllText(const AFileName: string): string;
+var
+  LText: std::string;
+  LF: std::fstream*;
+  LSize: std::size_t;
+begin
+  LF := new std::fstream(AFileName, std::ios::in | std::ios::binary);
+  if LF->is_open() then
+    LF->seekg(0, std::ios::end);
+    LSize := static_cast<std::size_t>(LF->tellg());
+    LF->seekg(0, std::ios::beg);
+    if LSize > 0 then
+      LText.resize(LSize);
+      LF->read(LText.data(), LSize);
+    end;
+  end;
+  delete LF;
+  return LText;
+end;
+
+// Write a string to a file, replacing any existing content
+exported routine WriteAllText(const AFileName: string; const AContent: string): boolean;
+var
+  LOk: boolean;
+  LF: std::fstream*;
+begin
+  LOk := false;
+  LF := new std::fstream(AFileName, std::ios::out | std::ios::trunc | std::ios::binary);
+  if LF->is_open() then
+    LF->write(AContent.data(), static_cast<std::streamsize>(AContent.size()));
+    LOk := LF->good();
+  end;
+  delete LF;
+  return LOk;
+end;
+
+// Append a string to a file
+exported routine AppendAllText(const AFileName: string; const AContent: string): boolean;
+var
+  LOk: boolean;
+  LF: std::fstream*;
+begin
+  LOk := false;
+  LF := new std::fstream(AFileName, std::ios::out | std::ios::app);
+  if LF->is_open() then
+    *LF << AContent;
+    LOk := LF->good();
+  end;
+  delete LF;
+  return LOk;
+end;
+
+// Read all lines into a fixed-size array - returns number of lines read
+exported routine ReadAllLines(const AFileName: string; var ALines: array of string): int32;
+var
+  LFile: TFileStream;
+  LLine: string;
+  LCount: int32;
+  LCapacity: int32;
+begin
+  LFile := OpenRead(AFileName);
+  if LFile = nil then
+    return 0;
+  end;
+
+  LCount := 0;
+  LCapacity := int32(len(ALines));
+
+  while not Eof(LFile) do
+    LLine := ReadLine(LFile);
+    if IsGood(LFile) or (LLine <> "") then
+      if LCount < LCapacity then
+        ALines[LCount] := LLine;
+      end;
+      LCount := LCount + 1;
+    end;
+  end;
+
+  CloseFile(LFile);
+  return LCount;
+end;
+
+end.

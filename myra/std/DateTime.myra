@@ -1,0 +1,631 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib DateTime;
+
+#include <chrono>
+#include <ctime>
+
+//-----------------------------------------------------------------------------
+// Types
+//-----------------------------------------------------------------------------
+
+exported type
+  TDateTime = float64;  // Days since Dec 30, 1899 (Delphi compatible)
+
+//-----------------------------------------------------------------------------
+// Constants
+//-----------------------------------------------------------------------------
+
+exported const
+  DateDelta: int32 = 693594;      // Days between 1/1/0001 and 12/30/1899
+  UnixDateDelta: int32 = 25569;   // Days between 12/30/1899 and 1/1/1970
+
+  HoursPerDay: int32 = 24;
+  MinsPerHour: int32 = 60;
+  SecsPerMin: int32 = 60;
+  MSecsPerSec: int32 = 1000;
+  MinsPerDay: int32 = 1440;
+  SecsPerDay: int32 = 86400;
+  MSecsPerDay: int32 = 86400000;
+
+  DaysPerWeek: int32 = 7;
+  MonthsPerYear: int32 = 12;
+
+//-----------------------------------------------------------------------------
+// Helper Functions (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine IsLeapYear(const AYear: int32): boolean;
+begin
+  return ((AYear mod 4) = 0) and (((AYear mod 100) <> 0) or ((AYear mod 400) = 0));
+end;
+
+exported routine DaysInMonth(const AYear: int32; const AMonth: int32): int32;
+begin
+  if (AMonth < 1) or (AMonth > 12) then
+    return 0;
+  end;
+
+  if AMonth = 2 then
+    if IsLeapYear(AYear) then
+      return 29;
+    else
+      return 28;
+    end;
+  else
+    if (AMonth = 4) or (AMonth = 6) or (AMonth = 9) or (AMonth = 11) then
+      return 30;
+    else
+      return 31;
+    end;
+  end;
+end;
+
+exported routine DaysInYear(const AYear: int32): int32;
+begin
+  if IsLeapYear(AYear) then
+    return 366;
+  else
+    return 365;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Encoding (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine EncodeDate(const AYear: int32; const AMonth: int32; const ADay: int32): TDateTime;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDayCount: int32;
+begin
+  LDayCount := 0;
+
+  for LYear := 1 to AYear - 1 do
+    LDayCount := LDayCount + DaysInYear(LYear);
+  end;
+
+  for LMonth := 1 to AMonth - 1 do
+    LDayCount := LDayCount + DaysInMonth(AYear, LMonth);
+  end;
+
+  LDayCount := LDayCount + ADay - 1;
+
+  return float64(LDayCount - DateDelta);
+end;
+
+exported routine EncodeTime(const AHour: int32; const AMinute: int32; const ASecond: int32; const AMilliSecond: int32): TDateTime;
+begin
+  return float64(AHour * 3600000 + AMinute * 60000 + ASecond * 1000 + AMilliSecond) / float64(MSecsPerDay);
+end;
+
+exported routine EncodeDateTime(const AYear: int32; const AMonth: int32; const ADay: int32;
+                              const AHour: int32; const AMinute: int32; const ASecond: int32;
+                              const AMilliSecond: int32): TDateTime;
+begin
+  return EncodeDate(AYear, AMonth, ADay) + EncodeTime(AHour, AMinute, ASecond, AMilliSecond);
+end;
+
+//-----------------------------------------------------------------------------
+// Current Date/Time (via chrono)
+//-----------------------------------------------------------------------------
+
+exported routine Now(): TDateTime;
+var
+  LMs: int32;
+begin
+  auto __now = std::chrono::system_clock::now();
+  auto __t   = std::chrono::system_clock::to_time_t(__now);
+  auto __tm  = std::localtime(&__t);
+  int32_t __ms = static_cast<int32_t>(
+  std::chrono::duration_cast<std::chrono::milliseconds>(__now.time_since_epoch()).count() % 1000);
+  LMs = __ms;
+  return EncodeDateTime(
+    __tm->tm_year + 1900,
+    __tm->tm_mon  + 1,
+    __tm->tm_mday,
+    __tm->tm_hour,
+    __tm->tm_min,
+    __tm->tm_sec,
+    LMs
+  );
+end;
+
+exported routine Date(): TDateTime;
+begin
+  auto __now = std::chrono::system_clock::now();
+  auto __t   = std::chrono::system_clock::to_time_t(__now);
+  auto __tm  = std::localtime(&__t);
+  return EncodeDate(
+    __tm->tm_year + 1900,
+    __tm->tm_mon  + 1,
+    __tm->tm_mday
+  );
+end;
+
+exported routine Time(): TDateTime;
+var
+  LMs: int32;
+begin
+  auto __now = std::chrono::system_clock::now();
+  auto __t   = std::chrono::system_clock::to_time_t(__now);
+  auto __tm  = std::localtime(&__t);
+  int32_t __ms = static_cast<int32_t>(
+  std::chrono::duration_cast<std::chrono::milliseconds>(__now.time_since_epoch()).count() % 1000);
+  LMs = __ms;
+  return EncodeTime(
+    __tm->tm_hour,
+    __tm->tm_min,
+    __tm->tm_sec,
+    LMs
+  );
+end;
+
+exported routine NowUTC(): TDateTime;
+var
+  LMs: int32;
+begin
+  auto __now = std::chrono::system_clock::now();
+  auto __t   = std::chrono::system_clock::to_time_t(__now);
+  auto __tm  = std::gmtime(&__t);
+  int32_t __ms = static_cast<int32_t>(
+  std::chrono::duration_cast<std::chrono::milliseconds>(__now.time_since_epoch()).count() % 1000);
+  LMs = __ms;
+  return EncodeDateTime(
+    __tm->tm_year + 1900,
+    __tm->tm_mon  + 1,
+    __tm->tm_mday,
+    __tm->tm_hour,
+    __tm->tm_min,
+    __tm->tm_sec,
+    LMs
+  );
+end;
+
+//-----------------------------------------------------------------------------
+// Decoding (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine DecodeDate(const ADateTime: TDateTime; var AYear: int32; var AMonth: int32; var ADay: int32);
+var
+  LDayCount: int32;
+  LDaysInYear: int32;
+  LDaysInMonth: int32;
+begin
+  LDayCount := int32(ADateTime) + DateDelta + 1;
+
+  if LDayCount < 1 then
+    AYear := 1;
+    AMonth := 1;
+    ADay := 1;
+    return;
+  end;
+
+  AYear := 1;
+  LDaysInYear := DaysInYear(AYear);
+  while LDayCount > LDaysInYear do
+    LDayCount := LDayCount - LDaysInYear;
+    AYear := AYear + 1;
+    LDaysInYear := DaysInYear(AYear);
+  end;
+
+  AMonth := 1;
+  LDaysInMonth := DaysInMonth(AYear, AMonth);
+  while (LDayCount > LDaysInMonth) and (AMonth < 12) do
+    LDayCount := LDayCount - LDaysInMonth;
+    AMonth := AMonth + 1;
+    LDaysInMonth := DaysInMonth(AYear, AMonth);
+  end;
+
+  ADay := LDayCount;
+end;
+
+exported routine DecodeTime(const ADateTime: TDateTime; var AHour: int32; var AMinute: int32;
+                          var ASecond: int32; var AMilliSecond: int32);
+var
+  LTime: float64;
+  LMSecs: int32;
+begin
+  LTime := ADateTime - float64(int32(ADateTime));
+  if LTime < 0.0 then
+    LTime := LTime + 1.0;
+  end;
+
+  LMSecs := int32(LTime * float64(MSecsPerDay) + 0.5);
+
+  AHour := LMSecs div 3600000;
+  LMSecs := LMSecs mod 3600000;
+
+  AMinute := LMSecs div 60000;
+  LMSecs := LMSecs mod 60000;
+
+  ASecond := LMSecs div 1000;
+  AMilliSecond := LMSecs mod 1000;
+end;
+
+//-----------------------------------------------------------------------------
+// Part Extraction (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine DateOf(const ADateTime: TDateTime): TDateTime;
+begin
+  return float64(int32(ADateTime));
+end;
+
+exported routine TimeOf(const ADateTime: TDateTime): TDateTime;
+begin
+  return ADateTime - float64(int32(ADateTime));
+end;
+
+exported routine YearOf(const ADateTime: TDateTime): int32;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDay: int32;
+begin
+  DecodeDate(ADateTime, LYear, LMonth, LDay);
+  return LYear;
+end;
+
+exported routine MonthOf(const ADateTime: TDateTime): int32;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDay: int32;
+begin
+  DecodeDate(ADateTime, LYear, LMonth, LDay);
+  return LMonth;
+end;
+
+exported routine DayOf(const ADateTime: TDateTime): int32;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDay: int32;
+begin
+  DecodeDate(ADateTime, LYear, LMonth, LDay);
+  return LDay;
+end;
+
+exported routine HourOf(const ADateTime: TDateTime): int32;
+var
+  LHour: int32;
+  LMinute: int32;
+  LSecond: int32;
+  LMilliSecond: int32;
+begin
+  DecodeTime(ADateTime, LHour, LMinute, LSecond, LMilliSecond);
+  return LHour;
+end;
+
+exported routine MinuteOf(const ADateTime: TDateTime): int32;
+var
+  LHour: int32;
+  LMinute: int32;
+  LSecond: int32;
+  LMilliSecond: int32;
+begin
+  DecodeTime(ADateTime, LHour, LMinute, LSecond, LMilliSecond);
+  return LMinute;
+end;
+
+exported routine SecondOf(const ADateTime: TDateTime): int32;
+var
+  LHour: int32;
+  LMinute: int32;
+  LSecond: int32;
+  LMilliSecond: int32;
+begin
+  DecodeTime(ADateTime, LHour, LMinute, LSecond, LMilliSecond);
+  return LSecond;
+end;
+
+exported routine MilliSecondOf(const ADateTime: TDateTime): int32;
+var
+  LHour: int32;
+  LMinute: int32;
+  LSecond: int32;
+  LMilliSecond: int32;
+begin
+  DecodeTime(ADateTime, LHour, LMinute, LSecond, LMilliSecond);
+  return LMilliSecond;
+end;
+
+//-----------------------------------------------------------------------------
+// Day of Week / Year / Week (pure Myra)
+//-----------------------------------------------------------------------------
+
+// Day of week (1 = Sunday, 7 = Saturday)
+exported routine DayOfWeek(const ADateTime: TDateTime): int32;
+var
+  LResult: int32;
+begin
+  LResult := (int32(ADateTime) mod 7) + 1;
+  if LResult < 1 then
+    LResult := LResult + 7;
+  end;
+  return LResult;
+end;
+
+// Day of year (1-366)
+exported routine DayOfYear(const ADateTime: TDateTime): int32;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDay: int32;
+  LM: int32;
+  LResult: int32;
+begin
+  DecodeDate(ADateTime, LYear, LMonth, LDay);
+  LResult := LDay;
+  for LM := 1 to LMonth - 1 do
+    LResult := LResult + DaysInMonth(LYear, LM);
+  end;
+  return LResult;
+end;
+
+// Week of year (1-53)
+exported routine WeekOfYear(const ADateTime: TDateTime): int32;
+begin
+  return (DayOfYear(ADateTime) - 1) div 7 + 1;
+end;
+
+//-----------------------------------------------------------------------------
+// Increment Functions (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine IncDay(const ADateTime: TDateTime; const ANumberOfDays: int32): TDateTime;
+begin
+  return ADateTime + float64(ANumberOfDays);
+end;
+
+exported routine IncDay(const ADateTime: TDateTime): TDateTime;
+begin
+  return ADateTime + 1.0;
+end;
+
+exported routine IncWeek(const ADateTime: TDateTime; const ANumberOfWeeks: int32): TDateTime;
+begin
+  return ADateTime + float64(ANumberOfWeeks * 7);
+end;
+
+exported routine IncMonth(const ADateTime: TDateTime; const ANumberOfMonths: int32): TDateTime;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDay: int32;
+  LNewMonth: int32;
+  LNewYear: int32;
+  LMaxDay: int32;
+begin
+  DecodeDate(ADateTime, LYear, LMonth, LDay);
+
+  LNewMonth := LMonth + ANumberOfMonths;
+  LNewYear := LYear;
+
+  while LNewMonth > 12 do
+    LNewMonth := LNewMonth - 12;
+    LNewYear := LNewYear + 1;
+  end;
+
+  while LNewMonth < 1 do
+    LNewMonth := LNewMonth + 12;
+    LNewYear := LNewYear - 1;
+  end;
+
+  LMaxDay := DaysInMonth(LNewYear, LNewMonth);
+  if LDay > LMaxDay then
+    LDay := LMaxDay;
+  end;
+
+  return EncodeDate(LNewYear, LNewMonth, LDay) + TimeOf(ADateTime);
+end;
+
+exported routine IncYear(const ADateTime: TDateTime; const ANumberOfYears: int32): TDateTime;
+var
+  LYear: int32;
+  LMonth: int32;
+  LDay: int32;
+  LMaxDay: int32;
+begin
+  DecodeDate(ADateTime, LYear, LMonth, LDay);
+  LYear := LYear + ANumberOfYears;
+
+  LMaxDay := DaysInMonth(LYear, LMonth);
+  if LDay > LMaxDay then
+    LDay := LMaxDay;
+  end;
+
+  return EncodeDate(LYear, LMonth, LDay) + TimeOf(ADateTime);
+end;
+
+exported routine IncHour(const ADateTime: TDateTime; const ANumberOfHours: int32): TDateTime;
+begin
+  return ADateTime + (float64(ANumberOfHours) / float64(HoursPerDay));
+end;
+
+exported routine IncMinute(const ADateTime: TDateTime; const ANumberOfMinutes: int32): TDateTime;
+begin
+  return ADateTime + (float64(ANumberOfMinutes) / float64(MinsPerDay));
+end;
+
+exported routine IncSecond(const ADateTime: TDateTime; const ANumberOfSeconds: int32): TDateTime;
+begin
+  return ADateTime + (float64(ANumberOfSeconds) / float64(SecsPerDay));
+end;
+
+exported routine IncMilliSecond(const ADateTime: TDateTime; const ANumberOfMilliSeconds: int32): TDateTime;
+begin
+  return ADateTime + (float64(ANumberOfMilliSeconds) / float64(MSecsPerDay));
+end;
+
+//-----------------------------------------------------------------------------
+// Difference Functions (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine DaysBetween(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int32;
+var
+  LDiff: float64;
+begin
+  LDiff := ADateTime2 - ADateTime1;
+  if LDiff < 0.0 then
+    LDiff := -LDiff;
+  end;
+  return int32(LDiff);
+end;
+
+exported routine HoursBetween(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int32;
+var
+  LDiff: float64;
+begin
+  LDiff := ADateTime2 - ADateTime1;
+  if LDiff < 0.0 then
+    LDiff := -LDiff;
+  end;
+  return int32(LDiff * float64(HoursPerDay));
+end;
+
+exported routine MinutesBetween(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int32;
+var
+  LDiff: float64;
+begin
+  LDiff := ADateTime2 - ADateTime1;
+  if LDiff < 0.0 then
+    LDiff := -LDiff;
+  end;
+  return int32(LDiff * float64(MinsPerDay));
+end;
+
+exported routine SecondsBetween(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int64;
+var
+  LDiff: float64;
+begin
+  LDiff := ADateTime2 - ADateTime1;
+  if LDiff < 0.0 then
+    LDiff := -LDiff;
+  end;
+  return int64(LDiff * float64(SecsPerDay));
+end;
+
+exported routine MilliSecondsBetween(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int64;
+var
+  LDiff: float64;
+begin
+  LDiff := ADateTime2 - ADateTime1;
+  if LDiff < 0.0 then
+    LDiff := -LDiff;
+  end;
+  return int64(LDiff * float64(MSecsPerDay));
+end;
+
+//-----------------------------------------------------------------------------
+// Comparison (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine SameDate(const ADateTime1: TDateTime; const ADateTime2: TDateTime): boolean;
+begin
+  return int32(ADateTime1) = int32(ADateTime2);
+end;
+
+exported routine SameTime(const ADateTime1: TDateTime; const ADateTime2: TDateTime): boolean;
+var
+  LTime1: float64;
+  LTime2: float64;
+begin
+  LTime1 := ADateTime1 - float64(int32(ADateTime1));
+  LTime2 := ADateTime2 - float64(int32(ADateTime2));
+  return int32(LTime1 * float64(MSecsPerDay)) = int32(LTime2 * float64(MSecsPerDay));
+end;
+
+exported routine CompareDate(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int32;
+var
+  LDate1: int32;
+  LDate2: int32;
+begin
+  LDate1 := int32(ADateTime1);
+  LDate2 := int32(ADateTime2);
+
+  if LDate1 < LDate2 then
+    return -1;
+  else
+    if LDate1 > LDate2 then
+      return 1;
+    else
+      return 0;
+    end;
+  end;
+end;
+
+exported routine CompareDateTime(const ADateTime1: TDateTime; const ADateTime2: TDateTime): int32;
+begin
+  if ADateTime1 < ADateTime2 then
+    return -1;
+  else
+    if ADateTime1 > ADateTime2 then
+      return 1;
+    else
+      return 0;
+    end;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Unix Timestamp Conversion (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine DateTimeToUnix(const ADateTime: TDateTime): int64;
+begin
+  return int64((ADateTime - float64(UnixDateDelta)) * float64(SecsPerDay));
+end;
+
+exported routine UnixToDateTime(const AUnixTime: int64): TDateTime;
+begin
+  return float64(AUnixTime) / float64(SecsPerDay) + float64(UnixDateDelta);
+end;
+
+//-----------------------------------------------------------------------------
+// Validation (pure Myra)
+//-----------------------------------------------------------------------------
+
+exported routine IsValidDate(const AYear: int32; const AMonth: int32; const ADay: int32): boolean;
+begin
+  if (AYear < 1) or (AYear > 9999) then
+    return false;
+  end;
+  if (AMonth < 1) or (AMonth > 12) then
+    return false;
+  end;
+  if (ADay < 1) or (ADay > DaysInMonth(AYear, AMonth)) then
+    return false;
+  end;
+  return true;
+end;
+
+exported routine IsValidTime(const AHour: int32; const AMinute: int32; const ASecond: int32; const AMilliSecond: int32): boolean;
+begin
+  if (AHour < 0) or (AHour > 23) then
+    return false;
+  end;
+  if (AMinute < 0) or (AMinute > 59) then
+    return false;
+  end;
+  if (ASecond < 0) or (ASecond > 59) then
+    return false;
+  end;
+  if (AMilliSecond < 0) or (AMilliSecond > 999) then
+    return false;
+  end;
+  return true;
+end;
+
+end.

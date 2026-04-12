@@ -1,0 +1,402 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Convert;
+
+#include <string>
+#include <format>
+#include <charconv>
+#include <stdexcept>
+#include <cstdlib>
+
+//-----------------------------------------------------------------------------
+// Integer to String
+//-----------------------------------------------------------------------------
+
+exported routine IntToStr(const AValue: int32): string;
+begin
+  return std::to_string(AValue);
+end;
+
+exported routine IntToStr(const AValue: int64): string;
+begin
+  return std::to_string(AValue);
+end;
+
+exported routine UIntToStr(const AValue: uint32): string;
+begin
+  return std::to_string(AValue);
+end;
+
+exported routine UIntToStr(const AValue: uint64): string;
+begin
+  return std::to_string(AValue);
+end;
+
+//-----------------------------------------------------------------------------
+// Integer to Hex String
+//-----------------------------------------------------------------------------
+
+exported routine IntToHex(const AValue: int64): string;
+begin
+  return std::format("{:X}", AValue);
+end;
+
+exported routine IntToHex(const AValue: int64; const ADigits: int32): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::vformat("{:0{}X}", std::make_format_args(AValue, ADigits));
+  return LResult;
+end;
+
+exported routine IntToHex(const AValue: uint64): string;
+begin
+  return std::format("{:X}", AValue);
+end;
+
+exported routine IntToHex(const AValue: uint64; const ADigits: int32): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::vformat("{:0{}X}", std::make_format_args(AValue, ADigits));
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// String to Integer
+//-----------------------------------------------------------------------------
+
+exported routine StrToInt(const AValue: string): int32;
+begin
+  return std::stoi(AValue);
+end;
+
+exported routine StrToInt64(const AValue: string): int64;
+begin
+  return std::stoll(AValue);
+end;
+
+exported routine StrToIntDef(const AValue: string; const ADefault: int32): int32;
+begin
+  if AValue.empty() then
+    return ADefault;
+  end;
+  guard
+    return std::stoi(AValue);
+  except
+    return ADefault;
+  end;
+end;
+
+exported routine StrToInt64Def(const AValue: string; const ADefault: int64): int64;
+begin
+  if AValue.empty() then
+    return ADefault;
+  end;
+  guard
+    return std::stoll(AValue);
+  except
+    return ADefault;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Hex String to Integer
+//-----------------------------------------------------------------------------
+
+exported routine HexToInt(const AValue: string): int64;
+var
+  LResult: int64;
+  LStart: size_t;
+begin
+  LResult := 0;
+  if not AValue.empty() then
+    LStart := 0;
+    if AValue[0] = '$' then
+      LStart := 1;
+    else
+      if (AValue.size() >= 2) and (AValue[0] = '0') and ((AValue[1] = 'x') or (AValue[1] = 'X')) then
+        LStart := 2;
+      end;
+    end;
+    LResult := static_cast<int64_t>(std::stoll(AValue.substr(LStart), nullptr, 16));
+  end;
+  return LResult;
+end;
+
+exported routine HexToIntDef(const AValue: string; const ADefault: int64): int64;
+begin
+  if AValue.empty() then
+    return ADefault;
+  end;
+  guard
+    return HexToInt(AValue);
+  except
+    return ADefault;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Float to String
+//-----------------------------------------------------------------------------
+
+exported routine FloatToStr(const AValue: float64): string;
+begin
+  return std::format("{:g}", AValue);
+end;
+
+exported routine FloatToStr(const AValue: float64; const ADecimals: int32): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::vformat("{:.{}f}", std::make_format_args(AValue, ADecimals));
+  return LResult;
+end;
+
+exported routine FloatToStrF(const AValue: float64; const AWidth: int32; const ADecimals: int32): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::vformat("{:{}.{}f}", std::make_format_args(AValue, AWidth, ADecimals));
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// String to Float
+//-----------------------------------------------------------------------------
+
+exported routine StrToFloat(const AValue: string): float64;
+begin
+  return std::stod(AValue);
+end;
+
+exported routine StrToFloatDef(const AValue: string; const ADefault: float64): float64;
+begin
+  if AValue.empty() then
+    return ADefault;
+  end;
+  guard
+    return std::stod(AValue);
+  except
+    return ADefault;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Boolean Conversions
+//-----------------------------------------------------------------------------
+
+exported routine BoolToStr(const AValue: boolean): string;
+begin
+  if AValue then
+    return "True";
+  else
+    return "False";
+  end;
+end;
+
+exported routine BoolToStr(const AValue: boolean; const AUseBoolStrs: boolean): string;
+begin
+  if AUseBoolStrs then
+    if AValue then
+      return "True";
+    else
+      return "False";
+    end;
+  else
+    if AValue then
+      return "1";
+    else
+      return "0";
+    end;
+  end;
+end;
+
+exported routine StrToBool(const AValue: string): boolean;
+var
+  LFirst: char;
+begin
+  if AValue.empty() then
+    return false;
+  end;
+
+  LFirst := char(AValue[0]);
+
+  if (LFirst = 'T') or (LFirst = 't') then
+    return true;
+  end;
+  if (LFirst = 'Y') or (LFirst = 'y') then
+    return true;
+  end;
+  if LFirst = '1' then
+    return true;
+  end;
+
+  return false;
+end;
+
+exported routine StrToBoolDef(const AValue: string; const ADefault: boolean): boolean;
+begin
+  if AValue.empty() then
+    return ADefault;
+  end;
+  return StrToBool(AValue);
+end;
+
+//-----------------------------------------------------------------------------
+// Character Conversions
+//-----------------------------------------------------------------------------
+
+exported routine Ord(const AValue: char): int32;
+begin
+  return int32(AValue);
+end;
+
+exported routine Chr(const AValue: int32): char;
+begin
+  return char(AValue);
+end;
+
+//-----------------------------------------------------------------------------
+// Number Formatting
+//-----------------------------------------------------------------------------
+
+// Format integer with thousands separator
+exported routine FormatNumber(const AValue: int64): string;
+var
+  LSrc: std::string;
+  LResult: std::string;
+  LDC: int32;
+  LI: int32;
+  LAbsVal: int64;
+begin
+  if AValue < 0 then
+    LAbsVal := -AValue;
+  else
+    LAbsVal := AValue;
+  end;
+  LSrc := std::to_string(LAbsVal);
+  LDC := 0;
+  LI := int32(LSrc.size()) - 1;
+  while LI >= 0 do
+    if (LDC > 0) and ((LDC mod 3) = 0) then
+      LResult := "," + LResult;
+    end;
+    LResult := std::string(1, LSrc[size_t(LI)]) + LResult;
+    LDC := LDC + 1;
+    LI := LI - 1;
+  end;
+  if AValue < 0 then
+    LResult := "-" + LResult;
+  end;
+  return LResult;
+end;
+
+// Format float with thousands separator
+exported routine FormatNumber(const AValue: float64; const ADecimals: int32): string;
+var
+  LIntPart: int64;
+  LFracPart: float64;
+  LResult: std::string;
+  LFrac: std::string;
+begin
+  LIntPart := int64(AValue);
+  LResult  := FormatNumber(LIntPart);
+
+  if ADecimals > 0 then
+    LFracPart := AValue - float64(LIntPart);
+    LFrac := std::vformat("{:.{}f}", std::make_format_args(LFracPart, ADecimals));
+    LResult := LResult + LFrac.substr(1);
+  end;
+
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Binary String Conversions
+//-----------------------------------------------------------------------------
+
+exported routine IntToBin(const AValue: int64): string;
+begin
+  return std::format("{:b}", AValue);
+end;
+
+exported routine IntToBin(const AValue: int64; const ADigits: int32): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::vformat("{:0{}b}", std::make_format_args(AValue, ADigits));
+  return LResult;
+end;
+
+exported routine BinToInt(const AValue: string): int64;
+var
+  LResult: int64;
+  LStart: size_t;
+begin
+  LResult := 0;
+  if not AValue.empty() then
+    LStart := 0;
+    if (AValue.size() >= 2) and (AValue[0] = '0') and ((AValue[1] = 'b') or (AValue[1] = 'B')) then
+      LStart := 2;
+    end;
+    LResult := static_cast<int64_t>(std::stoll(AValue.substr(LStart), nullptr, 2));
+  end;
+  return LResult;
+end;
+
+exported routine BinToIntDef(const AValue: string; const ADefault: int64): int64;
+begin
+  if AValue.empty() then
+    return ADefault;
+  end;
+  guard
+    return BinToInt(AValue);
+  except
+    return ADefault;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Octal String Conversions
+//-----------------------------------------------------------------------------
+
+exported routine IntToOct(const AValue: int64): string;
+begin
+  return std::format("{:o}", AValue);
+end;
+
+exported routine IntToOct(const AValue: int64; const ADigits: int32): string;
+var
+  LResult: std::string;
+begin
+  LResult := std::vformat("{:0{}o}", std::make_format_args(AValue, ADigits));
+  return LResult;
+end;
+
+exported routine OctToInt(const AValue: string): int64;
+var
+  LResult: int64;
+  LStart: size_t;
+begin
+  LResult := 0;
+  if not AValue.empty() then
+    LStart := 0;
+    if (AValue.size() >= 2) and (AValue[0] = '0') and ((AValue[1] = 'o') or (AValue[1] = 'O')) then
+      LStart := 2;
+    end;
+    LResult := static_cast<int64_t>(std::stoll(AValue.substr(LStart), nullptr, 8));
+  end;
+  return LResult;
+end;
+
+end.

@@ -1,0 +1,364 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Geometry;
+
+import
+  Maths;
+
+//-----------------------------------------------------------------------------
+// Geometric Types
+//-----------------------------------------------------------------------------
+
+exported type
+  TPoint = record
+    X: int32;
+    Y: int32;
+  end;
+
+  TPointF = record
+    X: float64;
+    Y: float64;
+  end;
+
+  TRect = record
+    Left: int32;
+    Top: int32;
+    Right: int32;
+    Bottom: int32;
+  end;
+
+  TRectF = record
+    Left: float64;
+    Top: float64;
+    Right: float64;
+    Bottom: float64;
+  end;
+
+  TSize = record
+    CX: int32;
+    CY: int32;
+  end;
+
+  TSizeF = record
+    CX: float64;
+    CY: float64;
+  end;
+
+//-----------------------------------------------------------------------------
+// Constructor Functions - Integer
+//-----------------------------------------------------------------------------
+
+exported routine Point(const AX: int32; const AY: int32): TPoint;
+var
+  LResult: TPoint;
+begin
+  LResult.X := AX;
+  LResult.Y := AY;
+  return LResult;
+end;
+
+exported routine Rect(const ALeft: int32; const ATop: int32; const ARight: int32; const ABottom: int32): TRect;
+var
+  LResult: TRect;
+begin
+  LResult.Left := ALeft;
+  LResult.Top := ATop;
+  LResult.Right := ARight;
+  LResult.Bottom := ABottom;
+  return LResult;
+end;
+
+exported routine Bounds(const ALeft: int32; const ATop: int32; const AWidth: int32; const AHeight: int32): TRect;
+var
+  LResult: TRect;
+begin
+  LResult.Left := ALeft;
+  LResult.Top := ATop;
+  LResult.Right := ALeft + AWidth;
+  LResult.Bottom := ATop + AHeight;
+  return LResult;
+end;
+
+exported routine Size(const ACX: int32; const ACY: int32): TSize;
+var
+  LResult: TSize;
+begin
+  LResult.CX := ACX;
+  LResult.CY := ACY;
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Constructor Functions - Float (overloaded)
+//-----------------------------------------------------------------------------
+
+exported routine Point(const AX: float64; const AY: float64): TPointF;
+var
+  LResult: TPointF;
+begin
+  LResult.X := AX;
+  LResult.Y := AY;
+  return LResult;
+end;
+
+exported routine Rect(const ALeft: float64; const ATop: float64; const ARight: float64; const ABottom: float64): TRectF;
+var
+  LResult: TRectF;
+begin
+  LResult.Left := ALeft;
+  LResult.Top := ATop;
+  LResult.Right := ARight;
+  LResult.Bottom := ABottom;
+  return LResult;
+end;
+
+exported routine Bounds(const ALeft: float64; const ATop: float64; const AWidth: float64; const AHeight: float64): TRectF;
+var
+  LResult: TRectF;
+begin
+  LResult.Left := ALeft;
+  LResult.Top := ATop;
+  LResult.Right := ALeft + AWidth;
+  LResult.Bottom := ATop + AHeight;
+  return LResult;
+end;
+
+exported routine Size(const ACX: float64; const ACY: float64): TSizeF;
+var
+  LResult: TSizeF;
+begin
+  LResult.CX := ACX;
+  LResult.CY := ACY;
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Query Functions - Integer
+//-----------------------------------------------------------------------------
+
+exported routine PtInRect(const ARect: TRect; const APoint: TPoint): boolean;
+begin
+  return (APoint.X >= ARect.Left) and (APoint.X < ARect.Right) and
+         (APoint.Y >= ARect.Top) and (APoint.Y < ARect.Bottom);
+end;
+
+exported routine RectWidth(const ARect: TRect): int32;
+begin
+  return ARect.Right - ARect.Left;
+end;
+
+exported routine RectHeight(const ARect: TRect): int32;
+begin
+  return ARect.Bottom - ARect.Top;
+end;
+
+exported routine IsRectEmpty(const ARect: TRect): boolean;
+begin
+  return (ARect.Right <= ARect.Left) or (ARect.Bottom <= ARect.Top);
+end;
+
+exported routine EqualRect(const ARect1: TRect; const ARect2: TRect): boolean;
+begin
+  return (ARect1.Left = ARect2.Left) and (ARect1.Top = ARect2.Top) and
+         (ARect1.Right = ARect2.Right) and (ARect1.Bottom = ARect2.Bottom);
+end;
+
+exported routine RectCenter(const ARect: TRect): TPoint;
+var
+  LResult: TPoint;
+begin
+  LResult.X := (ARect.Left + ARect.Right) div 2;
+  LResult.Y := (ARect.Top + ARect.Bottom) div 2;
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Query Functions - Float (overloaded)
+//-----------------------------------------------------------------------------
+
+exported routine PtInRect(const ARect: TRectF; const APoint: TPointF): boolean;
+begin
+  return (APoint.X >= ARect.Left) and (APoint.X < ARect.Right) and
+         (APoint.Y >= ARect.Top) and (APoint.Y < ARect.Bottom);
+end;
+
+exported routine RectWidth(const ARect: TRectF): float64;
+begin
+  return ARect.Right - ARect.Left;
+end;
+
+exported routine RectHeight(const ARect: TRectF): float64;
+begin
+  return ARect.Bottom - ARect.Top;
+end;
+
+exported routine IsRectEmpty(const ARect: TRectF): boolean;
+begin
+  return (ARect.Right <= ARect.Left) or (ARect.Bottom <= ARect.Top);
+end;
+
+exported routine RectCenter(const ARect: TRectF): TPointF;
+var
+  LResult: TPointF;
+begin
+  LResult.X := (ARect.Left + ARect.Right) / 2.0;
+  LResult.Y := (ARect.Top + ARect.Bottom) / 2.0;
+  return LResult;
+end;
+
+//-----------------------------------------------------------------------------
+// Modification Functions - Integer
+//-----------------------------------------------------------------------------
+
+exported routine OffsetRect(var ARect: TRect; const ADX: int32; const ADY: int32);
+begin
+  ARect.Left := ARect.Left + ADX;
+  ARect.Top := ARect.Top + ADY;
+  ARect.Right := ARect.Right + ADX;
+  ARect.Bottom := ARect.Bottom + ADY;
+end;
+
+exported routine InflateRect(var ARect: TRect; const ADX: int32; const ADY: int32);
+begin
+  ARect.Left := ARect.Left - ADX;
+  ARect.Top := ARect.Top - ADY;
+  ARect.Right := ARect.Right + ADX;
+  ARect.Bottom := ARect.Bottom + ADY;
+end;
+
+exported routine NormalizeRect(var ARect: TRect);
+var
+  LTemp: int32;
+begin
+  if ARect.Left > ARect.Right then
+    LTemp := ARect.Left;
+    ARect.Left := ARect.Right;
+    ARect.Right := LTemp;
+  end;
+  if ARect.Top > ARect.Bottom then
+    LTemp := ARect.Top;
+    ARect.Top := ARect.Bottom;
+    ARect.Bottom := LTemp;
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Modification Functions - Float (overloaded)
+//-----------------------------------------------------------------------------
+
+exported routine OffsetRect(var ARect: TRectF; const ADX: float64; const ADY: float64);
+begin
+  ARect.Left := ARect.Left + ADX;
+  ARect.Top := ARect.Top + ADY;
+  ARect.Right := ARect.Right + ADX;
+  ARect.Bottom := ARect.Bottom + ADY;
+end;
+
+exported routine InflateRect(var ARect: TRectF; const ADX: float64; const ADY: float64);
+begin
+  ARect.Left := ARect.Left - ADX;
+  ARect.Top := ARect.Top - ADY;
+  ARect.Right := ARect.Right + ADX;
+  ARect.Bottom := ARect.Bottom + ADY;
+end;
+
+//-----------------------------------------------------------------------------
+// Intersection / Union
+//-----------------------------------------------------------------------------
+
+exported routine IntersectRect(var ADestRect: TRect; const ARect1: TRect; const ARect2: TRect): boolean;
+begin
+  ADestRect.Left := ARect1.Left;
+  if ARect2.Left > ADestRect.Left then
+    ADestRect.Left := ARect2.Left;
+  end;
+
+  ADestRect.Top := ARect1.Top;
+  if ARect2.Top > ADestRect.Top then
+    ADestRect.Top := ARect2.Top;
+  end;
+
+  ADestRect.Right := ARect1.Right;
+  if ARect2.Right < ADestRect.Right then
+    ADestRect.Right := ARect2.Right;
+  end;
+
+  ADestRect.Bottom := ARect1.Bottom;
+  if ARect2.Bottom < ADestRect.Bottom then
+    ADestRect.Bottom := ARect2.Bottom;
+  end;
+
+  return not IsRectEmpty(ADestRect);
+end;
+
+exported routine UnionRect(var ADestRect: TRect; const ARect1: TRect; const ARect2: TRect): boolean;
+begin
+  ADestRect.Left := ARect1.Left;
+  if ARect2.Left < ADestRect.Left then
+    ADestRect.Left := ARect2.Left;
+  end;
+
+  ADestRect.Top := ARect1.Top;
+  if ARect2.Top < ADestRect.Top then
+    ADestRect.Top := ARect2.Top;
+  end;
+
+  ADestRect.Right := ARect1.Right;
+  if ARect2.Right > ADestRect.Right then
+    ADestRect.Right := ARect2.Right;
+  end;
+
+  ADestRect.Bottom := ARect1.Bottom;
+  if ARect2.Bottom > ADestRect.Bottom then
+    ADestRect.Bottom := ARect2.Bottom;
+  end;
+
+  return not IsRectEmpty(ADestRect);
+end;
+
+//-----------------------------------------------------------------------------
+// Point Operations
+//-----------------------------------------------------------------------------
+
+exported routine OffsetPoint(var APoint: TPoint; const ADX: int32; const ADY: int32);
+begin
+  APoint.X := APoint.X + ADX;
+  APoint.Y := APoint.Y + ADY;
+end;
+
+exported routine OffsetPoint(var APoint: TPointF; const ADX: float64; const ADY: float64);
+begin
+  APoint.X := APoint.X + ADX;
+  APoint.Y := APoint.Y + ADY;
+end;
+
+exported routine Distance(const AP1: TPoint; const AP2: TPoint): float64;
+var
+  LDX: float64;
+  LDY: float64;
+begin
+  LDX := float64(AP2.X - AP1.X);
+  LDY := float64(AP2.Y - AP1.Y);
+  return Maths.Sqrt(LDX * LDX + LDY * LDY);
+end;
+
+exported routine Distance(const AP1: TPointF; const AP2: TPointF): float64;
+var
+  LDX: float64;
+  LDY: float64;
+begin
+  LDX := AP2.X - AP1.X;
+  LDY := AP2.Y - AP1.Y;
+  return Maths.Sqrt(LDX * LDX + LDY * LDY);
+end;
+
+end.

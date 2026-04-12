@@ -1,0 +1,271 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Console;
+
+#include <iostream>
+
+//-----------------------------------------------------------------------------
+// ANSI Color Constants
+//-----------------------------------------------------------------------------
+
+// Text styles
+exported const
+  clReset: string = "\x1B[0m";
+  clBold: string = "\x1B[1m";
+  clDim: string = "\x1B[2m";
+  clItalic: string = "\x1B[3m";
+  clUnderline: string = "\x1B[4m";
+  clBlink: string = "\x1B[5m";
+  clReverse: string = "\x1B[7m";
+  clHidden: string = "\x1B[8m";
+  clStrikethrough: string = "\x1B[9m";
+
+// Foreground colors
+exported const
+  clBlack: string = "\x1B[30m";
+  clRed: string = "\x1B[31m";
+  clGreen: string = "\x1B[32m";
+  clYellow: string = "\x1B[33m";
+  clBlue: string = "\x1B[34m";
+  clMagenta: string = "\x1B[35m";
+  clCyan: string = "\x1B[36m";
+  clWhite: string = "\x1B[37m";
+  clDefault: string = "\x1B[39m";
+
+// Bright foreground colors
+exported const
+  clBrightBlack: string = "\x1B[90m";
+  clBrightRed: string = "\x1B[91m";
+  clBrightGreen: string = "\x1B[92m";
+  clBrightYellow: string = "\x1B[93m";
+  clBrightBlue: string = "\x1B[94m";
+  clBrightMagenta: string = "\x1B[95m";
+  clBrightCyan: string = "\x1B[96m";
+  clBrightWhite: string = "\x1B[97m";
+
+// Background colors
+exported const
+  clBgBlack: string = "\x1B[40m";
+  clBgRed: string = "\x1B[41m";
+  clBgGreen: string = "\x1B[42m";
+  clBgYellow: string = "\x1B[43m";
+  clBgBlue: string = "\x1B[44m";
+  clBgMagenta: string = "\x1B[45m";
+  clBgCyan: string = "\x1B[46m";
+  clBgWhite: string = "\x1B[47m";
+  clBgDefault: string = "\x1B[49m";
+
+// Bright background colors
+exported const
+  clBgBrightBlack: string = "\x1B[100m";
+  clBgBrightRed: string = "\x1B[101m";
+  clBgBrightGreen: string = "\x1B[102m";
+  clBgBrightYellow: string = "\x1B[103m";
+  clBgBrightBlue: string = "\x1B[104m";
+  clBgBrightMagenta: string = "\x1B[105m";
+  clBgBrightCyan: string = "\x1B[106m";
+  clBgBrightWhite: string = "\x1B[107m";
+
+//-----------------------------------------------------------------------------
+// Input Routines
+//-----------------------------------------------------------------------------
+
+// Read a single character (blocking)
+exported routine ReadChar(): char;
+begin
+  return char(std::cin.get());
+end;
+
+// Wait for Enter key
+exported routine ReadLn();
+var
+  LCh: int32;
+begin
+  LCh := std::cin.get();
+  while (LCh <> 10) and (LCh <> -1) do
+    LCh := std::cin.get();
+  end;
+end;
+
+// Pause and wait for keypress
+exported routine Pause();
+begin
+  write("Press Enter to continue...");
+  std::cout.flush();
+  ReadLn();
+end;
+
+// Pause with custom message
+exported routine Pause(const AMessage: string);
+begin
+  writeln("{}", AMessage);
+  std::cout.flush();
+  ReadLn();
+end;
+
+//-----------------------------------------------------------------------------
+// Screen Control
+//-----------------------------------------------------------------------------
+
+// Clear screen and move cursor to home
+exported routine ClearScreen();
+begin
+  write("\x1B[2J\x1B[H");
+end;
+
+// Clear current line
+exported routine ClearLine();
+begin
+  write("\x1B[2K\r");
+end;
+
+// Clear from cursor to end of line
+exported routine ClearToEndOfLine();
+begin
+  write("\x1B[K");
+end;
+
+// Clear from cursor to end of screen
+exported routine ClearToEndOfScreen();
+begin
+  write("\x1B[J");
+end;
+
+//-----------------------------------------------------------------------------
+// Cursor Visibility
+//-----------------------------------------------------------------------------
+
+exported routine HideCursor();
+begin
+  write("\x1B[?25l");
+end;
+
+exported routine ShowCursor();
+begin
+  write("\x1B[?25h");
+end;
+
+//-----------------------------------------------------------------------------
+// Cursor Movement
+//-----------------------------------------------------------------------------
+
+// Set cursor position (1-based)
+exported routine SetCursorPos(const AX: int32; const AY: int32);
+begin
+  write("\x1B[{};{}H", AY, AX);
+end;
+
+// Move cursor up N lines
+exported routine CursorUp(const ACount: int32);
+begin
+  write("\x1B[{}A", ACount);
+end;
+
+// Move cursor down N lines
+exported routine CursorDown(const ACount: int32);
+begin
+  write("\x1B[{}B", ACount);
+end;
+
+// Move cursor forward N columns
+exported routine CursorForward(const ACount: int32);
+begin
+  write("\x1B[{}C", ACount);
+end;
+
+// Move cursor back N columns
+exported routine CursorBack(const ACount: int32);
+begin
+  write("\x1B[{}D", ACount);
+end;
+
+// Move cursor to beginning of line N lines down
+exported routine CursorNextLine(const ACount: int32);
+begin
+  write("\x1B[{}E", ACount);
+end;
+
+// Move cursor to beginning of line N lines up
+exported routine CursorPrevLine(const ACount: int32);
+begin
+  write("\x1B[{}F", ACount);
+end;
+
+// Move cursor to column N (1-based)
+exported routine CursorToColumn(const AColumn: int32);
+begin
+  write("\x1B[{}G", AColumn);
+end;
+
+// Save cursor position
+exported routine SaveCursor();
+begin
+  write("\x1B[s");
+end;
+
+// Restore cursor position
+exported routine RestoreCursor();
+begin
+  write("\x1B[u");
+end;
+
+//-----------------------------------------------------------------------------
+// Color Helpers - 256 Color Mode
+//-----------------------------------------------------------------------------
+
+// Set foreground color (0-255)
+exported routine SetFgColor(const AColor: int32);
+begin
+  write("\x1B[38;5;{}m", AColor);
+end;
+
+// Set background color (0-255)
+exported routine SetBgColor(const AColor: int32);
+begin
+  write("\x1B[48;5;{}m", AColor);
+end;
+
+//-----------------------------------------------------------------------------
+// Color Helpers - True Color (24-bit RGB)
+//-----------------------------------------------------------------------------
+
+// Set RGB foreground color
+exported routine SetFgRGB(const AR: int32; const AG: int32; const AB: int32);
+begin
+  write("\x1B[38;2;{};{};{}m", AR, AG, AB);
+end;
+
+// Set RGB background color
+exported routine SetBgRGB(const AR: int32; const AG: int32; const AB: int32);
+begin
+  write("\x1B[48;2;{};{};{}m", AR, AG, AB);
+end;
+
+//-----------------------------------------------------------------------------
+// Reset
+//-----------------------------------------------------------------------------
+
+// Reset all attributes
+exported routine ResetColors();
+begin
+  write("\x1B[0m");
+end;
+
+// Reset and clear screen
+exported routine Reset();
+begin
+  ResetColors();
+  ClearScreen();
+  ShowCursor();
+end;
+
+end.

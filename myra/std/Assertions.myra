@@ -1,0 +1,259 @@
+﻿/*==============================================================================
+  Myra™ Programming Language.
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://myralang.org
+
+  See LICENSE for license information
+==============================================================================*/
+
+module lib Assertions;
+
+import
+  Console;
+
+#include <cstdlib>
+
+//-----------------------------------------------------------------------------
+// Internal Helper Routines
+//-----------------------------------------------------------------------------
+
+routine PrintFail(const AMessage: string);
+begin
+  write("{}{}", Console.clRed, Console.clBold);
+  write("🔴 FAIL: ");
+  write("{}", Console.clReset);
+  write("{}", Console.clRed);
+  writeln("{}", AMessage);
+  write("{}", Console.clReset);
+end;
+
+routine PrintPass(const AMessage: string);
+begin
+  write("{}{}", Console.clGreen, Console.clBold);
+  write("🟢 PASS: ");
+  write("{}", Console.clReset);
+  write("{}", Console.clGreen);
+  writeln("{}", AMessage);
+  write("{}", Console.clReset);
+end;
+
+//-----------------------------------------------------------------------------
+// Basic Assertions
+//-----------------------------------------------------------------------------
+
+// Basic assertion - fails if condition is false
+exported routine Assert(const ACondition: boolean; const AMessage: string);
+begin
+  if not ACondition then
+    PrintFail(AMessage);
+    std::exit(1);
+  end;
+end;
+
+// Assert that condition is true (explicit)
+exported routine AssertTrue(const ACondition: boolean; const AMessage: string);
+begin
+  if not ACondition then
+    PrintFail(AMessage);
+    writeln("    Expected: TRUE");
+    writeln("    Actual:   FALSE");
+    std::exit(1);
+  end;
+end;
+
+// Assert that condition is false (explicit)
+exported routine AssertFalse(const ACondition: boolean; const AMessage: string);
+begin
+  if ACondition then
+    PrintFail(AMessage);
+    writeln("    Expected: FALSE");
+    writeln("    Actual:   TRUE");
+    std::exit(1);
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Equality Assertions - Overloaded
+//-----------------------------------------------------------------------------
+
+// Assert equality - integer
+exported routine AssertEqual(const AExpected: int64; const AActual: int64; const AMessage: string);
+begin
+  if AExpected <> AActual then
+    PrintFail(AMessage);
+    writeln("    Expected: {}", AExpected);
+    writeln("    Actual:   {}", AActual);
+    std::exit(1);
+  end;
+end;
+
+// Assert equality - float
+exported routine AssertEqual(const AExpected: float64; const AActual: float64; const AMessage: string);
+begin
+  if AExpected <> AActual then
+    PrintFail(AMessage);
+    writeln("    Expected: {}", AExpected);
+    writeln("    Actual:   {}", AActual);
+    std::exit(1);
+  end;
+end;
+
+// Assert equality - string
+exported routine AssertEqual(const AExpected: string; const AActual: string; const AMessage: string);
+begin
+  if AExpected <> AActual then
+    PrintFail(AMessage);
+    writeln("    Expected: {}", AExpected);
+    writeln("    Actual:   {}", AActual);
+    std::exit(1);
+  end;
+end;
+
+// Assert equality - boolean
+exported routine AssertEqual(const AExpected: boolean; const AActual: boolean; const AMessage: string);
+begin
+  if AExpected <> AActual then
+    PrintFail(AMessage);
+    writeln("    Expected: {}", AExpected);
+    writeln("    Actual:   {}", AActual);
+    std::exit(1);
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Inequality Assertions - Overloaded
+//-----------------------------------------------------------------------------
+
+// Assert inequality - integer
+exported routine AssertNotEqual(const ANotExpected: int64; const AActual: int64; const AMessage: string);
+begin
+  if ANotExpected = AActual then
+    PrintFail(AMessage);
+    writeln("    Value should not be: {}", AActual);
+    std::exit(1);
+  end;
+end;
+
+// Assert inequality - string
+exported routine AssertNotEqual(const ANotExpected: string; const AActual: string; const AMessage: string);
+begin
+  if ANotExpected = AActual then
+    PrintFail(AMessage);
+    writeln("    Value should not be: {}", AActual);
+    std::exit(1);
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Pointer Assertions
+//-----------------------------------------------------------------------------
+
+// Assert pointer is nil
+exported routine AssertNil(const APointer: pointer; const AMessage: string);
+begin
+  if APointer <> nil then
+    PrintFail(AMessage);
+    writeln("    Expected: nil");
+    writeln("    Actual:   not nil");
+    std::exit(1);
+  end;
+end;
+
+// Assert pointer is not nil
+exported routine AssertNotNil(const APointer: pointer; const AMessage: string);
+begin
+  if APointer = nil then
+    PrintFail(AMessage);
+    writeln("    Expected: not nil");
+    writeln("    Actual:   nil");
+    std::exit(1);
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Range Assertions
+//-----------------------------------------------------------------------------
+
+// Assert value is within range [ALow, AHigh]
+exported routine AssertInRange(const AValue: int64; const ALow: int64; const AHigh: int64; const AMessage: string);
+begin
+  if (AValue < ALow) or (AValue > AHigh) then
+    PrintFail(AMessage);
+    writeln("    Value: {}", AValue);
+    writeln("    Expected range: [{}, {}]", ALow, AHigh);
+    std::exit(1);
+  end;
+end;
+
+// Assert float value is within range
+exported routine AssertInRange(const AValue: float64; const ALow: float64; const AHigh: float64; const AMessage: string);
+begin
+  if (AValue < ALow) or (AValue > AHigh) then
+    PrintFail(AMessage);
+    writeln("    Value: {}", AValue);
+    writeln("    Expected range: [{}, {}]", ALow, AHigh);
+    std::exit(1);
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Comparison Assertions
+//-----------------------------------------------------------------------------
+
+exported routine AssertGreater(const AValue: int64; const ACompare: int64; const AMessage: string);
+begin
+  if AValue <= ACompare then
+    PrintFail(AMessage);
+    writeln("    Expected: {} > {}", AValue, ACompare);
+    std::exit(1);
+  end;
+end;
+
+exported routine AssertGreaterOrEqual(const AValue: int64; const ACompare: int64; const AMessage: string);
+begin
+  if AValue < ACompare then
+    PrintFail(AMessage);
+    writeln("    Expected: {} >= {}", AValue, ACompare);
+    std::exit(1);
+  end;
+end;
+
+exported routine AssertLess(const AValue: int64; const ACompare: int64; const AMessage: string);
+begin
+  if AValue >= ACompare then
+    PrintFail(AMessage);
+    writeln("    Expected: {} < {}", AValue, ACompare);
+    std::exit(1);
+  end;
+end;
+
+exported routine AssertLessOrEqual(const AValue: int64; const ACompare: int64; const AMessage: string);
+begin
+  if AValue > ACompare then
+    PrintFail(AMessage);
+    writeln("    Expected: {} <= {}", AValue, ACompare);
+    std::exit(1);
+  end;
+end;
+
+//-----------------------------------------------------------------------------
+// Control Flow
+//-----------------------------------------------------------------------------
+
+// Unconditional failure
+exported routine Fail(const AMessage: string);
+begin
+  PrintFail(AMessage);
+  std::exit(1);
+end;
+
+// Mark test as passed (for explicit confirmation)
+exported routine Pass(const AMessage: string);
+begin
+  PrintPass(AMessage);
+end;
+
+end.
