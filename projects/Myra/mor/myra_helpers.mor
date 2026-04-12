@@ -39,6 +39,10 @@ routine resolveType(typeText: string) -> string {
     return resolveType(substr(typeText, 11, len(typeText) - 11)) + "*";
   }
   if typeText == "set" or startsWith(typeText, "set ") { return "MorSet"; }
+  // Convert module-qualified dots to C++ scope resolution
+  if contains(typeText, ".") {
+    return replace(typeText, ".", "::");
+  }
   return typeText;
 }
 
@@ -376,6 +380,14 @@ routine collectTypeText() -> string {
   typeRaw = currentText();
   advance();
 
+  // Follow . for module-qualified types (Module.Type)
+  while checkToken("delimiter.dot") {
+    typeRaw = typeRaw + ".";
+    advance();
+    typeRaw = typeRaw + currentText();
+    advance();
+  }
+
   // Follow :: chains (C++ qualified types like std::string)
   while checkToken("cpp.op.scope") {
     typeRaw = typeRaw + "::";
@@ -455,5 +467,144 @@ routine stampFloatLiterals(n: node, targetType: string) {
   while i < childCount(n) {
     stampFloatLiterals(getChild(n, i), targetType);
     i = i + 1;
+  }
+}
+
+// Emit an exported type declaration to header for lib modules
+routine emitExportedTypeToHeader(td: node) {
+  let tname = getAttr(td, "decl.name");
+  let tkind = getAttr(td, "type.kind");
+
+  if tkind == "alias" {
+    let aliasText = getAttr(td, "type.alias_text");
+    emitLine("using " + tname + " = " + resolveType(aliasText) + ";", "header");
+  } else if tkind == "record" or tkind == "overlay" {
+    let parentType = getAttr(td, "type.parent");
+    let isPacked = getAttr(td, "type.packed");
+    let alignVal = getAttr(td, "type.align");
+    if isPacked == "true" {
+      emitLine("#pragma pack(push, 1)", "header");
+    }
+    let structLine = "";
+    if tkind == "overlay" {
+      structLine = "union ";
+    } else {
+      structLine = "struct ";
+    }
+    if alignVal != "" {
+      structLine = structLine + "alignas(" + alignVal + ") ";
+    }
+    structLine = structLine + tname;
+    if parentType != "" {
+      structLine = structLine + " : public " + parentType;
+    }
+    emitLine(structLine + " {", "header");
+    // Emit fields to header
+    let fi = 0;
+    while fi < childCount(td) {
+      let fch = getChild(td, fi);
+      if nodeKind(fch) == "stmt.field_decl" {
+        let fname = getAttr(fch, "field.name");
+        let ftype = getAttr(fch, "field.type_text");
+        let bitwidth = getAttr(fch, "field.bitwidth");
+        if bitwidth != "" {
+          emitLine("  " + resolveType(ftype) + " " + fname + " : " + bitwidth + ";", "header");
+        } else {
+          emitLine("  " + resolveType(ftype) + " " + fname + ";", "header");
+        }
+      }
+      fi = fi + 1;
+    }
+    if parentType != "" {
+      emitLine("  using Super = " + parentType + ";", "header");
+    }
+    emitLine("};", "header");
+    if isPacked == "true" {
+      emitLine("#pragma pack(pop)", "header");
+    }
+  } else if tkind == "choices" {
+    let line = "enum " + tname + " { ";
+    let ci = 0;
+    let cn = childCount(td);
+    while ci < cn {
+      let cv = getChild(td, ci);
+      if ci > 0 { line = line + ", "; }
+      let cvname = getAttr(cv, "choice.name");
+      line = line + cvname;
+      if childCount(cv) > 0 {
+        line = line + " = " + exprToString(getChild(cv, 0));
+      }
+      ci = ci + 1;
+    }
+    emitLine(line + " };", "header");
+  } else if tkind == "pointer" {
+    let pointee = getAttr(td, "type.pointee");
+    let isConst = getAttr(td, "type.pointer_const");
+    if pointee != "" {
+      emitLine("struct " + resolveType(pointee) + ";", "header");
+      if isConst == "true" {
+        emitLine("using " + tname + " = const " + resolveType(pointee) + "*;", "header");
+      } else {
+        emitLine("using " + tname + " = " + resolveType(pointee) + "*;", "header");
+      }
+    } else {
+      emitLine("using " + tname + " = void*;", "header");
+    }
+  } else if tkind == "array" {
+    let elemType = getAttr(td, "type.elem_type");
+    let arrLow = getAttr(td, "type.array_low");
+    let arrHigh = getAttr(td, "type.array_high");
+    if arrLow != "" and arrHigh != "" {
+      let sz = strToInt(arrHigh) - strToInt(arrLow) + 1;
+      emitLine("using " + tname + " = std::array<" + resolveType(elemType) + ", " + intToStr(sz) + ">;", "header");
+    } else {
+      emitLine("using " + tname + " = std::vector<" + resolveType(elemType) + ">;", "header");
+    }
+  } else if tkind == "set" {
+    let rangeLow = getAttr(td, "type.set_range_low");
+    let rangeHigh = getAttr(td, "type.set_range_high");
+    let elemType = getAttr(td, "type.elem_type");
+    if rangeLow != "" and rangeHigh != "" {
+      let sz = strToInt(rangeHigh) - strToInt(rangeLow) + 1;
+      emitLine("using " + tname + " = std::bitset<" + intToStr(sz) + ">;", "header");
+    } else if elemType != "" {
+      emitLine("using " + tname + " = std::set<" + resolveType(elemType) + ">;", "header");
+    } else {
+      emitLine("using " + tname + " = std::set<int32_t>;", "header");
+    }
+  } else if tkind == "object" {
+    let parentType = getAttr(td, "type.parent");
+    if parentType != "" {
+      emitLine("struct " + tname + " : public " + parentType + " {", "header");
+      emitLine("  using Super = " + parentType + ";", "header");
+    } else {
+      emitLine("struct " + tname + " {", "header");
+    }
+    let fi = 0;
+    while fi < childCount(td) {
+      let fch = getChild(td, fi);
+      if nodeKind(fch) == "stmt.field_decl" {
+        let fname = getAttr(fch, "field.name");
+        let ftype = getAttr(fch, "field.type_text");
+        emitLine("  " + resolveType(ftype) + " " + fname + ";", "header");
+      }
+      fi = fi + 1;
+    }
+    emitLine("};", "header");
+  }
+}
+
+// Emit an exported const declaration to header for lib modules
+routine emitExportedConstToHeader(cd: node) {
+  let cname = getAttr(cd, "const.name");
+  let ctype = getAttr(cd, "const.type_text");
+  let prefix = "constexpr auto ";
+  if ctype != "" {
+    prefix = "constexpr " + resolveType(ctype) + " ";
+  }
+  if childCount(cd) > 0 {
+    emitLine(prefix + cname + " = " + exprToString(getChild(cd, 0)) + ";", "header");
+  } else {
+    emitLine(prefix + cname + ";", "header");
   }
 }

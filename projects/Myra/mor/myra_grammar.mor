@@ -487,8 +487,14 @@ grammar {
     while checkToken("keyword.const") or checkToken("keyword.type") or
           checkToken("keyword.var") or checkToken("keyword.routine") or
           checkToken("keyword.exported") or checkToken("cpp.op.hash") or
-          startsWith(currentKind(), "directive.") {
+          startsWith(currentKind(), "directive.") or
+          startsWith(currentKind(), "cpp.keyword.") {
       addChild(nd, parseStmt());
+    }
+
+    // Catch unrecognized tokens at module level
+    if not checkToken("keyword.begin") and not checkToken("keyword.end") and not checkToken("eof") {
+      error("Unexpected '" + currentText() + "' at module level; expected var, const, type, routine, exported, begin, or end.");
     }
 
     // Optional module body: begin StatementSeq end .
@@ -515,17 +521,11 @@ grammar {
   rule stmt.var_block {
     expect keyword.var;
     let nd = getResultNode();
-    while checkToken("identifier") or checkToken("keyword.exported") {
-      // BNF: [ "exported" ] VarDecl
-      let isExported = false;
-      if matchToken("keyword.exported") {
-        isExported = true;
-      }
+    while checkToken("identifier") {
       let nameTok = currentText();
       advance();
       let v = createNode("stmt.var_decl");
       setAttr(v, "var.name", nameTok);
-      if isExported { setAttr(v, "var.exported", "true"); }
       requireToken("delimiter.colon");
       // Collect full type text (array, pointer, qualified C++ types, etc.)
       let typeRaw = collectTypeText();
@@ -552,17 +552,11 @@ grammar {
   rule stmt.const_block {
     expect keyword.const;
     let nd = getResultNode();
-    while checkToken("identifier") or checkToken("keyword.exported") {
-      // BNF: [ "exported" ] ConstDecl
-      let isExported = false;
-      if matchToken("keyword.exported") {
-        isExported = true;
-      }
+    while checkToken("identifier") {
       let nameTok = currentText();
       advance();
       let c = createNode("stmt.const_decl");
       setAttr(c, "const.name", nameTok);
-      if isExported { setAttr(c, "const.exported", "true"); }
       if matchToken("delimiter.colon") {
         setAttr(c, "const.type_text", collectTypeText());
       }
@@ -577,18 +571,12 @@ grammar {
   rule stmt.type_block {
     expect keyword.type;
     let nd = getResultNode();
-    while checkToken("identifier") or checkToken("keyword.exported") {
-      // BNF: [ "exported" ] TypeDecl
-      let isExported = false;
-      if matchToken("keyword.exported") {
-        isExported = true;
-      }
+    while checkToken("identifier") {
       let nameTok = currentText();
       advance();
       requireToken("op.eq");
       let decl = createNode("stmt.type_decl");
       setAttr(decl, "decl.name", nameTok);
-      if isExported { setAttr(decl, "decl.exported", "true"); }
 
       if checkToken("keyword.record") {
         advance();
@@ -990,10 +978,22 @@ grammar {
   }
 
   // Expression-statement (identifier-led: assignment or call)
+  // Also handles C++ variable declarations (identifier identifier = expr;)
   rule stmt.expr {
     let nd = getResultNode();
-    addChild(nd, parseExpr(0));
-    matchToken("delimiter.semicolon");
+    // Detect C++ variable declarations: type followed by name
+    // e.g. int32_t __ms = static_cast<int32_t>(...);
+    if currentKind() == "identifier" and peekKind() == "identifier" {
+      let rawText = collectRaw();
+      // collectRaw may stop at balanced ) before ; — consume trailing ;
+      if matchToken("delimiter.semicolon") {
+        rawText = rawText + ";";
+      }
+      setAttr(nd, "cpp.raw", rawText);
+    } else {
+      addChild(nd, parseExpr(0));
+      matchToken("delimiter.semicolon");
+    }
   }
 
   // Self-led expression-statement (self.Field := value;)

@@ -33,12 +33,19 @@ emitters {
     let kind = getAttr(node, "module.kind");
 
     emitLine("#include <cstdint>", "header");
+    emitLine("#include <string>", "header");
+    emitLine("#include <array>", "header");
+    emitLine("#include <vector>", "header");
+    emitLine("#include <set>", "header");
+    emitLine("#include <bitset>", "header");
+    emitLine("#include <limits>", "header");
     emitLine("#include <cstdint>");
     emitLine("#include <string>");
     emitLine("#include <array>");
     emitLine("#include <vector>");
     emitLine("#include <set>");
     emitLine("#include <bitset>");
+    emitLine("#include <limits>");
     emitLine("#include <print>");
     emitLine("#include \"mor_runtime.h\"");
     emitLine("");
@@ -103,15 +110,31 @@ emitters {
       }
     }
 
-    // Emit preprocessor directives before namespace (must be at file scope)
+    // Emit preprocessor directives and interleaved C++ raw statements
+    // before namespace (must be at file scope). Emit to header only;
+    // the source gets these via the auto-generated #include "Module.h".
     let pi = 0;
     let pn = child_count();
     while pi < pn {
       let pch = getChild(node, pi);
-      if nodeKind(pch) == "stmt.preprocessor" {
-        emitNode(pch);
+      let pchKind = nodeKind(pch);
+      if pchKind == "stmt.preprocessor" or pchKind == "stmt.cpp_raw" {
+        let rawText = getAttr(pch, "cpp.raw");
+        emitLine(rawText, "header");
       }
       pi = pi + 1;
+    }
+
+    // Emit import includes before namespace (must be at file scope
+    // so system headers like <random>, <iostream> aren't nested)
+    let ii = 0;
+    let inum = child_count();
+    while ii < inum {
+      let ich = getChild(node, ii);
+      if nodeKind(ich) == "stmt.import_clause" {
+        emitNode(ich);
+      }
+      ii = ii + 1;
     }
 
     // For lib modules, wrap in namespace
@@ -121,13 +144,14 @@ emitters {
       emitLine("namespace " + mname + " {");
     }
 
-    // Emit non-preprocessor children inside namespace
+    // Emit remaining children inside namespace
     // Order: declarations, then test block functions, then module_body (main)
     let ei = 0;
     let en = child_count();
     while ei < en {
       let ech = getChild(node, ei);
-      if nodeKind(ech) != "stmt.preprocessor" and nodeKind(ech) != "stmt.test_block" and nodeKind(ech) != "stmt.module_body" {
+      let echKind = nodeKind(ech);
+      if echKind != "stmt.preprocessor" and echKind != "stmt.cpp_raw" and echKind != "stmt.import_clause" and echKind != "stmt.test_block" and echKind != "stmt.module_body" {
         emitNode(ech);
       }
       ei = ei + 1;
@@ -441,6 +465,7 @@ emitters {
   // Exported: emit header forward declarations for lib, then emit child
   on stmt.exported {
     let n = child_count();
+    let headerOnly = false;
     if n > 0 {
       let ch = getChild(node, 0);
       let chKind = nodeKind(ch);
@@ -449,9 +474,39 @@ emitters {
         emitRoutineForwardDecl(ch);
       } else if chKind == "stmt.var_block" {
         emitExportedVarForwardDecls(ch);
+      } else if chKind == "stmt.type_decl" {
+        emitExportedTypeToHeader(ch);
+        headerOnly = true;
+      } else if chKind == "stmt.type_block" {
+        let ti = 0;
+        while ti < childCount(ch) {
+          let tch = getChild(ch, ti);
+          if nodeKind(tch) == "stmt.type_decl" {
+            emitExportedTypeToHeader(tch);
+          }
+          ti = ti + 1;
+        }
+        headerOnly = true;
+      } else if chKind == "stmt.const_decl" {
+        emitExportedConstToHeader(ch);
+        headerOnly = true;
+      } else if chKind == "stmt.const_block" {
+        let ci = 0;
+        while ci < childCount(ch) {
+          let cch = getChild(ch, ci);
+          if nodeKind(cch) == "stmt.const_decl" {
+            emitExportedConstToHeader(cch);
+          }
+          ci = ci + 1;
+        }
+        headerOnly = true;
       }
     }
-    emitChildren(node);
+    // Types and consts go to header only (source gets them via self-include).
+    // Routines and vars need source emission for definitions/bodies.
+    if not headerOnly {
+      emitChildren(node);
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -573,6 +628,12 @@ emitters {
 
   // Expression-statement (identifier-led: assignment or call)
   on stmt.expr {
+    // C++ variable declaration passthrough (identifier identifier pattern)
+    let raw = getAttr(node, "cpp.raw");
+    if raw != "" {
+      emitLine(raw);
+      return;
+    }
     emitLine(exprToString(getChild(node, 0)) + ";");
   }
 

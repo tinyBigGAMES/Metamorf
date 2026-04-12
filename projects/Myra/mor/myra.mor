@@ -27,6 +27,10 @@ const {
 
 setDefine("MYRA");
 
+addModulePath("../myra/std");
+addModulePath("../myra/vendor/raylib");
+addModulePath("../myra/vendor/sdl3");
+
 import "myra_tokens.mor";
 import "myra_helpers.mor";
 import "myra_grammar.mor";
