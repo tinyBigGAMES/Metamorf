@@ -49,6 +49,7 @@ type
     // Token navigation (public so interpreter can call them)
     function Current(): TMorToken;
     function Peek(): TMorToken;
+    function PeekAt(const AOffset: Integer): TMorToken;
     function AtEnd(): Boolean;
     function Check(const AKind: string): Boolean;
     function Match(const AKind: string): Boolean;
@@ -108,6 +109,22 @@ function TMorGenericParser.Peek(): TMorToken;
 begin
   if (FPos + 1 >= 0) and (FPos + 1 < FTokens.Count) then
     Result := FTokens[FPos + 1]
+  else
+  begin
+    Result.Kind := 'eof';
+    Result.Text := '';
+    Result.Line := 0;
+    Result.Col := 0;
+  end;
+end;
+
+function TMorGenericParser.PeekAt(const AOffset: Integer): TMorToken;
+var
+  LIndex: Integer;
+begin
+  LIndex := FPos + AOffset;
+  if (LIndex >= 0) and (LIndex < FTokens.Count) then
+    Result := FTokens[LIndex]
   else
   begin
     Result.Kind := 'eof';

@@ -1121,6 +1121,11 @@ grammar {
         if peekKind() == "delimiter.colon" { break; }
         if peekKind() == "op.range" { break; }
         if peekKind() == "delimiter.comma" { break; }
+        // Detect negative label: -number followed by .. or : or ,
+        if currentKind() == "op.minus" {
+          let pk2 = peekKindAt(2);
+          if pk2 == "op.range" or pk2 == "delimiter.colon" or pk2 == "delimiter.comma" { break; }
+        }
         let s = parseStmt();
         if s != nil { addChild(arm, s); }
       }

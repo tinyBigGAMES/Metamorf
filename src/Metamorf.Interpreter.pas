@@ -2471,6 +2471,17 @@ begin
       Result := TValue.From<string>('');
   end
 
+  // peekKindAt(offset) -> string
+  // Returns the token kind at FPos + offset (e.g., peekKindAt(2) looks two ahead)
+  else if AName = 'peekKindAt' then
+  begin
+    if Assigned(FActiveParser) and (Length(AArgs) > 0) then
+      Result := TValue.From<string>(
+        TMorGenericParser(FActiveParser).PeekAt(AArgs[0].AsInteger()).Kind)
+    else
+      Result := TValue.From<string>('');
+  end
+
   // parseExpr(power) -> node
   else if AName = 'parseExpr' then
   begin
