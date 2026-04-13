@@ -1,25 +1,34 @@
 ﻿/*===============================================================================
-  Myra Programming Language.
+  Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
 
-  https://myra.org
+  https://metamorf.dev
 
   See LICENSE for license information
 ==============================================================================*/
 
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* PLATFORMS: WIN64 */
+
 module exe test_exe_sdl3_image;
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_image.h>
+@exeicon "..\res\icons\myra.ico";
 
-@includepath "../libs/SDL3/include"
-@copydll "../libs/SDL3/bin/SDL3.dll"
-@copydll "../libs/SDL3/bin/SDL3_image.dll"
-@linklibrary "SDL3"
-@linklibrary "SDL3_image"
-@exeicon "res/assets/icons/pax.ico"
+import
+  sdl3_import,
+  sdl3_image_import;
 
 const
   CScreenWidth = 1280;
@@ -103,7 +112,7 @@ begin
   end;
   
   // Load texture using SDL3_image
-  LTexture := IMG_LoadTexture(LRenderer, "../../../res/assets/images/logo.png");
+  LTexture := IMG_LoadTexture(LRenderer, "../../../../res/images/metamorf.png");
   if LTexture = nil then
     writeln("failed to load image");
     SDL_DestroyRenderer(LRenderer);

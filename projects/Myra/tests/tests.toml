@@ -186,3 +186,11 @@ define_value = "1"
 [[test]]
 index = 500
 name = "test_exe_sdl3"
+
+[[test]]
+index = 501
+name = "test_exe_sdl3_image"
+
+[[test]]
+index = 502
+name = "test_exe_sdl3_mixer"

@@ -96,6 +96,8 @@ begin
 
   //--- sdl3
   ATester.RegisterTest(0500, 'test_exe_sdl3', rmExecute);
+  ATester.RegisterTest(0501, 'test_exe_sdl3_image', rmExecute);
+  ATester.RegisterTest(0502, 'test_exe_sdl3_mixer', rmExecute);
 end;
 
 procedure ProcessCmdLine(const ATester: TMyraTester);
@@ -243,8 +245,8 @@ begin
       ProcessCmdLine(LTester);
       {$ELSE}
       //LTester.RunTestByIndex(301, tpLinux64);
-      LTester.RunTestByIndex(500, tpWin64);
-      //LTester.RunTestByIndex(451, tpwin64);
+      LTester.RunTestByIndex(52, tpWin64);
+      //LTester.RunTestByIndex(400, tpwin64);
       {$ENDIF}
     finally
       LTester.Free();

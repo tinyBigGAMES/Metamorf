@@ -1,25 +1,23 @@
 ﻿/*===============================================================================
-  Myra Programming Language.
+  Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
 
-  https://myra.org
+  https://metamorf.dev
 
   See LICENSE for license information
 ==============================================================================*/
 
+/* PLATFORMS: WIN64 */
+
 module exe test_exe_sdl3_mixer;
 
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_mixer.h>
+@exeicon "..\res\icons\myra.ico";
 
-@includepath "../libs/SDL3/include"
-@copydll "../libs/SDL3/bin/SDL3.dll"
-@copydll "../libs/SDL3/bin/SDL3_mixer.dll"
-@linklibrary "SDL3"
-@linklibrary "SDL3_mixer"
-@exeicon "res/assets/icons/pax.ico"
+import
+  sdl3_import,
+  sdl3_mixer_import;
 
 const
   CScreenWidth = 800;
@@ -45,7 +43,7 @@ begin
   LRunning := true;
 
   // Initialize SDL3 with video and audio
-  if not SDL_Init(SDL_INIT_VIDEO || SDL_INIT_AUDIO) then
+  if not SDL_Init(SDL_INIT_VIDEO or SDL_INIT_AUDIO) then
     writeln("Failed to init SDL: {}", SDL_GetError());
     return 1;
   end;
@@ -87,8 +85,8 @@ begin
     return 1;
   end;
 
-  // Load audio file
-  LAudio := MIX_LoadAudio(LMixer, "../../../res/assets/music/song01.ogg", true);
+  // Load audio file  
+  LAudio := MIX_LoadAudio(LMixer, "../../../../res/music/song01.ogg", true);
   if LAudio = nil then
     writeln("Failed to load audio: {}", SDL_GetError());
     MIX_DestroyMixer(LMixer);
