@@ -59,6 +59,8 @@ tokens {
   token keyword.until     = "until";
   token keyword.return    = "return";
   token keyword.match     = "match";
+  token keyword.leave     = "leave";
+  token keyword.skip      = "skip";
 
   // Declarations
   token keyword.var       = "var";

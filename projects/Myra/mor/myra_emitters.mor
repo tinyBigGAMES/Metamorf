@@ -781,6 +781,14 @@ emitters {
     }
   }
 
+  on stmt.leave {
+    emitLine("break;");
+  }
+
+  on stmt.skip {
+    emitLine("continue;");
+  }
+
   on stmt.guard {
     emitLine("{");
     indentIn();

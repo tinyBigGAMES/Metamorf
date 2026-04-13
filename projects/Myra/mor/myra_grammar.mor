@@ -1115,9 +1115,15 @@ grammar {
         addChild(arm, lbl2);
       }
       requireToken("delimiter.colon");
-      // Parse single statement for this arm (use begin/end for multiple)
-      let s = parseStmt();
-      if s != nil { addChild(arm, s); }
+      // Parse statements for this arm until next arm label, else, or end
+      while not checkToken("keyword.else") and not checkToken("keyword.end") and not checkToken("eof") {
+        // Next token is colon/range/comma means current token starts a new arm label
+        if peekKind() == "delimiter.colon" { break; }
+        if peekKind() == "op.range" { break; }
+        if peekKind() == "delimiter.comma" { break; }
+        let s = parseStmt();
+        if s != nil { addChild(arm, s); }
+      }
       addChild(nd, arm);
     }
     // Optional else branch
@@ -1140,6 +1146,18 @@ grammar {
     if not checkToken("delimiter.semicolon") and not checkToken("keyword.end") and not checkToken("eof") {
       addChild(nd, parseExpr(0));
     }
+    matchToken("delimiter.semicolon");
+  }
+
+  // Leave (break out of loop or match)
+  rule stmt.leave {
+    expect keyword.leave;
+    matchToken("delimiter.semicolon");
+  }
+
+  // Skip (continue to next iteration)
+  rule stmt.skip {
+    expect keyword.skip;
     matchToken("delimiter.semicolon");
   }
 

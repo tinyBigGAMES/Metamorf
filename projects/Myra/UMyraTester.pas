@@ -90,9 +90,12 @@ begin
   ATester.RegisterTest(0403, 'test_exe_debug', rmDebug);
   ATester.RegisterTest(0404, 'test_exe_unittest', rmExecute);
 
-  // --- External deps (compile only, require runtime DLLs) ---
+  // --- raylib
   ATester.RegisterTest(0450, 'test_exe_raylib', rmExecute, '', '');
   ATester.RegisterTest(0451, 'test_exe_raylib', rmExecute, 'STATIC', '1');
+
+  //--- sdl3
+  ATester.RegisterTest(0500, 'test_exe_sdl3', rmExecute);
 end;
 
 procedure ProcessCmdLine(const ATester: TMyraTester);
@@ -240,7 +243,7 @@ begin
       ProcessCmdLine(LTester);
       {$ELSE}
       //LTester.RunTestByIndex(301, tpLinux64);
-      LTester.RunTestByIndex(450, tpLinux64);
+      LTester.RunTestByIndex(500, tpWin64);
       //LTester.RunTestByIndex(451, tpwin64);
       {$ENDIF}
     finally

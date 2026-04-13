@@ -9,14 +9,15 @@
   See LICENSE for license information
 ==============================================================================*/
 
+/* PLATFORMS: WIN64 */
+
 module exe test_exe_sdl3;
 
-#include <SDL3/SDL.h>
+@exeicon "toolchain\assets\icons\myra.ico";
 
-@includepath "../libs/SDL3/include"
-@copydll "../libs/SDL3/bin/SDL3.dll"
-@linklibrary "SDL3"
-@exeicon "res/assets/icons/pax.ico"
+import
+  sdl3_import;
+
 
 const
   CScreenWidth = 1280;

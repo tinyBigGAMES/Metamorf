@@ -37,6 +37,11 @@ addModulePath("../myra/std");
 addModulePath("../myra/vendor/raylib");
 addIncludePath("../myra/vendor/raylib/include");
 
+// sdl3
+addModulePath("../myra/vendor/sdl3");
+addIncludePath("../myra/vendor/sdl3/include");
+addLibraryPath("../myra/vendor/sdl3/win64/lib");
+
 // language implementation
 import "myra_tokens.mor";
 import "myra_helpers.mor";

@@ -804,7 +804,7 @@ begin
       LRunMode := ARunMode;
       LDefine  := '';
       LDefVal  := '';
-      LFound   := False;
+      //LFound   := False;
       for LKey in FRegisteredTests.Keys do
       begin
         LEntry := FRegisteredTests[LKey];

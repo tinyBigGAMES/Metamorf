@@ -182,3 +182,7 @@ index = 451
 name = "test_exe_raylib"
 define = "STATIC"
 define_value = "1"
+
+[[test]]
+index = 500
+name = "test_exe_sdl3"
