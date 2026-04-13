@@ -349,6 +349,10 @@ begin
         FToolchainPath
       );
     FToolchainPath := TPath.Combine(FToolchainPath, 'toolchain');
+
+    // Normalize path (resolve any '..' segments)
+    FToolchainPath := TPath.GetFullPath(FToolchainPath);
+
   end;
 end;
 

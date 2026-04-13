@@ -1,2 +1,2 @@
 ﻿[build]
-toolchain_path = ""
+toolchain_path = "../"

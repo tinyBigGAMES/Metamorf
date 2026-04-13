@@ -91,18 +91,16 @@ distro.yml
 
 
 /bin/output
-/bin/toolchain/lldb
-/bin/toolchain/zig
-/bin/toolchain/libs/raylib/bin
-/bin/toolchain/libs/raylib/include
-/bin/toolchain/assets/icons
+/toolchain/zig
+/toolchain/libs/raylib/bin
+/toolchain/libs/raylib/include
+/toolchain/assets/icons
 checkpoint_base.zip
 _delphifmt.cmd
 delphifmt.yml
-bin/toolchain/libs/raylib/imports/raylib_pp.c
+/toolchain/libs/raylib/imports/raylib_pp.c
 _checkpoint_base.cmd
 docs/Metamorf.pdf
-/bin/toolchain/libs
 /bin/temp
 docs/Infographic.jpg
 docs/Overview.mp4
@@ -110,3 +108,4 @@ docs/Overview.mp4
 clean_output.cmd
 docs/Myra.pdf
 /myra/vendor
+/res
