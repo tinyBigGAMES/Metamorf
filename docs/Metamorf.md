@@ -3148,7 +3148,7 @@ The meta-language is **case-sensitive** for all keywords and identifiers.
 | Structure | `language`, `version`, `tokens`, `grammar`, `semantics`, `emitters`, `section` |
 | Rules | `rule`, `on`, `token`, `optional`, `expect`, `consume`, `parse`, `many`, `until`, `sync` |
 | Declarations | `let`, `const`, `routine`, `fragment`, `types`, `import`, `include` |
-| Control flow | `if`, `else`, `while`, `for`, `in`, `return`, `match`, `guard`, `try`, `recover` |
+| Control flow | `if`, `else`, `while`, `for`, `in`, `break`, `continue`, `return`, `match`, `guard`, `try`, `recover` |
 | Semantics | `declare`, `lookup`, `scope`, `visit`, `children`, `child`, `parent`, `as`, `where`, `pass` |
 | Emission | `emit`, `to`, `indent`, `before`, `after`, `node` |
 | Diagnostics | `error`, `warning`, `hint`, `note`, `info` |
@@ -3313,7 +3313,8 @@ Handler bodies (inside `on` blocks and `routine` declarations) support full impe
 
 ```ebnf
 HandlerStmt    = LetStmt | AssignStmt | IfStmt | WhileStmt | ForStmt
-               | MatchStmt | GuardStmt | ReturnStmt | TryRecover
+               | MatchStmt | GuardStmt | BreakStmt | ContinueStmt
+               | ReturnStmt | TryRecover
                | ErrorStmt | WarningStmt | HintStmt | NoteStmt | InfoStmt
                | FuncCallStmt | SetAttrStmt .
 
@@ -3336,6 +3337,9 @@ Pattern        = ( StringLiteral | IntLiteral | BoolLiteral )
 GuardStmt      = "guard" Expression "{" { HandlerStmt } "}" .
 
 ReturnStmt     = "return" [ Expression ] ";" .
+
+BreakStmt      = "break" ";" .
+ContinueStmt   = "continue" ";" .
 
 TryRecover     = "try" "{" { HandlerStmt } "}" "recover" "{" { HandlerStmt } "}" .
 

@@ -1230,12 +1230,12 @@ const      create     destroy    div        do         downto
 else       end        except     exported   external   false
 finally    for        freeMem    getExceptionCode
 getExceptionMessage   getMem     guard      if         import
-in         is         len        match      method     mod        module
+in         is         leave      len        match      method     mod        module
 nil        not        object     of         or         overlay
 packed     paramCount paramStr   parent     pointer
 raiseException        raiseExceptionCode    record     repeat
 resizeMem  return     routine    self       set        setLength
-shl        shr        size       test       then       to         true
+shl        shr        size       skip       test       then       to         true
 testAssert            testAssertTrue        testAssertFalse
 testAssertEqualInt    testAssertEqualUInt   testAssertEqualFloat
 testAssertEqualStr    testAssertEqualBool   testAssertEqualPtr
@@ -1503,7 +1503,8 @@ QualIdent       = ident { "." ident } .
 StatementSeq    = { Statement } .
 
 Statement       = [ Assignment | CallStmt | IfStmt | WhileStmt | ForStmt
-                | RepeatStmt | MatchStmt | ReturnStmt | GuardStmt | RaiseStmt
+                | RepeatStmt | LeaveStmt | SkipStmt
+                | MatchStmt | ReturnStmt | GuardStmt | RaiseStmt
                 | CreateStmt | DestroyStmt
                 | GetMemStmt | FreeMemStmt | ResizeMemStmt | SetLengthStmt
                 | WriteStmt | TestAssertStmt | Directive | ";" ] .
@@ -1520,6 +1521,9 @@ ForStmt         = "for" ident ":=" Expression ( "to" | "downto" ) Expression
                   "do" StatementSeq "end" [ ";" ] .
 
 RepeatStmt      = "repeat" StatementSeq "until" Expression [ ";" ] .
+
+LeaveStmt       = "leave" [ ";" ] .
+SkipStmt        = "skip" [ ";" ] .
 
 MatchStmt       = "match" Expression "of" { MatchArm } [ "else" StatementSeq ] "end" [ ";" ] .
 MatchArm        = MatchLabel { "," MatchLabel } ":" StatementSeq .
