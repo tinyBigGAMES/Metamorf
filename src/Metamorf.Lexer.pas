@@ -128,6 +128,8 @@ begin
   FKeywords.Add('match', 'kw.match');
   FKeywords.Add('guard', 'kw.guard');
   FKeywords.Add('return', 'kw.return');
+  FKeywords.Add('break', 'kw.break');
+  FKeywords.Add('continue', 'kw.continue');
   FKeywords.Add('routine', 'kw.routine');
   FKeywords.Add('const', 'kw.const');
   FKeywords.Add('enum', 'kw.enum');
@@ -271,6 +273,7 @@ function TMorLexer.MakeToken(const AKind: string; const AText: string;
 begin
   Result.Kind := AKind;
   Result.Text := AText;
+  Result.Filename := FFilename;
   Result.Line := ALine;
   Result.Col := ACol;
 end;

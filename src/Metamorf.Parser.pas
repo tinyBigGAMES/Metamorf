@@ -111,6 +111,8 @@ type
     function ParseMatch(): TMorASTNode;
     function ParseGuard(): TMorASTNode;
     function ParseReturn(): TMorASTNode;
+    function ParseBreak(): TMorASTNode;
+    function ParseContinue(): TMorASTNode;
     function ParseTryRecover(): TMorASTNode;
     function ParseExpectStmt(): TMorASTNode;
     function ParseConsumeStmt(): TMorASTNode;
@@ -612,6 +614,8 @@ begin
   else if LKind = 'kw.match' then Result := ParseMatch()
   else if LKind = 'kw.guard' then Result := ParseGuard()
   else if LKind = 'kw.return' then Result := ParseReturn()
+  else if LKind = 'kw.break' then Result := ParseBreak()
+  else if LKind = 'kw.continue' then Result := ParseContinue()
   else if LKind = 'kw.try' then Result := ParseTryRecover()
   else if LKind = 'kw.expect' then Result := ParseExpectStmt()
   else if LKind = 'kw.consume' then Result := ParseConsumeStmt()
@@ -1258,6 +1262,20 @@ begin
     LNode.AddChild(ParseExpr(0)); // child 0 = return value (optional)
   ExpectSemicolon();
   Result := LNode;
+end;
+
+function TMorParser.ParseBreak(): TMorASTNode;
+begin
+  Result := CreateNode('meta.break');
+  DoAdvance(); // skip 'break'
+  ExpectSemicolon();
+end;
+
+function TMorParser.ParseContinue(): TMorASTNode;
+begin
+  Result := CreateNode('meta.continue');
+  DoAdvance(); // skip 'continue'
+  ExpectSemicolon();
 end;
 
 function TMorParser.ParseTryRecover(): TMorASTNode;

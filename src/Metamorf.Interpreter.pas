@@ -54,6 +54,18 @@ type
     constructor Create(const AValue: TValue);
   end;
 
+  { EMorBreakSignal }
+  EMorBreakSignal = class(Exception)
+  public
+    constructor Create();
+  end;
+
+  { EMorContinueSignal }
+  EMorContinueSignal = class(Exception)
+  public
+    constructor Create();
+  end;
+
   { TMorOperatorEntryInterp }
   TMorOperatorEntryInterp = record
     Text: string;
@@ -310,6 +322,20 @@ constructor EMorReturnSignal.Create(const AValue: TValue);
 begin
   inherited Create('return');
   ReturnValue := AValue;
+end;
+
+{ EMorBreakSignal }
+
+constructor EMorBreakSignal.Create();
+begin
+  inherited Create('break');
+end;
+
+{ EMorContinueSignal }
+
+constructor EMorContinueSignal.Create();
+begin
+  inherited Create('continue');
 end;
 
 { TMorInterpreter }
@@ -1018,7 +1044,14 @@ begin
     begin
       LCond := EvalExpr(ANode.GetChild(0));
       if not MorIsTrue(LCond) then Break;
-      ExecBlock(ANode.GetChild(1));
+      try
+        ExecBlock(ANode.GetChild(1));
+      except
+        on EMorBreakSignal do
+          Break;
+        on EMorContinueSignal do
+          ; // continue to next iteration
+      end;
       if Assigned(FErrors) and FErrors.ReachedMaxErrors() then Break;
       Inc(LCount);
       if LCount > 100000 then
@@ -1045,7 +1078,14 @@ begin
     for LI := 0 to LCount - 1 do
     begin
       FEnv.SetVar(LVarName, TValue.From<Int64>(LI));
-      ExecBlock(ANode.GetChild(1));
+      try
+        ExecBlock(ANode.GetChild(1));
+      except
+        on EMorBreakSignal do
+          Break;
+        on EMorContinueSignal do
+          ; // continue to next iteration
+      end;
       if Assigned(FErrors) and FErrors.ReachedMaxErrors() then Break;
     end;
   end
@@ -1100,6 +1140,14 @@ begin
     raise EMorReturnSignal.Create(LValue);
   end
 
+  // break;
+  else if LKind = 'meta.break' then
+    raise EMorBreakSignal.Create()
+
+  // continue;
+  else if LKind = 'meta.continue' then
+    raise EMorContinueSignal.Create()
+
   // try { ... } recover { ... }
   else if LKind = 'meta.try_recover' then
   begin
@@ -1108,6 +1156,10 @@ begin
     except
       on E: EMorReturnSignal do
         raise; // re-raise return signals
+      on E: EMorBreakSignal do
+        raise; // re-raise break signals
+      on E: EMorContinueSignal do
+        raise; // re-raise continue signals
       on E: Exception do
       begin
         if ANode.ChildCount() > 1 then
@@ -1297,6 +1349,10 @@ begin
       except
         on E: EMorReturnSignal do
           raise;
+        on E: EMorBreakSignal do
+          raise;
+        on E: EMorContinueSignal do
+          raise;
         on E: Exception do
         begin
           // Parse failed, restore parser position and silently ignore
@@ -1310,6 +1366,10 @@ begin
         ExecBlock(ANode.GetChild(0));
       except
         on E: EMorReturnSignal do
+          raise;
+        on E: EMorBreakSignal do
+          raise;
+        on E: EMorContinueSignal do
           raise;
         on E: Exception do
         begin
@@ -1583,8 +1643,11 @@ begin
     else
     begin
       if Assigned(FErrors) then
-        FErrors.Add(esError, MOR_ERR_MORINTERP_UNDEFINED_VAR,
+      begin
+        FErrors.Add(ANode.GetToken().Filename, ANode.GetToken().Line,
+          ANode.GetToken().Col, esError, MOR_ERR_MORINTERP_UNDEFINED_VAR,
           RSMorInterpUndefinedVar, [LName]);
+      end;
       Result := TValue.Empty;
     end;
   end
