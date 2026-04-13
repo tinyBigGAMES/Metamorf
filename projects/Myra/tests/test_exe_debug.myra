@@ -1,3 +1,14 @@
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
 /* Debug test: two breakpoints - one in routine, one in main */
 
 /* EXITCODE: 0 */

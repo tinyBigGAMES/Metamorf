@@ -1,10 +1,10 @@
 ﻿/*===============================================================================
-  Myra Programming Language.
+  Metamorf™ - Language Engineering Platform
 
   Copyright © 2025-present tinyBigGAMES™ LLC
   All Rights Reserved.
 
-  https://myra.org
+  https://metamorf.dev
 
   See LICENSE for license information
 ==============================================================================*/
@@ -47,7 +47,7 @@ module exe test_exe_verinfo;
 @vicopyright "Copyright © 2025 tinyBigGAMES LLC";
 
 // Icon embedding
-@exeicon "toolchain/assets/icons/metamorf.ico";
+@exeicon "../res/icons/metamorf.ico";
 
 begin
   writeln("=== Version Info Test ===");

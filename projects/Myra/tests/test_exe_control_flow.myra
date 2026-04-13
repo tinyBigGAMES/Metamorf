@@ -1,3 +1,14 @@
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
 /* EXPECT: Testing control flow...
 For to: 0 1 2 3 4
 For downto: 5 4 3 2 1

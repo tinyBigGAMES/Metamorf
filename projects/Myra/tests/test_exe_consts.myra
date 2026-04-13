@@ -1,4 +1,15 @@
-﻿/* EXPECT:
+﻿/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXPECT:
 Myra Test
 100
 1

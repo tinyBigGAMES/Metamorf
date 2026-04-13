@@ -1,3 +1,14 @@
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
 /* EXPECT: Empty set: 0
 Single elements: 42
 Range: 62

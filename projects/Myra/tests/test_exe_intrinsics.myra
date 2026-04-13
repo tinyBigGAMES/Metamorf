@@ -1,3 +1,14 @@
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
 /* EXPECT: === size(type) ===
 size(int8) = 1
 size(int16) = 2

@@ -1,3 +1,14 @@
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
 /* EXPECT: STATIC_BUILD=yes
 FEATURE_A=yes
 FEATURE_B=no

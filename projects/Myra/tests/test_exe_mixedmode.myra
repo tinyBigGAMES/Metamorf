@@ -1,4 +1,15 @@
-﻿/* EXPECT:
+﻿/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXPECT:
 === Mixed Mode: Myra + C++ Interop ===
 --- C++ Functions in Myra Expressions ---
 std::abs(-42) = 42
@@ -109,7 +120,7 @@ module exe test_exe_mixedmode;
 @vicopyright "Copyright (c) 2026, tinyBigGAMES LLC";
 
 //@exeicon "path" 
-@exeicon "toolchain/assets/icons/metamorf.ico"; 
+@exeicon "../res/icons/metamorf.ico"; 
 
 #include <cmath>
 #include <cstring>

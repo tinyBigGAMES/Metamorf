@@ -1,3 +1,14 @@
+/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
 // test_lib_mathlib.myra - Tests: exported, linkage, static, overloads, W200 warning
 //
 // Visibility x Linkage matrix coverage:

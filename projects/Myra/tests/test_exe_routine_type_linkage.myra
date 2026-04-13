@@ -1,4 +1,15 @@
-﻿/* EXPECT: === Routine Type Linkage Test ===
+﻿/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXPECT: === Routine Type Linkage Test ===
 --- C++ Linkage (Default) ---
 TIntFunc callback: 30
 --- C Linkage ---

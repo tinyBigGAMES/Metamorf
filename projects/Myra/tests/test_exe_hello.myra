@@ -1,4 +1,15 @@
-﻿/* EXPECT: Hello from Myra! */
+﻿/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXPECT: Hello from Myra! */
 
 module exe test_exe_hello;
 

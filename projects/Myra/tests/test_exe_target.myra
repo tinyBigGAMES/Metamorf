@@ -1,4 +1,15 @@
-﻿/* EXPECT: === Target Directive Test (win64) ===
+﻿/*===============================================================================
+  Metamorf™ - Language Engineering Platform
+
+  Copyright © 2025-present tinyBigGAMES™ LLC
+  All Rights Reserved.
+
+  https://metamorf.dev
+
+  See LICENSE for license information
+==============================================================================*/
+
+/* EXPECT: === Target Directive Test (win64) ===
 MYRA defined: yes
 WINDOWS defined: yes
 WIN64 defined: yes
