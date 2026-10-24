@@ -1,3 +1,26 @@
+## Project Archived: Development Continues with PaskalCPP
+
+This project is now **archived and read-only**. No further development, updates, or bug fixes are planned.
+
+Over the past year, I've explored various approaches to language and compiler design, particularly my long-term vision of bringing Pascal-style programming and modern C/C++ interoperability together.
+
+Each of these projects has been an important part of that journey, providing valuable experience, ideas, and lessons that have ultimately led to **PaskalCPP**.
+
+Going forward, **PaskalCPP will be my primary focus and long-term language development project**. All future development efforts, new features, improvements, and innovations will be concentrated there.
+
+### 🚀 Follow the Journey
+
+**PaskalCPP Programming Language**
+
+- **GitHub:** https://github.com/tinyBigGAMES/PaskalCPP
+- **Website:** https://paskalcpp.org
+
+This repository will remain available for historical reference and for anyone who may find its code, ideas, or approach useful.
+
+**The journey continues with PaskalCPP. I hope you'll join me!**
+
+© 2026-present tinyBigGAMES LLC
+
 <div align="center">
 
 ![Metamorf](media/metamorf.png)
